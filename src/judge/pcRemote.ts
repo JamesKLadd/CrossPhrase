@@ -22,15 +22,28 @@ function parseVerdict(value: unknown): Verdict | null {
   };
 }
 
+/**
+ * fetch with a time limit. React Native has no AbortSignal.timeout(), so
+ * this uses a plain AbortController and timer.
+ */
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function post(url: string, body: unknown, timeoutMs: number): Promise<unknown> {
   let response: Response;
   try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    response = await fetchWithTimeout(
+      url,
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
+      timeoutMs,
+    );
   } catch (error) {
     throw new JudgeRequestError(`Couldn't reach the PC judge: ${String(error)}`, true);
   }
@@ -61,7 +74,7 @@ export function createPcRemote(baseUrl: string): RemoteJudge {
 
     async isReachable() {
       try {
-        const res = await fetch(`${base}/health`, { signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS) });
+        const res = await fetchWithTimeout(`${base}/health`, {}, HEALTH_TIMEOUT_MS);
         return res.ok;
       } catch {
         return false;

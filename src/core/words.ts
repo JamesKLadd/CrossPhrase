@@ -12,7 +12,7 @@ const POOLS = data.pools as Record<string, string[]>;
 export const CORE_POOL = 'core';
 
 export function isWord(word: string): boolean {
-  return Object.hasOwn(WORDS, word);
+  return Object.prototype.hasOwnProperty.call(WORDS, word);
 }
 
 export function wordInfo(word: string): WordInfo {

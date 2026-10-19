@@ -11,20 +11,24 @@ you can train.
 
 ## Run it
 
-You need **Node.js 22.13 or newer** (the current LTS from nodejs.org). Older
+You need **Node.js 20.19.4 or newer** (the current LTS from nodejs.org). Older
 versions fail with confusing errors or a blank white page; `npm start` checks
 and says so.
 
 ```sh
 npm install
 npm run web      # in a browser
-npm start        # then scan the QR code with Expo Go (SDK 58) on a phone
+npm start        # then scan the QR code with Expo Go from the App Store / Play Store
 ```
 
 If the phone sits on "loading" forever after scanning, it can't reach your
 computer: check both are on the same Wi-Fi (not a guest network or VPN), and on
 Windows allow Node.js through the firewall when asked. Or skip the network
 question entirely with `npx expo start --tunnel`.
+
+The project stays on **Expo SDK 54** on purpose: it's the last SDK the App
+Store version of Expo Go runs. Moving to a newer SDK means building your own
+Expo Go or a development build (both need a paid Apple Developer account).
 
 ## The judges
 

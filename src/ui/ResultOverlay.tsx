@@ -67,7 +67,7 @@ function Button({ label, primary, onPress }: { label: string; primary?: boolean;
 
 const styles = StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,

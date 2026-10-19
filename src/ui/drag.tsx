@@ -10,7 +10,7 @@ import {
   type ComponentRef,
 } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useCompetingGestures, usePanGesture, useTapGesture } from 'react-native-gesture-handler';
+import { Gesture } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 import type { CellKey } from '../core/types';
@@ -212,23 +212,26 @@ export function useDraggable(props: {
     latest.current = props;
   });
 
-  const pan = usePanGesture({
-    enabled: props.enabled,
-    runOnJS: true,
-    minDistance: 6,
-    onActivate: (e) => {
-      const { source, word, size } = latest.current;
-      start({ source, word, size }, e.absoluteX, e.absoluteY);
-    },
-    onUpdate: (e) => move(e.absoluteX, e.absoluteY),
-    onDeactivate: (e) => end(e.absoluteX, e.absoluteY),
-  });
-  const tap = useTapGesture({
-    enabled: props.enabled,
-    runOnJS: true,
-    onActivate: () => latest.current.onTap(),
-  });
-  const gesture = useCompetingGestures(pan, tap);
+  const gesture = useMemo(() => {
+    const pan = Gesture.Pan()
+      .enabled(props.enabled)
+      .runOnJS(true)
+      .minDistance(6)
+      .onStart((e) => {
+        const { source, word, size } = latest.current;
+        start({ source, word, size }, e.absoluteX, e.absoluteY);
+      })
+      .onUpdate((e) => move(e.absoluteX, e.absoluteY))
+      .onEnd((e) => end(e.absoluteX, e.absoluteY));
+    const tap = Gesture.Tap()
+      .enabled(props.enabled)
+      .runOnJS(true)
+      .onEnd((_e, success) => {
+        if (success) latest.current.onTap();
+      });
+    // Whichever is recognised first wins: a tap never starts a drag.
+    return Gesture.Race(pan, tap);
+  }, [props.enabled, start, move, end]);
 
   return { gesture, isDragged: dragging !== null && sameSource(dragging.source, props.source) };
 }
