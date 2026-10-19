@@ -52,6 +52,8 @@ function writeOutbox(items: Pending[]) {
   localStorage.setItem(OUTBOX, JSON.stringify(items.slice(-MAX_OUTBOX)));
 }
 
+/** Why the last anonymous sign-in failed, to show the player. */
+let signInError: string | null = null;
 let signingIn: Promise<boolean> | null = null;
 async function signedIn(): Promise<boolean> {
   if (!supabase) return false;
@@ -59,7 +61,15 @@ async function signedIn(): Promise<boolean> {
   if (data.session) return true;
   signingIn ??= supabase.auth
     .signInAnonymously()
-    .then(({ error }) => !error)
+    .then(({ error }) => {
+      signInError = error ? error.message : null;
+      if (error) console.warn('Anonymous sign-in failed:', error.message);
+      return !error;
+    })
+    .catch((e: unknown) => {
+      signInError = String(e);
+      return false;
+    })
     .finally(() => (signingIn = null));
   return signingIn;
 }
@@ -154,10 +164,17 @@ export function playerName(): string {
   return localStorage.getItem(NAME) ?? '';
 }
 
-export async function setPlayerName(name: string): Promise<boolean> {
+/** Saves your leaderboard name. Returns null on success, or what went wrong. */
+export async function setPlayerName(name: string): Promise<string | null> {
   const trimmed = name.trim().slice(0, 20);
-  if (!supabase || !trimmed || !(await signedIn())) return false;
+  if (!supabase) return 'The online backend isn’t configured (.env.local).';
+  if (!trimmed) return 'Type a name first.';
+  if (!(await signedIn())) return `Couldn't sign in: ${signInError ?? 'no connection'}`;
   const { error } = await supabase.rpc('set_player_name', { p_name: trimmed });
-  if (!error) localStorage.setItem(NAME, trimmed);
-  return !error;
+  if (error) {
+    console.warn('Saving the name failed:', error);
+    return `The server said: ${error.message}`;
+  }
+  localStorage.setItem(NAME, trimmed);
+  return null;
 }

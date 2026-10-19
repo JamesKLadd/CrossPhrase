@@ -151,9 +151,12 @@ function Boards() {
 function NameEditor() {
   const [name, setName] = useState(playerName);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const [problem, setProblem] = useState<string | null>(null);
   const save = async () => {
     setStatus('saving');
-    setStatus((await setPlayerName(name)) ? 'saved' : 'failed');
+    const error = await setPlayerName(name);
+    setProblem(error);
+    setStatus(error ? 'failed' : 'saved');
   };
   return (
     <View style={styles.card}>
@@ -177,7 +180,11 @@ function NameEditor() {
         </Pressable>
       </View>
       {status === 'saved' && <Text style={styles.note}>Saved.</Text>}
-      {status === 'failed' && <Text style={styles.note}>{"Couldn't save that. Try again."}</Text>}
+      {status === 'failed' && (
+        <Text style={styles.note} testID="name-problem">
+          {`Couldn't save that. ${problem ?? ''}`}
+        </Text>
+      )}
     </View>
   );
 }
