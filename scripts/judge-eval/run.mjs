@@ -1,10 +1,14 @@
 // Runs the judge over a labelled phrase set and reports agreement, tiers and
 // latency. Use it after every change to the judge prompt.
 //
-//   EXPO_PUBLIC_JUDGE_URL=... EXPO_PUBLIC_SUPABASE_ANON_KEY=... node scripts/judge-eval/run.mjs
+//   EXPO_PUBLIC_SUPABASE_URL=... EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=... node scripts/judge-eval/run.mjs
 //
-// Each request is a real judge call, so this costs a little API usage.
+// It signs in anonymously like a player would. The judge answers phrases it
+// has seen before from its cache, so after changing the prompt, bump
+// PROMPT_VERSION in supabase/functions/judge/model.ts and redeploy, or the
+// eval will just replay old verdicts. New phrases cost a little API usage.
 
+import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
 
 const here = new URL('.', import.meta.url);
@@ -13,12 +17,15 @@ const dictionary = JSON.parse(
   readFileSync(new URL('../../supabase/functions/_shared/dictionary.json', here)),
 );
 
-const url = process.env.EXPO_PUBLIC_JUDGE_URL;
-const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 if (!url || !key) {
-  console.error('Set EXPO_PUBLIC_JUDGE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY (see .env.example).');
+  console.error('Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (see .env.example).');
   process.exit(1);
 }
+const supabase = createClient(url, key, { auth: { persistSession: false } });
+const { error: signInError } = await supabase.auth.signInAnonymously();
+if (signInError) throw new Error(`anonymous sign-in failed: ${signInError.message}`);
 
 for (const { phrase } of phrases) {
   const unknown = phrase.split(' ').filter((w) => !(w in dictionary));
@@ -33,14 +40,10 @@ for (let start = 0; start < phrases.length; start += BATCH) {
   const batch = phrases.slice(start, start + BATCH);
   const entries = batch.map((p, i) => ({ id: `${i + 1}A`, words: p.phrase.split(' ') }));
   const began = Date.now();
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}`, apikey: key },
-    body: JSON.stringify({ entries }),
-  });
+  const { data, error } = await supabase.functions.invoke('judge', { body: { entries } });
   latencies.push(Date.now() - began);
-  if (!response.ok) throw new Error(`judge returned ${response.status}: ${await response.text()}`);
-  const { verdicts } = await response.json();
+  if (error) throw new Error(`judge request failed: ${error.message}`);
+  const { verdicts } = data;
   const byId = new Map(verdicts.map((v) => [v.entryId, v]));
   batch.forEach((p, i) => {
     const v = byId.get(`${i + 1}A`);

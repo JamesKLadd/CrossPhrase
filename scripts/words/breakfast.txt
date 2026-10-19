@@ -3,8 +3,8 @@ noun: toast egg pancake waffle coffee tea juice butter jam honey bacon cereal mi
 noun: muffin bagel croissant syrup orange banana berry apple kitchen table spoon
 noun: fork mug plate cup morning sunrise chef grandma toaster kettle porridge omelette
 noun: crumb yolk napkin cinnamon
-verb: pour pours stir stirs toast toasts fry fries spread spreads sip sips crunch crunches
-verb: bake bakes melt melts brew brews wake wakes yawn yawns munch munches drip drips
-verb: sizzle sizzles
+verb: pour/pours stir/stirs toast/toasts fry/fries spread/spreads sip/sips crunch/crunches
+verb: bake/bakes melt/melts brew/brews wake/wakes yawn/yawns munch/munches drip/drips
+verb: sizzle/sizzles
 adj: crispy fluffy buttery golden hot sticky sleepy fresh burnt sugary creamy toasted
 adj: runny delicious early hungry

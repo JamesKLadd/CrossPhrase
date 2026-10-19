@@ -29,8 +29,13 @@ function verdicts(tierA: Verdict['tier'], tierD: Verdict['tier']): Record<string
 describe('wordValue', () => {
   it('scores common words low and rare words high', () => {
     expect(wordValue('the')).toBe(1);
-    expect(wordValue('munches')).toBe(10);
     expect(wordValue('toast')).toBeGreaterThan(wordValue('big'));
+    expect(wordValue('nebula')).toBeGreaterThan(wordValue('moon'));
+  });
+
+  it('scores an inflected form the same as its base form', () => {
+    expect(wordValue('munches')).toBe(wordValue('munch'));
+    expect(wordValue('ate')).toBe(wordValue('eat'));
   });
 });
 

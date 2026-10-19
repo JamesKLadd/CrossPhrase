@@ -34,7 +34,8 @@ export default function PlayScreen() {
 }
 
 function Game({ level }: { level: LevelDef }) {
-  const { state, dispatch, submit, restart, error } = useGame(level);
+  const { state, dispatch, submit, restart, error, mode, notice, appealed, appeal, canAppeal } =
+    useGame(level);
   const [selection, setSelection] = useState<Selection>(null);
   const [highlightedEntry, setHighlightedEntry] = useState<string | null>(null);
   const { width, height } = useWindowDimensions();
@@ -139,8 +140,13 @@ function Game({ level }: { level: LevelDef }) {
             <OwlPanel
               state={state}
               error={error}
+              mode={mode}
+              notice={notice}
               highlighted={highlightedEntry}
               onEntryPress={(id) => setHighlightedEntry((h) => (h === id ? null : id))}
+              canAppeal={canAppeal}
+              appealed={appealed}
+              onAppeal={appeal}
             />
           </ScrollView>
 

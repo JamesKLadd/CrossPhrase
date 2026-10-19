@@ -2,7 +2,17 @@ import { HAND_SIZE, MAX_SUBMITS } from './config';
 import { buildPool, drawWord, type DrawPool } from './draw';
 import { extractEntries, openCells } from './grid';
 import { scoreSubmission } from './scoring';
-import type { CellKey, Entry, JudgeEntry, LevelDef, SubmitResult, Tile, Verdict } from './types';
+import type {
+  CellKey,
+  Entry,
+  JudgeEntry,
+  LevelDef,
+  PhraseVerdict,
+  SubmitResult,
+  Tier,
+  Tile,
+  Verdict,
+} from './types';
 
 export type GamePhase = 'playing' | 'judging' | 'won' | 'lost';
 
@@ -37,6 +47,7 @@ export type GameAction =
   | { type: 'submitStart' }
   | { type: 'submitResult'; verdicts: Verdict[] }
   | { type: 'submitError' }
+  | { type: 'reconcile'; verdicts: PhraseVerdict[] }
   | { type: 'restart' };
 
 const pools = new Map<string, DrawPool>();
@@ -168,6 +179,7 @@ export function canSubmit(state: GameState): boolean {
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   if (action.type === 'restart') return createGame(state.level);
+  if (action.type === 'reconcile') return reconcile(state, action.verdicts);
 
   if (state.phase === 'judging') {
     if (action.type === 'submitResult') return applyVerdicts(state, action.verdicts);
@@ -250,4 +262,33 @@ function applyVerdicts(state: GameState, verdicts: Verdict[]): GameState {
     lastResult: result,
     phase: submitsUsed >= MAX_SUBMITS ? 'lost' : 'playing',
   };
+}
+
+const TIER_RANK: Record<Tier, number> = { invalid: 0, ok: 1, great: 2, poetic: 3 };
+
+/**
+ * Applies the AI judge's verdicts to phrases that were graded offline. A
+ * provisional verdict is only ever upgraded, never revoked. If the level was
+ * already won, its score is recomputed so the player gets any extra points.
+ */
+function reconcile(state: GameState, verdicts: PhraseVerdict[]): GameState {
+  const verdictCache = { ...state.verdictCache };
+  let changed = false;
+  for (const { phrase, verdict } of verdicts) {
+    const current = verdictCache[phrase];
+    if (!current?.provisional) continue;
+    verdictCache[phrase] =
+      TIER_RANK[verdict.tier] >= TIER_RANK[current.tier]
+        ? { ...verdict, provisional: false }
+        : { ...current, provisional: false };
+    changed = true;
+  }
+  if (!changed) return state;
+
+  const next = { ...state, verdictCache };
+  if (state.phase === 'won' && state.lastResult) {
+    const rescored = scoreFromCache(next, verdictCache);
+    if (rescored && rescored.total > state.lastResult.total) next.lastResult = rescored;
+  }
+  return next;
 }

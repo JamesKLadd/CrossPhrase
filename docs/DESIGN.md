@@ -235,7 +235,7 @@ Each phase ends in a **playable build** with a clear exit test.
 - [x] Judge eval set + runner (`scripts/judge-eval`)
 - [ ] Deploy the judge and run the eval against the real model; tune the prompt
 - [ ] Playtest on real phones; tune hand size, draw weighting, star thresholds
-- [ ] Known tuning item: inflected verb forms ("munches") read rarer than their base form and score high
+- [x] Inflected verb forms share their base form's rarity (done in Phase 2)
 
 ### Phase 2: Judge & scoring hardening (≈2 weeks)
 - Quality tiers with multipliers, crossing double-scoring, rarity curve tuning.
@@ -245,6 +245,21 @@ Each phase ends in a **playable build** with a clear exit test.
 - Offline fallback: local cache, POS rule check, provisional verdicts and reconciliation.
 - Rate limiting and anonymous auth.
 - **Exit:** verdicts feel fair to playtesters; airplane mode doesn't break play; cost per active user is measured.
+
+**Status (Phase 2):**
+- [x] Rarity: word forms (`eat/eats/ate`) share one rarity, so inflections aren't worth extra
+- [x] Server verdict cache (`verdict_cache`): only new phrases reach Claude; `PROMPT_VERSION` invalidates old verdicts, upheld appeals are kept; hit counts recorded
+- [x] On-device verdict cache (expo-sqlite `localStorage`) plus a shipped seed (`src/data/seedVerdicts.json`, exported by `scripts/export_seed_verdicts.mjs`)
+- [x] Offline fallback: unknown phrases graded provisionally by the local rules ("OK?"), queued and re-checked on reconnect, app foreground and every 30s. Provisional passes are never revoked, only upgraded, and a won level is rescored if that raises it
+- [x] Appeals: Appeal button on "Nope" verdicts; `appeals` table with RLS, verdict snapshot, and a trigger that applies an upheld ruling to the cache and settles every appeal of the phrase
+- [x] Anonymous sign-in for every player; the judge requires a signed-in user (`@supabase/server`, `auth: 'user'`)
+- [x] Rate limits per player (`consume_judge_quota`): 40 requests / 10 min, 400 / day
+- [x] Cost per active player: every request logged to `judge_calls`; `judge_cost_daily` view prices tokens
+- [x] Prompt caching on the judge's system prompt
+- [x] Tests: Jest (game + judge client), Deno (judge function), PGlite (migrations)
+- [ ] Deploy, run the eval against real Haiku, iterate on the prompt (needs an Anthropic API key)
+- [ ] Playtest for fairness; watch `judge_cost_daily` and the appeal queue
+- [ ] Later hardening: CAPTCHA on anonymous sign-ins if abuse shows up (Supabase supports it)
 
 ### Phase 3: Levels & progression (≈3 weeks)
 - Procedural generator plus simulation bot for star thresholds.

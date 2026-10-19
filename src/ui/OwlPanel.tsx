@@ -1,15 +1,25 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { MAX_SUBMITS, TIER_MULTIPLIER } from '../core/config';
-import { entryWords, verdictFor, type GameState } from '../core/game';
+import { entryWords, phraseKey, verdictFor, type GameState } from '../core/game';
 import { starThresholds, wordValue } from '../core/scoring';
 import { displayWord } from '../core/words';
+import type { JudgeMode } from '../judge';
 import { colors, TIER_LABEL } from './theme';
 
-function speech(state: GameState, error: string | null): string {
+function speech(
+  state: GameState,
+  error: string | null,
+  mode: JudgeMode | null,
+  notice: string | null,
+): string {
   if (state.phase === 'judging') return 'Hmm. Let me adjust my glasses…';
-  if (error) return "I couldn't reach my study, so that submit wasn't counted. Try again.";
+  if (error) return "Something went wrong on my end, so that submit wasn't counted. Try again.";
+  if (notice) return notice;
   const result = state.lastResult;
+  if (result && mode === 'offline') {
+    return "My study's internet is down, so I judged by the rulebook. I'll double-check later, and I never take back a pass.";
+  }
   if (!result) {
     return `Fill every square. Each row and column must read as a phrase, and rarer words score more. You get ${MAX_SUBMITS} submits. I'll be judging.`;
   }
@@ -23,13 +33,23 @@ function speech(state: GameState, error: string | null): string {
 export function OwlPanel({
   state,
   error,
+  mode,
+  notice,
   highlighted,
   onEntryPress,
+  canAppeal,
+  appealed,
+  onAppeal,
 }: {
   state: GameState;
   error: string | null;
+  mode: JudgeMode | null;
+  notice: string | null;
   highlighted: string | null;
   onEntryPress: (entryId: string) => void;
+  canAppeal: boolean;
+  appealed: ReadonlySet<string>;
+  onAppeal: (phrase: string) => void;
 }) {
   const judging = state.phase === 'judging';
 
@@ -38,7 +58,7 @@ export function OwlPanel({
       <View style={styles.speechRow}>
         <Text style={styles.owl}>🦉</Text>
         <View style={styles.bubble}>
-          <Text style={styles.speech}>{speech(state, error)}</Text>
+          <Text style={styles.speech}>{speech(state, error, mode, notice)}</Text>
           {judging && <ActivityIndicator color={colors.wood} style={styles.spinner} />}
         </View>
       </View>
@@ -49,6 +69,9 @@ export function OwlPanel({
             const words = entryWords(state, entry);
             const verdict = verdictFor(state, entry);
             const base = words?.reduce((sum, w) => sum + wordValue(w), 0) ?? 0;
+            const phrase = words && phraseKey(words);
+            const appealable =
+              canAppeal && phrase && verdict?.tier === 'invalid' && !verdict.provisional;
             return (
               <Pressable
                 key={entry.id}
@@ -61,8 +84,15 @@ export function OwlPanel({
                     {verdict?.reading || words?.map(displayWord).join(' ') || '…'}
                   </Text>
                   {verdict ? (
-                    <Text style={[styles.badge, { backgroundColor: colors.tier[verdict.tier] }]}>
+                    <Text
+                      style={[
+                        styles.badge,
+                        { backgroundColor: colors.tier[verdict.tier] },
+                        verdict.provisional && styles.badgeProvisional,
+                      ]}
+                    >
                       {TIER_LABEL[verdict.tier]}
+                      {verdict.provisional ? '?' : ''}
                       {verdict.valid ? ` +${Math.round(base * TIER_MULTIPLIER[verdict.tier])}` : ''}
                     </Text>
                   ) : (
@@ -70,10 +100,22 @@ export function OwlPanel({
                   )}
                 </View>
                 {verdict && (
-                  <Text style={styles.quip}>
-                    {verdict.reason ? `${verdict.reason}. ` : ''}
-                    <Text style={styles.quipItalic}>{verdict.quip}</Text>
-                  </Text>
+                  <View style={styles.detail}>
+                    <Text style={styles.quip}>
+                      {verdict.reason ? `${verdict.reason}. ` : ''}
+                      <Text style={styles.quipItalic}>
+                        {verdict.provisional ? 'Graded offline. I will double-check.' : verdict.quip}
+                      </Text>
+                    </Text>
+                    {appealable &&
+                      (appealed.has(phrase) ? (
+                        <Text style={styles.appealed}>Appealed</Text>
+                      ) : (
+                        <Pressable onPress={() => onAppeal(phrase)} hitSlop={8}>
+                          <Text style={styles.appeal}>Appeal</Text>
+                        </Pressable>
+                      ))}
+                  </View>
                 )}
               </Pressable>
             );
@@ -123,6 +165,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   unjudged: { fontSize: 12, color: colors.inkSoft, fontStyle: 'italic' },
-  quip: { marginTop: 4, marginLeft: 36, fontSize: 13, color: colors.inkSoft },
+  badgeProvisional: { opacity: 0.6 },
+  detail: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 4, marginLeft: 36 },
+  quip: { flex: 1, fontSize: 13, color: colors.inkSoft },
+  appeal: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.wood,
+    textDecorationLine: 'underline',
+  },
+  appealed: { fontSize: 12, fontStyle: 'italic', color: colors.inkSoft },
   quipItalic: { fontStyle: 'italic' },
 });

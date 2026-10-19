@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LEVELS } from '../data/levels';
 import { THEMES } from '../data/themes';
-import { judge } from '../judge/client';
+import { judgeService } from '../judge';
 import { colors } from '../ui/theme';
 
 export default function LevelSelect() {
@@ -19,9 +19,9 @@ export default function LevelSelect() {
             <Text style={styles.owl}>🦉</Text>
             <Text style={styles.title}>CrossPhrase</Text>
             <Text style={styles.subtitle}>A crossword where every square is a word.</Text>
-            {!judge.remote && (
+            {!judgeService.hasRemote && (
               <Text style={styles.devNote}>
-                Dev mode: no judge endpoint set, so a lenient local judge grades phrases.
+                Dev mode: no backend configured, so a lenient local judge grades phrases.
               </Text>
             )}
           </View>

@@ -53,6 +53,17 @@ export interface Verdict {
   reason: string;
   /** The owl's one-liner. */
   quip: string;
+  /**
+   * Graded offline by the local rules and waiting to be re-checked by the AI
+   * judge. Provisional verdicts are never revoked, only upgraded.
+   */
+  provisional?: boolean;
+}
+
+/** A verdict from the AI judge for a phrase, used to resolve provisional ones. */
+export interface PhraseVerdict {
+  phrase: string;
+  verdict: Omit<Verdict, 'entryId'>;
 }
 
 export interface SubmitResult {

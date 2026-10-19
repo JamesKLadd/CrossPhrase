@@ -206,3 +206,66 @@ describe('submitting', () => {
     expect(gameReducer(state, { type: 'remove', cell: '0,0' })).toBe(state);
   });
 });
+
+describe('reconcile (offline verdicts re-checked online)', () => {
+  function playOffline(tier: Tier): GameState {
+    let state = fillBoard(createGame(level));
+    state = gameReducer(state, { type: 'submitStart' });
+    const verdicts = judgeAll(state, tier).map((v) => ({ ...v, provisional: true }));
+    return gameReducer(state, { type: 'submitResult', verdicts });
+  }
+
+  const phrases = (state: GameState) =>
+    state.entries.map((e) => (entryWordsOf(state, e.id) ?? []).join(' '));
+  const entryWordsOf = (state: GameState, id: string) =>
+    state.entries.find((e) => e.id === id)!.cells.map((c) => state.board[c]!.word);
+  const real = (phrase: string, tier: Tier) => ({
+    phrase,
+    verdict: { valid: tier !== 'invalid', tier, reading: phrase, reason: '', quip: '' },
+  });
+
+  it('upgrades a provisional verdict and rescores a won level', () => {
+    const state = playOffline('ok');
+    expect(state.phase).toBe('won');
+    const before = state.lastResult!.total;
+    const next = gameReducer(state, {
+      type: 'reconcile',
+      verdicts: phrases(state).map((p) => real(p, 'poetic')),
+    });
+    expect(verdictFor(next, next.entries[0])).toMatchObject({ tier: 'poetic', provisional: false });
+    expect(next.lastResult!.total).toBe(before * 2);
+  });
+
+  it('never revokes a provisional pass', () => {
+    const state = playOffline('ok');
+    const next = gameReducer(state, {
+      type: 'reconcile',
+      verdicts: phrases(state).map((p) => real(p, 'invalid')),
+    });
+    expect(verdictFor(next, next.entries[0])).toMatchObject({ tier: 'ok', provisional: false });
+    expect(next.lastResult).toEqual(state.lastResult);
+  });
+
+  it('turns a provisional rejection into a pass mid-level', () => {
+    const state = playOffline('invalid');
+    expect(state.phase).toBe('playing');
+    expect(canSubmit(state)).toBe(false);
+    const next = gameReducer(state, {
+      type: 'reconcile',
+      verdicts: phrases(state).map((p) => real(p, 'great')),
+    });
+    // Every phrase is now judged valid, so the same board may be resubmitted.
+    expect(canSubmit(next)).toBe(true);
+  });
+
+  it('ignores verdicts for phrases that were not provisional', () => {
+    let state = fillBoard(createGame(level));
+    state = gameReducer(state, { type: 'submitStart' });
+    state = gameReducer(state, { type: 'submitResult', verdicts: judgeAll(state, 'ok') });
+    const next = gameReducer(state, {
+      type: 'reconcile',
+      verdicts: phrases(state).map((p) => real(p, 'poetic')),
+    });
+    expect(next).toBe(state);
+  });
+});

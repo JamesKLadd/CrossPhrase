@@ -2,7 +2,7 @@
 noun: moon star sky planet comet galaxy rocket astronaut telescope night dream cloud
 noun: owl wolf meteor orbit space alien universe constellation darkness shadow lantern
 noun: firefly midnight dawn nebula satellite crater horizon wish
-verb: glow glows twinkle twinkles drift drifts orbit orbits howl howls whisper whispers
-verb: wander wanders gaze gazes blink blinks soar soars float floats spin spins hum hums
+verb: glow/glows twinkle/twinkles drift/drifts orbit/orbits howl/howls whisper/whispers
+verb: wander/wanders gaze/gazes blink/blinks soar/soars float/floats spin/spins hum/hums
 adj: silver distant cosmic starry silent lunar endless glowing celestial infinite pale
 adj: mysterious ancient sparkling
