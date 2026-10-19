@@ -16,7 +16,7 @@ versions fail with confusing errors or a blank white page; `npm start` checks
 and says so.
 
 ```sh
-npm install
+npm ci           # installs exactly the locked versions (never edits package-lock.json)
 npm run web      # in a browser
 npm start        # then scan the QR code with Expo Go from the App Store / Play Store
 ```
@@ -25,6 +25,10 @@ If the phone sits on "loading" forever after scanning, it can't reach your
 computer: check both are on the same Wi-Fi (not a guest network or VPN), and on
 Windows allow Node.js through the firewall when asked. Or skip the network
 question entirely with `npx expo start --tunnel`.
+
+If `git pull` complains that local changes to `package-lock.json` would be
+overwritten, an earlier `npm install` rewrote it. Discard that with
+`git checkout -- package-lock.json`, pull again, then run `npm ci`.
 
 The project's Expo SDK must match the Expo Go app on your phone; it's on
 **SDK 57**, which is what the App Store's Expo Go runs today. If Expo Go

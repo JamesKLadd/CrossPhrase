@@ -10,7 +10,7 @@ if (!ok) {
   console.error(
     `\nCrossPhrase needs Node.js 20.19.4+, 22.13+ or 24.3+, but this computer has ${process.version}.\n` +
       'Install the current LTS from https://nodejs.org, close and reopen your terminal,\n' +
-      'then run `npm install` again before `npm start`.\n',
+      'then run `npm ci` again before `npm start`.\n',
   );
   process.exit(1);
 }
