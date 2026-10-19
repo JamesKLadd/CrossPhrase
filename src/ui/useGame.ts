@@ -1,6 +1,5 @@
-import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState } from 'react-native';
 
 import {
   canSubmit,
@@ -12,22 +11,10 @@ import {
 } from '../core/game';
 import type { LevelDef, Tier } from '../core/types';
 import { judgeService, type JudgeMode } from '../judge';
+import { haptic, playSound } from './feedback';
 
 /** How often to retry offline phrases while any are queued. */
 const RECONCILE_INTERVAL_MS = 30_000;
-
-function haptic(kind: 'tap' | 'success' | 'error') {
-  if (Platform.OS === 'web') return;
-  const run =
-    kind === 'tap'
-      ? Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-      : Haptics.notificationAsync(
-          kind === 'success'
-            ? Haptics.NotificationFeedbackType.Success
-            : Haptics.NotificationFeedbackType.Error,
-        );
-  run.catch(() => {});
-}
 
 export function useGame(level: LevelDef) {
   const [state, rawDispatch] = useReducer(gameReducer, level, createGame);
@@ -44,7 +31,15 @@ export function useGame(level: LevelDef) {
   }, [mode]);
 
   const dispatch = useCallback((action: GameAction) => {
-    if (action.type === 'place' || action.type === 'move') haptic('tap');
+    if (action.type === 'place' || action.type === 'move') {
+      haptic('tap');
+      playSound('place');
+    } else if (action.type === 'swap') {
+      haptic('select');
+      playSound('swap');
+    } else if (action.type === 'remove') {
+      playSound('tap');
+    }
     rawDispatch(action);
   }, []);
 
@@ -85,13 +80,13 @@ export function useGame(level: LevelDef) {
       try {
         const outcome = await judgeService.judge(pendingJudgeEntries(current));
         setMode(outcome.mode);
-        haptic(outcome.verdicts.some((v) => !v.valid) ? 'error' : 'success');
         rawDispatch({ type: 'submitResult', verdicts: outcome.verdicts });
         // We're online, so it's a good moment to clear any older offline queue.
         if (outcome.mode === 'online') void reconcile().catch(() => {});
       } catch (e) {
         console.warn(e);
         setError(String(e));
+        haptic('error');
         rawDispatch({ type: 'submitError' });
       }
     },
@@ -114,18 +109,10 @@ export function useGame(level: LevelDef) {
     void judgeService.syncLabels();
   }, []);
 
-  const restart = useCallback(() => {
-    setError(null);
-    setNotice(null);
-    setMode(null);
-    rawDispatch({ type: 'restart' });
-  }, []);
-
   return {
     state,
     dispatch,
     submit: () => submit(state),
-    restart,
     error,
     mode,
     notice,

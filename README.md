@@ -6,9 +6,11 @@ AI judge) grades each phrase. Rare words and great phrasing score the points
 needed to clear the level.
 
 The full game design and phase plan are in [docs/DESIGN.md](docs/DESIGN.md).
-This repo is at **Phase 3: levels and progression**: 120 levels on a level map
-(a 10-level tutorial, then generated levels across five themes), stars, bonus
-objectives and wildcards, judged by free judges you can train.
+This repo is at **Phase 4: identity and juice**: the owl has a face (and
+moods), verdicts are revealed line by line with sounds, haptics and confetti,
+and there's music, a settings screen and accessibility options. Underneath:
+120 levels on a level map, stars, bonus objectives and wildcards, judged by
+free judges you can train.
 
 ## Run it
 
@@ -109,8 +111,31 @@ Study App's training kit) on the NVIDIA desktop.
 ### Developer tools
 
 With `EXPO_PUBLIC_DEV_PIN` set in `.env.local`, **long-press the owl** on the
-home screen and enter the PIN for: the labelling screen, **Unlock all levels**
-(to try any level) and **Reset progress**.
+home screen and enter the PIN for: the labelling screen, a gallery of **the
+owl's moods**, **Unlock all levels** (to try any level) and **Reset progress**.
+
+## The owl, sound and settings
+
+- **The owl** ([`src/ui/Owl.tsx`](src/ui/Owl.tsx)) is drawn in vector shapes:
+  placeholder art until a commissioned mascot replaces it. It has six moods
+  (idle, thinking, pleased, delighted, dazzled, disappointed), blinks, bobs,
+  hops when pleased and shakes its head when not. Tap it for a hoot.
+- **Verdicts are revealed one line at a time**: each line gets the owl's
+  quip in its speech bubble, a sound, a haptic and a reaction; poetic lines
+  and cleared levels get confetti, and stars pop in one by one. The AI judges
+  write their own quips; the built-in judge and the owl's other lines come from
+  [`src/core/quips.ts`](src/core/quips.ts).
+- **Sounds and music** are synthesised by `npm run make:sounds`
+  ([`scripts/make-sounds.mjs`](scripts/make-sounds.mjs)) into `assets/sounds/`:
+  no samples, nothing to license, and the same files every run. Edit the
+  script, not the WAVs. They respect the phone's silent switch and let your
+  own music keep playing.
+- **Settings** (⚙️ on the home screen): sound effects, music, vibration,
+  reduce motion (also follows the phone's setting) and colour-blind-friendly
+  verdict colours. Verdicts always carry an icon (✗ ✓ ★ ✦) as well as a
+  colour, tiles and buttons have screen-reader labels, and text follows the
+  phone's text size (word tiles stay fixed so they fit the board).
+- The app icon is the owl, rendered from the same component.
 
 ## Commands
 
@@ -122,6 +147,7 @@ home screen and enter the PIN for: the labelling screen, **Unlock all levels**
 | `npm run test:functions` | Claude judge function tests (needs [Deno](https://deno.com)) |
 | `npm run train:judge` | Retrains the built-in judge from `training/` |
 | `npm run generate:levels` | Regenerates levels 11–120 (see Levels above) |
+| `npm run make:sounds` | Regenerates the sound effects and music in `assets/sounds/` |
 | `npm run pc-judge:setup` / `npm run pc-judge` | Sets up / starts the PC judge |
 | `npm run typecheck` | TypeScript |
 | `npm run lint` | ESLint (Expo config) |
@@ -164,9 +190,12 @@ src/
   judge/          Judge service: picks the judge, on-device verdict cache,
                   labels, offline grading and re-checks
   progress/       Saved stars and scores, and what's unlocked
+  settings/       Sound, music, vibration, motion and colour settings
   lib/            Supabase client
-  ui/             Board, hand tray, drag-and-drop, owl panel, star bar and
-                  goals, wildcard picker, result overlay
+  ui/             The owl, board, hand tray, drag-and-drop, owl panel, star
+                  bar and goals, wildcard picker, result overlay, confetti,
+                  sounds and haptics (feedback.ts)
+assets/sounds/    Generated sound effects and music
 pc-judge/         The free PC judge: llama.cpp + Gemma behind a small HTTP server
 training/         Labels and PC-judge verdicts for training
 supabase/
@@ -176,7 +205,7 @@ supabase/
   migrations/     Verdict cache, appeals, rate limits, usage log and cost view
   tests/          Database tests
 scripts/          Word list builder, word sources, judge eval, train-judge.ts,
-                  generate-levels.ts
+                  generate-levels.ts, make-sounds.mjs
 docs/DESIGN.md    Game design and phase plan
 ```
 

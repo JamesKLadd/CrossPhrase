@@ -1,10 +1,13 @@
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { TIER_MULTIPLIER } from '../core/config';
 import { entryTiles, objectiveProgress, phraseKey, type GameState } from '../core/game';
 import { describeObjective } from '../core/objectives';
 import { failedSubmitPenalty, starThresholds, tileValue } from '../core/scoring';
 import type { ObjectiveResult } from '../core/types';
+import { useReduceMotion } from '../settings';
 import { colors } from './theme';
 
 /**
@@ -32,19 +35,33 @@ export function LevelGoals({ state }: { state: GameState }) {
   const max = Math.round(stars[2] * 1.15);
   const at = (points: number) => `${Math.min(100, (points / max) * 100)}%` as const;
   const earned = stars.filter((t) => score >= t).length;
+  const fraction = Math.min(1, score / max);
+  const still = useReduceMotion();
+  const fill = useSharedValue(fraction);
+  useEffect(() => {
+    fill.set(still ? fraction : withTiming(fraction, { duration: 350 }));
+  }, [fraction, still, fill]);
+  const fillStyle = useAnimatedStyle(() => ({ width: `${fill.get() * 100}%` }));
 
   return (
     <View style={styles.goals}>
       <View style={styles.barRow}>
-        <Text style={styles.score} testID="score-estimate">
+        <Text
+          style={styles.score}
+          testID="score-estimate"
+          maxFontSizeMultiplier={1.2}
+          accessibilityLabel={`Score ${score}. Stars at ${stars.join(', ')}`}
+        >
           {score}
         </Text>
         <View style={styles.bar}>
-          <View style={[styles.fill, { width: at(score) }]} />
+          <Animated.View style={[styles.fill, fillStyle]} />
           {stars.map((threshold, i) => (
             <View key={i} style={[styles.tick, { left: at(threshold) }]}>
               <Text style={[styles.tickStar, i < earned && styles.tickStarEarned]}>★</Text>
-              <Text style={styles.tickLabel}>{threshold}</Text>
+              <Text style={styles.tickLabel} maxFontSizeMultiplier={1.2}>
+                {threshold}
+              </Text>
             </View>
           ))}
         </View>
@@ -79,7 +96,12 @@ const styles = StyleSheet.create({
   fill: { height: '100%', borderRadius: 5, backgroundColor: colors.selected },
   tick: { position: 'absolute', top: -5, alignItems: 'center', width: 30, marginLeft: -15 },
   tickStar: { fontSize: 16, lineHeight: 18, color: colors.starEmpty },
-  tickStarEarned: { color: colors.star },
+  tickStarEarned: {
+    color: colors.white,
+    textShadowColor: colors.wood,
+    textShadowRadius: 3,
+    textShadowOffset: { width: 0, height: 0 },
+  },
   tickLabel: { fontSize: 9, fontWeight: '700', color: colors.inkSoft },
   objectives: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6 },
   objective: {

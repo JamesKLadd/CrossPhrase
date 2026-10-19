@@ -10,7 +10,7 @@ import { displayWord } from '../../core/words';
 import { judgeService } from '../../judge';
 import { devToolsEnabled, isUnlocked } from '../../ui/devAccess';
 import { DevToolsOff, PinGate } from '../../ui/PinGate';
-import { colors, TIER_LABEL } from '../../ui/theme';
+import { colors, TIER_ICON, TIER_LABEL, useTierColors } from '../../ui/theme';
 
 const TIERS: Tier[] = ['invalid', 'ok', 'great', 'poetic'];
 const TIER_HELP: Record<Tier, string> = {
@@ -46,6 +46,7 @@ export default function LabelScreen() {
 }
 
 function Labeller() {
+  const tierColors = useTierColors();
   const [rng] = useState(() => new Rng(Date.now() | 0));
   /** Phrases already labelled, so none comes up twice. */
   const [seen, setSeen] = useState<ReadonlySet<string>>(
@@ -106,9 +107,11 @@ function Labeller() {
           <Pressable
             key={tier}
             onPress={() => label(tier)}
-            style={[styles.tier, { backgroundColor: colors.tier[tier] }]}
+            style={[styles.tier, { backgroundColor: tierColors[tier] }]}
           >
-            <Text style={styles.tierLabel}>{TIER_LABEL[tier]}</Text>
+            <Text style={styles.tierLabel}>
+              {TIER_ICON[tier]} {TIER_LABEL[tier]}
+            </Text>
             <Text style={styles.tierHelp}>{TIER_HELP[tier]}</Text>
           </Pressable>
         ))}

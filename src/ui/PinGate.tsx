@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { unlock } from './devAccess';
+import { Owl } from './Owl';
 import { colors } from './theme';
 
 /** Asks for the developer PIN (see devAccess.ts). */
@@ -17,7 +18,7 @@ export function PinGate({ onUnlock }: { onUnlock: () => void }) {
   };
   return (
     <View style={styles.gate}>
-      <Text style={styles.owl}>🦉</Text>
+      <Owl size={90} mood="thinking" />
       <Text style={styles.note}>Developer PIN</Text>
       <TextInput
         value={pin}
@@ -49,7 +50,6 @@ export function DevToolsOff() {
 
 const styles = StyleSheet.create({
   gate: { alignItems: 'center', gap: 12, marginTop: 40 },
-  owl: { fontSize: 56 },
   note: { textAlign: 'center', fontSize: 14, color: colors.inkSoft, lineHeight: 20 },
   pin: {
     width: 180,

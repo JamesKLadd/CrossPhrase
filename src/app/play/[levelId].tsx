@@ -1,23 +1,42 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MAX_SUBMITS } from '../../core/config';
 import { canSubmit, entryWords, isBoardFull } from '../../core/game';
-import type { CellKey, LevelDef, Tile } from '../../core/types';
+import type { CellKey, Entry, LevelDef, Tier, Tile } from '../../core/types';
 import { LEVEL_IDS, LEVELS, levelById, levelNumber } from '../../data/levels';
 import { THEMES } from '../../data/themes';
 import { isUnlocked, progress, useProgress } from '../../progress';
+import { useReduceMotion } from '../../settings';
 import { Board, boardCellSize } from '../../ui/Board';
+import { Confetti } from '../../ui/Confetti';
 import { DragProvider, type DragSource, type ZoneId } from '../../ui/drag';
+import { haptic, playSound, type HapticKind, type SoundName } from '../../ui/feedback';
 import { HandTray } from '../../ui/HandTray';
 import { LevelGoals } from '../../ui/LevelGoals';
 import { OwlPanel } from '../../ui/OwlPanel';
 import { ResultOverlay } from '../../ui/ResultOverlay';
-import { colors } from '../../ui/theme';
+import { colors, TIER_LABEL } from '../../ui/theme';
 import { useGame } from '../../ui/useGame';
+import { useReveal } from '../../ui/useReveal';
 import { WildcardPicker } from '../../ui/WildcardPicker';
+
+const TIER_FEEDBACK: Record<Tier, [SoundName, HapticKind]> = {
+  invalid: ['invalid', 'error'],
+  ok: ['ok', 'tap'],
+  great: ['great', 'success'],
+  poetic: ['poetic', 'success'],
+};
 
 type Selection = { kind: 'hand'; tileId: number } | { kind: 'cell'; cell: CellKey } | null;
 
@@ -25,6 +44,7 @@ export default function PlayScreen() {
   const { levelId } = useLocalSearchParams<{ levelId: string }>();
   const level = levelById(levelId);
   const saved = useProgress();
+  const [attempt, setAttempt] = useState(0);
   if (!level) {
     return (
       <SafeAreaView style={styles.screen}>
@@ -45,15 +65,16 @@ export default function PlayScreen() {
       </SafeAreaView>
     );
   }
-  // Keyed so moving to the next level starts a fresh game.
-  return <Game key={level.id} level={level} />;
+  // Keyed so moving to the next level, or replaying, starts a fresh game.
+  return <Game key={`${level.id}:${attempt}`} level={level} onReplay={() => setAttempt((a) => a + 1)} />;
 }
 
 const bestScore = (levelId: string) => progress.snapshot().levels[levelId]?.best ?? null;
 
-function Game({ level }: { level: LevelDef }) {
-  const { state, dispatch, submit, restart, error, mode, notice, corrections, correct } =
-    useGame(level);
+function Game({ level, onReplay }: { level: LevelDef; onReplay: () => void }) {
+  const { state, dispatch, submit, error, mode, notice, corrections, correct } = useGame(level);
+  const still = useReduceMotion();
+  const [confetti, setConfetti] = useState(0);
   const [selection, setSelection] = useState<Selection>(null);
   const [highlightedEntry, setHighlightedEntry] = useState<string | null>(null);
   /** The result card is hidden while the player reviews the verdicts of a finished level. */
@@ -63,7 +84,7 @@ function Game({ level }: { level: LevelDef }) {
     null,
   );
   /** The best score before this attempt, to spot a new best. */
-  const [previousBest, setPreviousBest] = useState(() => bestScore(level.id));
+  const [previousBest] = useState(() => bestScore(level.id));
   const finished = state.phase === 'won' || state.phase === 'lost';
   const { width, height } = useWindowDimensions();
   const number = levelNumber(level.id);
@@ -83,17 +104,43 @@ function Game({ level }: { level: LevelDef }) {
     Math.floor((height * 0.38 - 4 * (rows - 1)) / rows),
   );
   const next = LEVELS[number];
-  const playing = state.phase === 'playing';
+
+  // Verdicts appear one line at a time, each with its own sound and the owl's reaction.
+  const reveal = useReveal(
+    state,
+    still,
+    (entry: Entry, tier: Tier) => {
+      const [sound, buzz] = TIER_FEEDBACK[tier];
+      playSound(sound);
+      haptic(buzz);
+      if (tier === 'poetic' && !still) setConfetti((c) => c + 1);
+      AccessibilityInfo.announceForAccessibility(`${entry.id}: ${TIER_LABEL[tier]}`);
+    },
+    () => {
+      if (state.phase === 'won') {
+        playSound('win');
+        haptic('success');
+        if (!still) setConfetti((c) => c + 1);
+      } else if (state.phase === 'lost') {
+        playSound('lose');
+        haptic('warning');
+      }
+    },
+  );
+  const playing = state.phase === 'playing' && !reveal.active;
 
   const highlighted = useMemo(
     () => new Set(state.entries.find((e) => e.id === highlightedEntry)?.cells ?? []),
     [state.entries, highlightedEntry],
   );
 
-  const onTilePress = (tile: Tile) =>
+  const onTilePress = (tile: Tile) => {
+    playSound('tap');
+    haptic('select');
     setSelection((s) =>
       s?.kind === 'hand' && s.tileId === tile.id ? null : { kind: 'hand', tileId: tile.id },
     );
+  };
 
   /** Places a hand tile, asking for a word first if it's a wildcard. */
   const place = (tileId: number, cell: CellKey) => {
@@ -112,6 +159,8 @@ function Game({ level }: { level: LevelDef }) {
       if (selection.cell !== cell) dispatch({ type: 'move', from: selection.cell, to: cell });
       setSelection(null);
     } else if (state.board[cell] && !state.board[cell].anchor) {
+      playSound('tap');
+      haptic('select');
       setSelection({ kind: 'cell', cell });
     }
   };
@@ -167,6 +216,9 @@ function Game({ level }: { level: LevelDef }) {
               cellSize={cellSize}
               selectedCell={selection?.kind === 'cell' ? selection.cell : null}
               highlighted={highlighted}
+              shown={reveal.shown}
+              enabled={playing}
+              still={still}
               onCellPress={onCellPress}
             />
           </View>
@@ -174,6 +226,8 @@ function Game({ level }: { level: LevelDef }) {
           <ScrollView style={styles.owlScroll} contentContainerStyle={styles.owlContent}>
             <OwlPanel
               state={state}
+              reveal={reveal}
+              still={still}
               error={error}
               mode={mode}
               notice={notice}
@@ -213,7 +267,7 @@ function Game({ level }: { level: LevelDef }) {
               )}
               <ActionButton
                 label={
-                  state.phase === 'judging'
+                  state.phase === 'judging' || reveal.active
                     ? 'Judging…'
                     : canSubmit(state)
                       ? 'Submit'
@@ -223,7 +277,7 @@ function Game({ level }: { level: LevelDef }) {
                 }
                 primary
                 onPress={submit}
-                enabled={canSubmit(state)}
+                enabled={canSubmit(state) && !reveal.active}
               />
             </View>
           )}
@@ -239,23 +293,20 @@ function Game({ level }: { level: LevelDef }) {
           onCancel={() => setWildcardTarget(null)}
         />
 
-        {!reviewing && (
+        {!reviewing && !reveal.active && (
           <ResultOverlay
             state={state}
             levelNumber={number}
             newBest={newBest}
+            still={still}
             hasNext={next !== undefined}
             onNext={() => router.replace(`/play/${next!.id}`)}
-            onRetry={() => {
-              setSelection(null);
-              setReviewing(false);
-              setPreviousBest(bestScore(level.id));
-              restart();
-            }}
+            onRetry={onReplay}
             onExit={() => router.back()}
             onReview={() => setReviewing(true)}
           />
         )}
+        <Confetti burst={confetti} />
       </DragProvider>
     </SafeAreaView>
   );
@@ -276,6 +327,8 @@ function ActionButton({
     <Pressable
       onPress={onPress}
       disabled={!enabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !enabled }}
       style={[styles.action, primary && styles.actionPrimary, !enabled && styles.actionDisabled]}
     >
       <Text style={[styles.actionText, primary && styles.actionTextPrimary]}>{label}</Text>

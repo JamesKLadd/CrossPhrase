@@ -5,6 +5,8 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
     "expo": "~57.0.30",
+    "expo-asset": "~57.0.20",
+    "expo-audio": "~57.0.5",
     "expo-constants": "~57.0.22",
     "expo-haptics": "~57.0.3",
     "expo-linking": "~57.0.13",
@@ -18,6 +20,7 @@
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
     "react-native-web": "^0.21.4",
     "react-native-worklets": "0.10.1"
   },
@@ -51,6 +54,7 @@
     "test:functions": "deno test --no-lock supabase/functions",
     "train:judge": "tsx scripts/train-judge.ts",
     "generate:levels": "tsx scripts/generate-levels.ts",
+    "make:sounds": "node scripts/make-sounds.mjs",
     "pc-judge": "tsx pc-judge/server.ts",
     "pc-judge:setup": "tsx pc-judge/setup.ts",
     "test:pc-judge": "tsx --test pc-judge/app.test.ts"

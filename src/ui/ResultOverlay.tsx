@@ -1,13 +1,44 @@
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSpring,
+} from 'react-native-reanimated';
 
 import type { GameState } from '../core/game';
 import { describeObjective } from '../core/objectives';
+import { owlLine } from '../core/quips';
+import { playSound } from './feedback';
+import { Owl } from './Owl';
 import { colors } from './theme';
+
+const STAR_DELAY_MS = 450;
+const STAR_GAP_MS = 380;
+
+function Star({ index, earned, still }: { index: number; earned: boolean; still: boolean }) {
+  const scale = useSharedValue(earned && !still ? 0 : 1);
+  useEffect(() => {
+    if (!earned || still) return;
+    scale.set(withDelay(STAR_DELAY_MS + index * STAR_GAP_MS, withSpring(1, { damping: 7, stiffness: 160 })));
+  }, [earned, still, index, scale]);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.get() }, { rotate: `${(1 - scale.get()) * -90}deg` }],
+  }));
+  return (
+    <View>
+      <Text style={[styles.star, styles.starEmpty]}>★</Text>
+      {earned && <Animated.Text style={[styles.star, styles.starEarned, style]}>★</Animated.Text>}
+    </View>
+  );
+}
 
 export function ResultOverlay({
   state,
   levelNumber,
   newBest,
+  still,
   hasNext,
   onNext,
   onRetry,
@@ -18,6 +49,8 @@ export function ResultOverlay({
   levelNumber: number;
   /** This clear beat the player's earlier best on the level. */
   newBest: boolean;
+  /** Reduced motion: no pops or entrance. */
+  still: boolean;
   hasNext: boolean;
   onNext: () => void;
   onRetry: () => void;
@@ -26,19 +59,55 @@ export function ResultOverlay({
   onReview: () => void;
 }) {
   const result = state.lastResult;
-  if (!result || (state.phase !== 'won' && state.phase !== 'lost')) return null;
   const won = state.phase === 'won';
+  const stars = won ? (result?.stars ?? 0) : 0;
+  const finished = result !== null && (state.phase === 'won' || state.phase === 'lost');
+
+  // Each star chimes as it lands.
+  useEffect(() => {
+    if (!finished) return;
+    const timers = Array.from({ length: stars }, (_, i) =>
+      setTimeout(
+        () => playSound(`star${(i + 1) as 1 | 2 | 3}`),
+        still ? i * 150 : STAR_DELAY_MS + i * STAR_GAP_MS + 120,
+      ),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [finished, stars, still]);
+
+  const entrance = useSharedValue(still ? 1 : 0);
+  useEffect(() => {
+    if (finished && !still) entrance.set(withSpring(1, { damping: 13, stiffness: 140 }));
+  }, [finished, still, entrance]);
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, entrance.get() * 1.5),
+    transform: [{ scale: 0.85 + 0.15 * entrance.get() }],
+  }));
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: Math.min(1, entrance.get() * 2) }));
+
+  if (!finished || !result) return null;
+  const seed = `${state.level.id}:${result.total}`;
 
   return (
-    <View style={styles.backdrop}>
-      <View style={styles.card}>
-        <Text style={styles.owl}>🦉</Text>
+    <Animated.View style={[styles.backdrop, backdropStyle]}>
+      <Animated.View style={[styles.card, cardStyle]}>
+        <Owl
+          size={96}
+          mood={won ? (stars === 3 ? 'dazzled' : 'delighted') : 'disappointed'}
+          still={still}
+        />
         <Text style={styles.title}>{won ? `Level ${levelNumber} cleared!` : 'Out of submits'}</Text>
         {won && (
-          <Text style={styles.stars} testID="result-stars">
-            {'★'.repeat(result.stars)}
-            <Text style={styles.starsEmpty}>{'★'.repeat(3 - result.stars)}</Text>
-          </Text>
+          <View
+            style={styles.stars}
+            testID="result-stars"
+            accessible
+            accessibilityLabel={`${stars} of 3 stars`}
+          >
+            {[0, 1, 2].map((i) => (
+              <Star key={i} index={i} earned={i < stars} still={still} />
+            ))}
+          </View>
         )}
         {won && newBest && <Text style={styles.best}>New best!</Text>}
         <Text style={styles.score}>{result.total} points</Text>
@@ -59,11 +128,7 @@ export function ResultOverlay({
           </View>
         )}
         <Text style={styles.remark}>
-          {won
-            ? result.stars === 3
-              ? 'Exquisite. I may frame this one.'
-              : 'Acceptable work. I expect more next time.'
-            : 'The dictionary weeps. Shall we try again?'}
+          {won ? owlLine(`win${stars as 1 | 2 | 3}`, seed) : owlLine('lose', seed)}
         </Text>
         <View style={styles.buttons}>
           {won && hasNext && <Button label="Next level" primary onPress={onNext} />}
@@ -71,15 +136,24 @@ export function ResultOverlay({
           <Button label="See the owl's verdicts" onPress={onReview} />
           <Button label="Levels" onPress={onExit} />
         </View>
-      </View>
-    </View>
+      </Animated.View>
+    </Animated.View>
   );
 }
 
 function Button({ label, primary, onPress }: { label: string; primary?: boolean; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={[styles.button, primary && styles.buttonPrimary]}>
-      <Text style={[styles.buttonText, primary && styles.buttonTextPrimary]}>{label}</Text>
+    <Pressable
+      onPress={() => {
+        playSound('tap');
+        onPress();
+      }}
+      accessibilityRole="button"
+      style={[styles.button, primary && styles.buttonPrimary]}
+    >
+      <Text style={[styles.buttonText, primary && styles.buttonTextPrimary]} maxFontSizeMultiplier={1.4}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -105,10 +179,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: colors.paper,
   },
-  owl: { fontSize: 56 },
   title: { fontSize: 24, fontWeight: '800', color: colors.ink },
-  stars: { fontSize: 36, color: colors.star, letterSpacing: 4 },
-  starsEmpty: { color: colors.starEmpty },
+  stars: { flexDirection: 'row', gap: 6 },
+  star: { fontSize: 40, lineHeight: 46 },
+  starEmpty: { color: colors.starEmpty },
+  starEarned: { position: 'absolute', color: colors.star },
   best: {
     overflow: 'hidden',
     paddingHorizontal: 10,

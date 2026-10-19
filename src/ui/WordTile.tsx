@@ -37,10 +37,21 @@ export function WordTile({
   });
 
   const blank = wildcard && word === WILDCARD;
+  const label = blank
+    ? 'Wildcard, can be any word'
+    : `${displayWord(word)}${locked ? ', anchored' : `, ${tileValue({ word, wildcard })} points`}${wildcard ? ', wildcard' : ''}`;
   return (
     <GestureDetector gesture={gesture}>
       <View
         testID={blank ? 'tile-wildcard' : `tile-${word}`}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ selected, disabled: !enabled || locked }}
+        accessibilityActions={[{ name: 'activate' }]}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === 'activate' && enabled && !locked) onTap();
+        }}
         style={[
           styles.tile,
           { width: size, height: size },
@@ -52,6 +63,7 @@ export function WordTile({
       >
         <Text
           numberOfLines={1}
+          allowFontScaling={false}
           style={[
             styles.word,
             { fontSize: blank ? size * 0.42 : wordFontSize(word, size) },
@@ -60,9 +72,21 @@ export function WordTile({
         >
           {displayWord(word)}
         </Text>
-        {blank && <Text style={styles.anyWord}>any word</Text>}
-        {wildcard && !blank && <Text style={styles.wildMark}>★</Text>}
-        {!locked && !blank && <Text style={styles.value}>{tileValue({ word, wildcard })}</Text>}
+        {blank && (
+          <Text style={styles.anyWord} allowFontScaling={false}>
+            any word
+          </Text>
+        )}
+        {wildcard && !blank && (
+          <Text style={styles.wildMark} allowFontScaling={false}>
+            ★
+          </Text>
+        )}
+        {!locked && !blank && (
+          <Text style={styles.value} allowFontScaling={false}>
+            {tileValue({ word, wildcard })}
+          </Text>
+        )}
       </View>
     </GestureDetector>
   );

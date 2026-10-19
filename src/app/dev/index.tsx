@@ -43,6 +43,7 @@ function Tools() {
       </Text>
 
       <Button label="Label phrases" primary onPress={() => router.push('/dev/label')} />
+      <Button label="The owl's moods" onPress={() => router.push('/dev/owl')} />
       <Button
         label={saved.unlockAll ? 'Unlock all levels: on' : 'Unlock all levels: off'}
         onPress={() => progress.setUnlockAll(!saved.unlockAll)}

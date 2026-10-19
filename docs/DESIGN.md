@@ -308,6 +308,18 @@ Each phase ends in a **playable build** with a clear exit test.
 - Settings, accessibility (font scaling, color-blind-safe verdict colors).
 - **Exit:** a stranger watching a clip of it says "that looks cute and fun".
 
+**Status (Phase 4):**
+- [x] Placeholder mascot: a vector owl in reading glasses (`src/ui/Owl.tsx`, react-native-svg) with six moods, blinking, an idle bob, and reactions (hop, head shake, thinking tilt); tap for a hoot. Mood gallery in the developer menu. App icons rendered from it
+- [ ] Commissioned mascot art (swap the drawing in `Owl.tsx`; the moods and animations stay)
+- [x] Line-by-line verdict reveal: each line's quip in the owl's typewriter speech bubble, its own sound, haptic and owl reaction; play is locked until the reveal finishes
+- [x] Canned lines (`src/core/quips.ts`): ~35 tier quips for the built-in judge (some quote the phrase), plus lines for judging, intros, fixes, wins by stars, losses and pokes, picked by seed so they don't flicker
+- [x] Effects: tiles pop when placed and when their line is graded, dealt tiles spring into the hand, the score bar slides, stars pop in with a chime each, confetti for poetic lines and cleared levels
+- [x] Sound and music synthesised by `scripts/make-sounds.mjs` (13 effects and an 8-bar music-box loop, no samples), via expo-audio; respects the silent switch and mixes with other audio
+- [x] Settings screen: sound, music, vibration, reduce motion (plus the phone's own setting), colour-blind-friendly verdict colours (Okabe–Ito based)
+- [x] Accessibility: tier icons (✗ ✓ ★ ✦) everywhere a verdict colour shows, screen-reader labels and actions on tiles, cells, map nodes and buttons, verdicts announced as they're revealed, text that scales with the phone's setting (tiles and the board stay fixed)
+- [x] Theme tints for map chapters
+- [ ] Record a clip and show it to a stranger (the exit test)
+
 ### Phase 5: Modes & social (≈2–3 weeks)
 - **Daily puzzle:** date-seeded, one attempt plus resubmits, shareable emoji result card.
 - **Zen mode:** endless boards, no threshold, no lives.

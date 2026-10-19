@@ -1,6 +1,7 @@
 import bundledModel from '../data/judgeModel.json';
+import { quipFor } from './quips';
 import { predict, type TinyModel } from './tinyJudge';
-import type { JudgeEntry, Pos, Tier, Verdict } from './types';
+import type { JudgeEntry, Pos, Verdict } from './types';
 import { wordInfo } from './words';
 
 // The built-in judge: a few hard grammar rules, then the tiny trained model
@@ -14,39 +15,8 @@ const DET: ReadonlySet<Pos> = new Set(['det']);
 
 export const BUNDLED_MODEL = bundledModel as TinyModel;
 
-const QUIPS: Record<Tier, string[]> = {
-  invalid: [
-    'I adjusted my glasses twice. Still nonsense.',
-    'Hoo wrote this? Try again.',
-    'Even my feathers are confused.',
-  ],
-  ok: [
-    'Grammatical. I suppose that counts for something.',
-    'It parses. My standards remain unmoved.',
-    'Acceptable. Barely, but acceptable.',
-    'Fine. Not poetry, but fine.',
-    'Adequate. I have read worse. Recently, even.',
-  ],
-  great: [
-    'Oh, that one has a pulse.',
-    'Now we are getting somewhere.',
-    'I may underline that one.',
-  ],
-  poetic: [
-    'I need a moment. That was lovely.',
-    'Someone frame this immediately.',
-    'My spectacles fogged up a little.',
-  ],
-};
-
 function only(word: string, tags: ReadonlySet<Pos>): boolean {
   return wordInfo(word).pos.every((pos) => tags.has(pos));
-}
-
-function pick(list: string[], seed: string): string {
-  let hash = 0;
-  for (const ch of seed) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
-  return list[Math.abs(hash) % list.length];
 }
 
 /** A hard grammar problem that makes a phrase invalid whatever any model says, or null. */
@@ -78,6 +48,6 @@ export function localVerdict(entry: JudgeEntry, model: TinyModel = BUNDLED_MODEL
     tier,
     reading: phrase,
     reason: rule ?? (tier === 'invalid' ? "Doesn't read naturally" : ''),
-    quip: pick(QUIPS[tier], phrase),
+    quip: quipFor(tier, phrase),
   };
 }

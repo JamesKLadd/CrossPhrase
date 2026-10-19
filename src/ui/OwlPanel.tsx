@@ -2,41 +2,72 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { MAX_SUBMITS, TIER_MULTIPLIER } from '../core/config';
-import { entryTiles, phraseKey, verdictFor, type GameState } from '../core/game';
+import { entryTiles, hasNewPhrases, phraseKey, verdictFor, type GameState } from '../core/game';
+import { owlLine } from '../core/quips';
 import { starThresholds, tileValue } from '../core/scoring';
 import type { Tier } from '../core/types';
 import { displayWord } from '../core/words';
 import type { JudgeMode } from '../judge';
-import { colors, TIER_LABEL } from './theme';
+import { haptic, playSound } from './feedback';
+import { Owl, type OwlMood } from './Owl';
+import { colors, TIER_ICON, TIER_LABEL, useTierColors } from './theme';
+import { Typewriter } from './Typewriter';
+import type { Reveal } from './useReveal';
+
+export const TIER_MOOD: Record<Tier, OwlMood> = {
+  invalid: 'disappointed',
+  ok: 'pleased',
+  great: 'delighted',
+  poetic: 'dazzled',
+};
+
+/** How the owl looks right now, from the state of the game. */
+export function owlMood(state: GameState, reveal: Reveal): OwlMood {
+  if (state.phase === 'judging') return 'thinking';
+  if (reveal.active) {
+    const verdict = reveal.current && verdictFor(state, reveal.current);
+    return verdict ? TIER_MOOD[verdict.tier] : 'thinking';
+  }
+  if (state.phase === 'won') return state.lastResult?.stars === 3 ? 'dazzled' : 'delighted';
+  if (state.phase === 'lost') return 'disappointed';
+  // Unimpressed after a failed submit, until there's something new to look at.
+  if (state.lastResult && !state.lastResult.passed && !hasNewPhrases(state)) return 'disappointed';
+  return 'idle';
+}
 
 function speech(
   state: GameState,
+  reveal: Reveal,
   error: string | null,
   mode: JudgeMode | null,
   notice: string | null,
 ): string {
-  if (state.phase === 'judging') return 'Hmm. Let me adjust my glasses…';
+  const seed = `${state.level.id}:${state.submitsUsed}`;
+  if (state.phase === 'judging') return owlLine('judging', seed);
   if (error) return "Something went wrong on my end, so that submit wasn't counted. Try again.";
+  if (reveal.active) {
+    const verdict = reveal.current && verdictFor(state, reveal.current);
+    if (!verdict) return '…';
+    return `${reveal.current!.id}: ${verdict.provisional ? 'Graded offline; I will double-check. ' : ''}${verdict.quip}`;
+  }
   if (notice) return notice;
   const result = state.lastResult;
-  if (result && mode === 'offline') {
-    return "I couldn't reach the big judge, so my pocket edition graded these. I'll double-check later, and I never take back a pass.";
+  if (result && mode === 'offline') return owlLine('offline', seed);
+  if (!result) return state.level.intro ?? owlLine('intro', state.level.id, { submits: MAX_SUBMITS });
+  if (state.phase === 'won') return owlLine(`win${result.stars as 1 | 2 | 3}`, seed);
+  if (state.phase === 'lost') return owlLine('lose', seed);
+  const remaining = MAX_SUBMITS - state.submitsUsed;
+  const left = `${remaining} submit${remaining === 1 ? '' : 's'}`;
+  if (state.entries.some((e) => verdictFor(state, e)?.tier === 'invalid')) {
+    return owlLine('fixLines', seed, { left });
   }
-  if (!result) {
-    return (
-      state.level.intro ??
-      `Fill every square. Each row and column must read as a phrase, and rarer words score more. You get ${MAX_SUBMITS} submits. I'll be judging.`
-    );
-  }
-  const left = MAX_SUBMITS - state.submitsUsed;
-  const anyInvalid = state.entries.some((e) => verdictFor(state, e)?.tier === 'invalid');
-  if (anyInvalid) return `Not quite. Fix the red lines. ${left} submit${left === 1 ? '' : 's'} left.`;
-  const need = starThresholds(state.level)[0];
-  return `All valid, but ${result.total} is short of ${need}. Rarer words, please. ${left} left.`;
+  return owlLine('short', seed, { score: result.total, need: starThresholds(state.level)[0], left });
 }
 
 export function OwlPanel({
   state,
+  reveal,
+  still,
   error,
   mode,
   notice,
@@ -46,6 +77,9 @@ export function OwlPanel({
   onCorrect,
 }: {
   state: GameState;
+  reveal: Reveal;
+  /** Reduced motion: no typing, bobbing or hopping. */
+  still: boolean;
   error: string | null;
   mode: JudgeMode | null;
   notice: string | null;
@@ -56,22 +90,41 @@ export function OwlPanel({
   onCorrect: (phrase: string, judged: Tier, tier: Tier) => void;
 }) {
   const judging = state.phase === 'judging';
+  const tierColors = useTierColors();
   /** The line whose "Wrong?" picker is open. */
   const [correcting, setCorrecting] = useState<string | null>(null);
+  /** Pokes at the owl; its reply lasts until the game moves on. */
+  const [poke, setPoke] = useState<{ count: number; state: GameState | null }>({ count: 0, state: null });
+  const poked = poke.state === state;
+  const mood = owlMood(state, reveal);
+
+  const onPoke = () => {
+    playSound('hoot');
+    haptic('tap');
+    setPoke((p) => ({ count: p.count + 1, state }));
+  };
+  const text = poked ? owlLine('poke', String(poke.count)) : speech(state, reveal, error, mode, notice);
 
   return (
     <View style={styles.panel}>
       <View style={styles.speechRow}>
-        <Text style={styles.owl}>🦉</Text>
+        <Pressable onPress={onPoke} accessibilityRole="button" accessibilityLabel="The owl" testID="owl">
+          <Owl
+            size={60}
+            mood={mood}
+            reaction={state.submitsUsed * 100 + reveal.shown + poke.count * 1000}
+            still={still}
+          />
+        </Pressable>
         <View style={styles.bubble}>
-          <Text style={styles.speech}>{speech(state, error, mode, notice)}</Text>
+          <Typewriter text={text} still={still} style={styles.speech} />
           {judging && <ActivityIndicator color={colors.wood} style={styles.spinner} />}
         </View>
       </View>
 
       {state.submitsUsed > 0 && (
         <View style={styles.entries}>
-          {state.entries.map((entry) => {
+          {state.entries.slice(0, reveal.shown).map((entry) => {
             const tiles = entryTiles(state, entry);
             const words = tiles?.map((t) => t.word) ?? null;
             const verdict = verdictFor(state, entry);
@@ -93,11 +146,11 @@ export function OwlPanel({
                     <Text
                       style={[
                         styles.badge,
-                        { backgroundColor: colors.tier[verdict.tier] },
+                        { backgroundColor: tierColors[verdict.tier] },
                         verdict.provisional && styles.badgeProvisional,
                       ]}
                     >
-                      {TIER_LABEL[verdict.tier]}
+                      {TIER_ICON[verdict.tier]} {TIER_LABEL[verdict.tier]}
                       {verdict.provisional ? '?' : ''}
                       {verdict.valid ? ` +${Math.round(base * TIER_MULTIPLIER[verdict.tier])}` : ''}
                     </Text>
@@ -136,10 +189,10 @@ export function OwlPanel({
                           setCorrecting(null);
                           onCorrect(phrase, verdict.tier, tier);
                         }}
-                        style={[styles.chip, { borderColor: colors.tier[tier] }]}
+                        style={[styles.chip, { borderColor: tierColors[tier] }]}
                       >
-                        <Text style={[styles.chipText, { color: colors.tier[tier] }]}>
-                          {TIER_LABEL[tier]}
+                        <Text style={[styles.chipText, { color: tierColors[tier] }]}>
+                          {TIER_ICON[tier]} {TIER_LABEL[tier]}
                         </Text>
                       </Pressable>
                     ))}
@@ -156,8 +209,7 @@ export function OwlPanel({
 
 const styles = StyleSheet.create({
   panel: { alignSelf: 'stretch', gap: 10 },
-  speechRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  owl: { fontSize: 40 },
+  speechRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   bubble: {
     flex: 1,
     flexDirection: 'row',

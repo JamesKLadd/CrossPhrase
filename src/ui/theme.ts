@@ -1,4 +1,5 @@
 import type { Pos, Tier } from '../core/types';
+import { useSettings } from '../settings';
 
 // Placeholder palette: warm paper and ink, to suit a bookish owl. Phase 4
 // replaces this with the real art direction.
@@ -24,6 +25,34 @@ export const colors = {
     great: '#3F8F5C',
     poetic: '#8A55B5',
   } satisfies Record<Tier, string>,
+};
+
+/**
+ * Verdict colours. The colour-blind set (from the Okabe–Ito palette, darkened
+ * so white text stays readable) keeps the four tiers apart for the common
+ * kinds of colour blindness. Either way, verdicts also carry an icon and a
+ * label, so colour is never the only cue.
+ */
+export const TIER_PALETTES: Record<'standard' | 'colorBlind', Record<Tier, string>> = {
+  standard: colors.tier,
+  colorBlind: {
+    invalid: '#C25200',
+    ok: '#0072B2',
+    great: '#007A5A',
+    poetic: '#A35488',
+  },
+};
+
+/** The verdict colours for the player's settings. */
+export function useTierColors(): Record<Tier, string> {
+  return TIER_PALETTES[useSettings().colorBlind ? 'colorBlind' : 'standard'];
+}
+
+export const TIER_ICON: Record<Tier, string> = {
+  invalid: '✗',
+  ok: '✓',
+  great: '★',
+  poetic: '✦',
 };
 
 export const TIER_LABEL: Record<Tier, string> = {
