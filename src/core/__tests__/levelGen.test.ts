@@ -17,7 +17,8 @@ describe('growLayout', () => {
   it.each(LEVEL_BANDS.map((b) => [b.name, b] as const))('grows playable %s layouts', (_, band) => {
     const rng = new Rng(7);
     let grown = 0;
-    for (let i = 0; i < 25; i++) {
+    // Big bands reject most attempts, so try plenty (the generator tries 120 per level).
+    for (let i = 0; i < 300 && grown < 10; i++) {
       const layout = growLayout(rng, band);
       if (!layout) continue;
       grown++;

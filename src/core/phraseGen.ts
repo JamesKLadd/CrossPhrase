@@ -1,3 +1,4 @@
+import { MIN_ENTRY_LENGTH } from './config';
 import { ruleProblem } from './localJudge';
 import { nextRandom } from './rng';
 import { predict, type Example, type TinyModel } from './tinyJudge';
@@ -28,6 +29,19 @@ const TEMPLATES: Pos[][] = [
   ['det', 'noun', 'conj', 'det', 'noun'],
   ['verb', 'adv'],
   ['det', 'adj', 'adj', 'noun'],
+  // Headline-style lines without articles, which three-word boards are full of.
+  ['noun', 'verb', 'noun'],
+  ['noun', 'verb', 'adv'],
+  ['pron', 'verb', 'noun'],
+  ['pron', 'verb', 'adv'],
+  ['verb', 'adj', 'noun'],
+  ['noun', 'prep', 'noun'],
+  ['noun', 'conj', 'noun'],
+  ['adj', 'noun', 'verb', 'adv'],
+  ['adj', 'noun', 'prep', 'noun'],
+  ['det', 'noun', 'verb', 'noun'],
+  ['verb', 'det', 'adj', 'noun'],
+  ['det', 'adj', 'noun', 'verb', 'adv'],
 ];
 
 export class Rng {
@@ -106,7 +120,7 @@ export function bootstrapExamples(count: number, seed: number, weight: number): 
 /**
  * The next phrase to ask a human about. Half are drawn to look plausible, a
  * quarter are random, and a quarter are the ones the tiny model is least sure
- * about, which teach it the most.
+ * about, which teach it the most. Only phrases as long as a board's lines.
  */
 export function labellingCandidate(rng: Rng, model: TinyModel, skip: ReadonlySet<string>): string[] {
   for (let attempt = 0; attempt < 50; attempt++) {
@@ -126,7 +140,8 @@ export function labellingCandidate(rng: Rng, model: TinyModel, skip: ReadonlySet
           : best,
       );
     }
+    if (words.length < MIN_ENTRY_LENGTH) continue;
     if (!skip.has(words.join(' ')) && !ruleProblem(words)) return words;
   }
-  return templatePhrase(rng);
+  return ['the', 'quiet', 'owl'];
 }

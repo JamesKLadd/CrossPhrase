@@ -13,11 +13,12 @@ export const TUTORIAL: LevelDef[] = [
     layout: [
       '...',
       '.##',
+      '.##',
     ],
     swaps: 5,
-    stars: [11, 16, 24],
+    stars: [15, 22, 32],
     seed: 101,
-    deck: ['the', 'golden', 'toast', 'chef', 'sleepy', 'hot', 'tea', 'muffin', 'fresh', 'a', 'jam'],
+    deck: ['the', 'golden', 'toast', 'sleepy', 'chef', 'hot', 'tea', 'muffin', 'fresh', 'a', 'jam'],
     intro:
       'Welcome! Drag a word onto each square. The row and the column must each read as a phrase, and they share the corner.',
   },
@@ -28,11 +29,15 @@ export const TUTORIAL: LevelDef[] = [
     layout: [
       '...',
       '.#.',
+      '.#.',
     ],
     swaps: 5,
-    stars: [19, 28, 41],
+    stars: [23, 34, 50],
     seed: 202,
-    deck: ['the', 'chef', 'stirs', 'kettle', 'slowly', 'hot', 'jam', 'my', 'pancake', 'gently', 'sips'],
+    deck: [
+      'the', 'chef', 'stirs', 'hot', 'kettle', 'the', 'porridge',
+      'jam', 'my', 'pancake', 'sips', 'slowly', 'golden', 'tea',
+    ],
     intro:
       'Two crossings now. A word where lines cross has to work both ways, and it scores in both lines.',
   },
@@ -59,13 +64,14 @@ export const TUTORIAL: LevelDef[] = [
     layout: [
       '...',
       '#.#',
+      '#.#',
     ],
     swaps: 5,
-    stars: [13, 24, 35],
+    stars: [19, 28, 41],
     seed: 404,
     deck: [
       'of', 'but', 'or', 'the', 'and', 'to', 'very',
-      'comet', 'glows', 'drifts', 'silver', 'night', 'owl', 'blinks', 'wolf', 'howls', 'lunar', 'sky',
+      'comet', 'glows', 'drifts', 'slowly', 'silver', 'night', 'owl', 'blinks', 'wolf', 'howls', 'lunar',
     ],
     intro:
       "That hand is all glue. Tap a word you don't want, then Swap it for a new one. Swaps are limited, so choose well.",

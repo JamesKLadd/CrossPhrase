@@ -4,6 +4,9 @@ import type { Tier } from './types';
 
 export const HAND_SIZE = 7;
 
+/** Every line on a board is at least this many words. Two-word lines proved too fiddly to fill. */
+export const MIN_ENTRY_LENGTH = 3;
+
 export const MAX_SUBMITS = 3;
 
 /** Points lost per failed submit, as a fraction of the level's 1-star threshold. */
@@ -89,9 +92,9 @@ export interface LevelBand {
 }
 
 export const LEVEL_BANDS: LevelBand[] = [
-  { name: 'warm-up', from: 11, maxRows: 4, maxCols: 4, entries: [3, 4], length: [2, 3], loops: 0, anchors: [1, 2], hints: 0.5, swaps: 5, objectives: [0, 0], oneStar: 0.75 },
-  { name: 'early', from: 21, maxRows: 5, maxCols: 5, entries: [4, 6], length: [2, 4], loops: 0.15, anchors: [1, 2], hints: 0.35, swaps: 4, objectives: [1, 1], oneStar: 0.8 },
-  { name: 'mid', from: 41, maxRows: 5, maxCols: 5, entries: [5, 8], length: [2, 4], loops: 0.3, anchors: [1, 2], hints: 0.25, swaps: 4, objectives: [1, 1], oneStar: 0.85 },
+  { name: 'warm-up', from: 11, maxRows: 4, maxCols: 4, entries: [3, 4], length: [3, 3], loops: 0, anchors: [1, 2], hints: 0.5, swaps: 5, objectives: [0, 0], oneStar: 0.75 },
+  { name: 'early', from: 21, maxRows: 5, maxCols: 5, entries: [4, 6], length: [3, 4], loops: 0.15, anchors: [1, 2], hints: 0.35, swaps: 4, objectives: [1, 1], oneStar: 0.8 },
+  { name: 'mid', from: 41, maxRows: 5, maxCols: 5, entries: [5, 8], length: [3, 4], loops: 0.3, anchors: [1, 2], hints: 0.25, swaps: 4, objectives: [1, 1], oneStar: 0.85 },
   { name: 'hard', from: 71, maxRows: 6, maxCols: 5, entries: [6, 9], length: [3, 5], loops: 0.4, anchors: [1, 3], hints: 0.15, swaps: 4, objectives: [1, 1], oneStar: 0.9 },
-  { name: 'late', from: 101, maxRows: 6, maxCols: 6, entries: [8, 10], length: [2, 5], loops: 0.5, anchors: [1, 2], hints: 0.1, swaps: 3, objectives: [1, 2], oneStar: 0.95 },
+  { name: 'late', from: 101, maxRows: 6, maxCols: 6, entries: [8, 10], length: [3, 5], loops: 0.5, anchors: [1, 2], hints: 0.1, swaps: 3, objectives: [1, 2], oneStar: 0.95 },
 ];

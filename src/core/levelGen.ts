@@ -51,7 +51,7 @@ const MIN_FILL = 0.42;
  * Grows a layout one entry at a time. Each new entry crosses at least one
  * existing entry and must add exactly one run: no merging into an existing
  * run, and no stray side-by-side cells that would form extra runs. Sprawling
- * layouts, and ones made mostly of two-word entries, are rejected.
+ * layouts, and ones made mostly of the shortest entries, are rejected.
  */
 export function growLayout(rng: Rng, band: LevelBand): string[] | null {
   const { maxRows: rows, maxCols: cols } = band;

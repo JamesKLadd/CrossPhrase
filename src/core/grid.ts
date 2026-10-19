@@ -1,3 +1,4 @@
+import { MIN_ENTRY_LENGTH } from './config';
 import type { CellKey, Direction, Entry } from './types';
 
 export function cellKey(row: number, col: number): CellKey {
@@ -74,9 +75,15 @@ export function validateLayout(layout: string[]): string[] {
   const cells = openCells(layout);
   if (cells.length === 0) return [...problems, 'layout has no open cells'];
 
-  const inEntry = new Set(extractEntries(layout).flatMap((e) => e.cells));
+  const entries = extractEntries(layout);
+  const inEntry = new Set(entries.flatMap((e) => e.cells));
   for (const cell of cells) {
     if (!inEntry.has(cell)) problems.push(`cell ${cell} is not part of any entry`);
+  }
+  for (const entry of entries) {
+    if (entry.cells.length < MIN_ENTRY_LENGTH) {
+      problems.push(`entry ${entry.id} has ${entry.cells.length} words; lines need at least ${MIN_ENTRY_LENGTH}`);
+    }
   }
 
   // Every open cell must be reachable from the first one.

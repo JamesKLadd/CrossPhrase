@@ -28,6 +28,7 @@ Status: pre-production · Target: mobile (iOS + Android) · Team: solo · First 
 | Offline | Offline fallback (cached verdicts + lenient local check, re-verified later) |
 | Levels | Procedurally generated, each with a **theme that has its own word pool** |
 | Submits | **3 submits per level.** Each failed submit costs points; failing the third fails the level |
+| Line length | **At least 3 words per line** (decided after playtesting Phase 4: two-word lines were too fiddly) |
 | POS hints | Always soft. They're never enforced, so players keep creative freedom |
 | Repeats | The same word can appear more than once on a board |
 | Word forms | A noun can be read as singular or plural in each phrase. Every other word must be used exactly as drawn |
@@ -40,7 +41,8 @@ Status: pre-production · Target: mobile (iOS + Android) · Team: solo · First 
 
 ### 2.1 Board
 - The grid has **open cells** and **blocked cells**, as in a crossword.
-- An **entry** is any maximal horizontal or vertical run of at least 2 open cells. Each entry must form an acceptable phrase, read left→right or top→bottom.
+- An **entry** (a line) is any maximal horizontal or vertical run of open cells. Each entry must form an acceptable phrase, read left→right or top→bottom.
+- **Every line is at least 3 words** (`MIN_ENTRY_LENGTH`). Two-word lines turned out to be the hardest to fill in playtesting, so layouts never contain them; `validateLayout` rejects any that do.
 - A cell where two entries cross is a **crossing cell**. Its word must work in both phrases. This is where most of the puzzle's difficulty, and its strategy, comes from.
 - Some cells are **anchors**: pre-filled, locked words.
 - Some cells carry a **POS hint** (noun / verb / adjective / adverb / function word). Hints are always *soft*: they show on the cell (dictionary-style, e.g. *n.*, *adj.*), but placement isn't blocked and the judge never sees them.
@@ -197,17 +199,17 @@ Built in Phase 3 (`src/core/levelGen.ts`, `src/core/levelBot.ts`). Difficulty ba
 
 | Band | Levels | Max grid | Entries | Words per entry | Loop chance | Anchors | Hints | Swaps | Objectives | 1★ vs bot |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Tutorial | 1–10 | 4×4 | 2–4 | 2–4 | – | scripted | scripted | 5 | scripted | 2★ = the intended fill |
-| Warm-up | 11–20 | 4×4 | 3–4 | 2–3 | 0 | 1–2 | 50% of cells | 5 | 0 | 0.75 |
-| Early | 21–40 | 5×5 | 4–6 | 2–4 | 15% | 1–2 | 35% | 4 | 1 | 0.80 |
-| Mid | 41–70 | 5×5 | 5–8 | 2–4 | 30% | 1–2 | 25% | 4 | 1 | 0.85 |
+| Tutorial | 1–10 | 4×4 | 2–4 | 3–4 | – | scripted | scripted | 5 | scripted | 2★ = the intended fill |
+| Warm-up | 11–20 | 4×4 | 3–4 | 3 | 0 | 1–2 | 50% of cells | 5 | 0 | 0.75 |
+| Early | 21–40 | 5×5 | 4–6 | 3–4 | 15% | 1–2 | 35% | 4 | 1 | 0.80 |
+| Mid | 41–70 | 5×5 | 5–8 | 3–4 | 30% | 1–2 | 25% | 4 | 1 | 0.85 |
 | Hard | 71–100 | 6 rows × 5 | 6–9 | 3–5 | 40% | 1–3 | 15% | 4 | 1 | 0.90 |
-| Late | 101+ | 6×6 | 8–10 | 2–5 | 50% | 1–2 | 10% | 3 | 1–2 | 0.95 |
+| Late | 101+ | 6×6 | 8–10 | 3–5 | 50% | 1–2 | 10% | 3 | 1–2 | 0.95 |
 
 Grids stop at 6×6: past that, word tiles get too small to read on a phone.
 
 Steps:
-1. **Layout:** grow a crossword one entry at a time. Each new entry crosses an existing one and must add exactly one across/down run (no merging into another run, no stray side-by-side cells). Entries that cross two or more others close loops, which makes boards much harder; each band sets how often that's allowed. Sprawling layouts (under 42% open) and ones made mostly of two-word entries are rejected.
+1. **Layout:** grow a crossword one entry at a time. Each new entry crosses an existing one and must add exactly one across/down run (no merging into another run, no stray side-by-side cells). Entries that cross two or more others close loops, which makes boards much harder; each band sets how often that's allowed. Sprawling layouts (under 42% open) and ones made mostly of the shortest entries are rejected.
 2. **Anchors:** at most one per entry, from a friendly list by position: an opener ("the", "we") where entries start, a link word ("of", "and") mid-entry, otherwise a common theme noun.
 3. **Bot playthroughs:** a bot plays the level by the real rules (same deal, refills and swaps) and is judged by the built-in judge. It fills one entry at a time, trying every way to put its hand words in, swaps when stuck and backs up when it paints itself into a corner. A careful bot picks the phrases the judge is surest of; a greedy one chases rare words. A layout is kept only if the careful bot clears the level's own deal, plus 2 of 4 other deals (fallback: the best attempt with 2 of 5).
 4. **Thresholds:** 1★ = the careful bot's median score × the band factor, but never more than it scored on the level's own deal. 3★ = 0.95 × the greedy bot's median, at least 40% above 1★. 2★ sits halfway. Tune from real completion data later.

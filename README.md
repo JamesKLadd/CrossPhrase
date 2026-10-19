@@ -85,6 +85,8 @@ Study App's training kit) on the NVIDIA desktop.
 
 ## Levels
 
+- **Every line is at least 3 words** (`MIN_ENTRY_LENGTH` in `src/core/config.ts`;
+  layouts with shorter lines are rejected).
 - **Levels 1–10** are a scripted tutorial ([`src/data/tutorial.ts`](src/data/tutorial.ts)).
   Each teaches one thing (crossings, anchors, swaps, tiers, rarity, hints,
   wildcards, bonus goals) and deals a fixed hand that can solve it.
