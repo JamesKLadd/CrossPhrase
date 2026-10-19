@@ -10,7 +10,7 @@ import {
   type GameAction,
   type GameState,
 } from '../core/game';
-import type { LevelDef } from '../core/types';
+import type { LevelDef, Tier } from '../core/types';
 import { judgeService, type JudgeMode } from '../judge';
 
 /** How often to retry offline phrases while any are queued. */
@@ -34,9 +34,10 @@ export function useGame(level: LevelDef) {
   const [error, setError] = useState<string | null>(null);
   /** How the last submit was judged. */
   const [mode, setMode] = useState<JudgeMode | null>(null);
-  /** A one-off line from the owl (appeal filed, offline rulings re-checked...). */
+  /** A one-off line from the owl (correction noted, offline rulings re-checked...). */
   const [notice, setNotice] = useState<string | null>(null);
-  const [appealed, setAppealed] = useState<ReadonlySet<string>>(new Set());
+  /** Phrases the player has corrected this game, with the tier they gave. */
+  const [corrections, setCorrections] = useState<ReadonlyMap<string, Tier>>(new Map());
   const modeRef = useRef(mode);
   useEffect(() => {
     modeRef.current = mode;
@@ -58,11 +59,14 @@ export function useGame(level: LevelDef) {
     }
   }, []);
 
-  // Re-check offline phrases on mount, whenever the app returns to the
-  // foreground, and periodically while any are waiting.
+  // Re-check offline phrases and send queued labels on mount, whenever the
+  // app returns to the foreground, and periodically while any are waiting.
   useEffect(() => {
     if (!judgeService.hasRemote) return;
-    const run = () => void reconcile().catch((e) => console.warn('Reconcile failed:', e));
+    const run = () => {
+      reconcile().catch((e) => console.warn('Reconcile failed:', e));
+      if (judgeService.unsentLabelCount() > 0) void judgeService.syncLabels();
+    };
     run();
     const timer = setInterval(run, RECONCILE_INTERVAL_MS);
     const subscription = AppState.addEventListener('change', (s) => s === 'active' && run());
@@ -94,20 +98,20 @@ export function useGame(level: LevelDef) {
     [reconcile],
   );
 
-  const appeal = useCallback(async (phrase: string) => {
-    setAppealed((prev) => new Set(prev).add(phrase));
-    try {
-      await judgeService.appeal(phrase);
-      setNotice('Appeal noted. I shall consult the dictionary. Again.');
-    } catch (e) {
-      console.warn('Appeal failed:', e);
-      setAppealed((prev) => {
-        const next = new Set(prev);
-        next.delete(phrase);
-        return next;
-      });
-      setNotice("I couldn't file that appeal. Try again when you're online.");
-    }
+  /**
+   * The player says the owl got a phrase wrong. The ruling stands for this
+   * level, but the correction is saved as training data (and, with the cloud
+   * judge, a rejected phrase becomes an appeal).
+   */
+  const correct = useCallback((phrase: string, judged: Tier, tier: Tier) => {
+    setCorrections((prev) => new Map(prev).set(phrase, tier));
+    judgeService.label({ phrase, tier, judged, source: 'play' });
+    setNotice(
+      tier === judged
+        ? 'So we agree after all. How novel.'
+        : 'Noted. I shall consult the dictionary, and my conscience.',
+    );
+    void judgeService.syncLabels();
   }, []);
 
   const restart = useCallback(() => {
@@ -125,8 +129,7 @@ export function useGame(level: LevelDef) {
     error,
     mode,
     notice,
-    appealed,
-    appeal,
-    canAppeal: judgeService.hasRemote,
+    corrections,
+    correct,
   };
 }

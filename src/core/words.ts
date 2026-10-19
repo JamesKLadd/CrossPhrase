@@ -27,6 +27,10 @@ export function poolWords(pool: string): string[] {
   return words;
 }
 
+export function allWords(): string[] {
+  return Object.keys(WORDS);
+}
+
 export function poolNames(): string[] {
   return Object.keys(POOLS);
 }

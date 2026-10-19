@@ -46,3 +46,9 @@ yarn-error.*
 
 # python venv for scripts/build_words.py
 .venv/
+
+# PC judge downloads and logs
+pc-judge/runtime/
+pc-judge/models/
+pc-judge/*.log
+training/*.tmp

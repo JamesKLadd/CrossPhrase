@@ -32,7 +32,7 @@ Status: pre-production · Target: mobile (iOS + Android) · Team: solo · First 
 | Repeats | The same word can appear more than once on a board |
 | Word forms | A noun can be read as singular or plural in each phrase. Every other word must be used exactly as drawn |
 | Language | English only at launch |
-| AI provider | **Claude Haiku 5.5** behind our own `/judge` endpoint (see §5) |
+| AI provider | **Free judges for development** (§5.0): a PC judge (Gemma 4 E2B via llama.cpp, like the Study App) and a tiny built-in model trained on our own labels. Claude Haiku 5.5 is built but switched off until launch |
 
 ---
 
@@ -129,6 +129,15 @@ Each level gets 0–2 objectives. They add points or count toward 3★.
 ---
 
 ## 5. The AI judge
+
+### 5.0 Current strategy: free judges you can train (decided after Phase 2)
+No API spending during development. The game picks the best judge it can reach:
+
+1. **PC judge:** Gemma 4 E2B (Apache-2.0) on the developer's computer through llama.cpp (Vulkan + MTP), the same stack as the Study App, reusing its downloads. Same `/judge` contract and shared prompt as the Claude judge, with hard grammar rules applied first and a compact-JSON grammar to cut output tokens. Measured on the eval set: 27/30 agreement (prompt v2); about 33 output tokens per phrase.
+2. **Built-in judge:** hard rules plus a tiny logistic-regression model (POS patterns + word pairs; ~90 KB) inside the app. Offline, instant, trained by `npm run train:judge` from human labels, the PC judge's verdicts (distillation) and a generated starter set. Starter model: 28/30 on the eval set.
+3. **Claude judge:** the Phase 2 Supabase function, kept for launch and off unless configured.
+
+Training data comes from **Wrong?** corrections during play and a PIN-locked labelling screen, saved to `training/` on the PC. Next step once there are a few hundred human labels: a LoRA fine-tune of Gemma on the NVIDIA desktop, adapted from the Study App's training kit.
 
 ### 5.1 Your cost question, answered
 - **A Claude subscription (Pro/Max) does *not* cover API usage.** The API is billed separately, pay-as-you-go, through the Claude Console. Your game's API traffic would never touch your chat plan's limits, and your plan wouldn't pay for it either.
@@ -261,6 +270,14 @@ Each phase ends in a **playable build** with a clear exit test.
 - [ ] Playtest for fairness; watch `judge_cost_daily` and the appeal queue
 - [ ] Later hardening: CAPTCHA on anonymous sign-ins if abuse shows up (Supabase supports it)
 
+**Status (Phase 2b, free judges):**
+- [x] PC judge (`pc-judge/`): Gemma 4 E2B via llama.cpp, Study App downloads reused, pinned + checksummed setup, GPU→CPU fallback, rules first, compact-JSON grammar, verdict memory and label collection in `training/`
+- [x] Built-in judge: rules + tiny trained model (`src/core/tinyJudge.ts`), training script with held-out and eval reporting
+- [x] "Wrong?" corrections in play (also on cleared levels via "See the owl's verdicts") and a PIN-locked labelling screen
+- [x] Judge prompt shared by every judge (`supabase/functions/_shared/judgePrompt.ts`), v2 with examples of invalid phrases
+- [ ] Collect a few hundred labels; retrain the built-in judge
+- [ ] LoRA fine-tune of Gemma from the labels (port the Study App kit)
+
 ### Phase 3: Levels & progression (≈3 weeks)
 - Procedural generator plus simulation bot for star thresholds.
 - Anchors, POS hint badges, wildcard tiles.
@@ -319,4 +336,4 @@ Each phase ends in a **playable build** with a clear exit test.
 5. Word forms: nouns can be read as singular or plural; everything else is used exactly as drawn.
 6. Themes: yes, each level theme has its own word pool.
 7. Language: English only at launch.
-8. AI provider: Claude Haiku 5.5 via the `/judge` endpoint.
+8. AI provider: Claude Haiku 5.5 via the `/judge` endpoint. *Revised:* free trainable judges for development (§5.0); Claude stays switched off for now.

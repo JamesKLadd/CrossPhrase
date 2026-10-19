@@ -53,7 +53,13 @@ Docs: https://docs.expo.dev/eas/index.md
   `judge_test.ts`); `index.ts` only wires Supabase and Anthropic in.
 - Database changes go in a new file in `supabase/migrations/`, with tests in
   `supabase/tests/database.test.mjs`. Never edit a migration that has shipped.
-- Changing the judge prompt in `supabase/functions/judge/model.ts` means
-  bumping `PROMPT_VERSION`.
+- The judge prompt every judge uses is `supabase/functions/_shared/judgePrompt.ts`;
+  changing it means bumping `PROMPT_VERSION`.
+- Judges: the PC judge (`pc-judge/`, Node via tsx, reuses `judge/judge.ts`), the
+  built-in judge (`src/core/localJudge.ts` + `tinyJudge.ts`, model in
+  `src/data/judgeModel.json`, retrained by `npm run train:judge`), and the
+  optional Claude judge (Supabase). Never commit test labels or verdicts in
+  `training/`; it holds the developer's real data.
 - Before declaring work done: `npm test`, `npm run typecheck`, `npm run lint`,
-  plus `npm run test:db` and `npm run test:functions` when touching `supabase/`.
+  plus `npm run test:pc-judge` when touching `pc-judge/`, and `npm run test:db` /
+  `npm run test:functions` when touching `supabase/`.

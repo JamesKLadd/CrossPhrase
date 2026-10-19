@@ -2,13 +2,18 @@ import { phraseKey, type CachedVerdict } from '../core/game';
 import { localVerdict } from '../core/localJudge';
 import type { JudgeEntry, PhraseVerdict, Verdict } from '../core/types';
 import { isWord } from '../core/words';
+import type { Label, LabelStore } from './labelStore';
 import type { VerdictStore } from './verdictStore';
 
-/** The AI judge, reached over the network. */
+/** A bigger judge reached over the network: the PC judge, or the Claude judge on Supabase. */
 export interface RemoteJudge {
+  readonly kind: 'pc' | 'cloud';
   /** Throws JudgeRequestError when the judge can't be reached or refuses. */
   judge(entries: JudgeEntry[]): Promise<Verdict[]>;
-  appeal(phrase: string): Promise<void>;
+  /** Delivers labels (the PC judge saves them for training; the cloud judge files appeals). */
+  submitLabels(labels: Label[]): Promise<void>;
+  /** Whether the judge answers right now. */
+  isReachable(): Promise<boolean>;
 }
 
 export class JudgeRequestError extends Error {
@@ -22,14 +27,15 @@ export class JudgeRequestError extends Error {
 }
 
 /**
- * online:  the AI judge (or this device's cache of its verdicts) graded everything.
- * offline: the AI judge was unreachable; unknown phrases got provisional local verdicts.
- * local:   no AI judge is configured (development); the local rules are the judge.
+ * online:  the bigger judge (or this device's cache of its verdicts) graded everything.
+ * offline: the bigger judge was unreachable; unknown phrases got provisional built-in verdicts.
+ * local:   no bigger judge is configured; the built-in judge is the judge.
  */
 export type JudgeMode = 'online' | 'offline' | 'local';
 
 export interface JudgeService {
   readonly hasRemote: boolean;
+  readonly remoteKind: RemoteJudge['kind'] | null;
   judge(entries: JudgeEntry[]): Promise<{ verdicts: Verdict[]; mode: JudgeMode }>;
   /** Phrases graded offline that are still waiting for the AI judge. */
   pendingCount(): number;
@@ -38,7 +44,14 @@ export interface JudgeService {
    * or an empty list if there was nothing to do or the judge is still unreachable.
    */
   reconcile(): Promise<PhraseVerdict[]>;
-  appeal(phrase: string): Promise<void>;
+  /** Records a human's verdict on a phrase and queues it for the remote judge. */
+  label(label: Omit<Label, 'at'>): void;
+  labels(): Label[];
+  /** Labels waiting to reach a judge that collects them. */
+  unsentLabelCount(): number;
+  /** Sends queued labels. Returns how many were delivered (0 if unreachable). */
+  syncLabels(): Promise<number>;
+  isRemoteReachable(): Promise<boolean>;
 }
 
 /** The judge endpoint takes at most this many entries per request. */
@@ -48,9 +61,17 @@ function stripEntryId({ entryId: _, ...verdict }: Verdict): CachedVerdict {
   return verdict;
 }
 
-export function createJudgeService(remote: RemoteJudge | null, store: VerdictStore): JudgeService {
+/** Labels sent per request. */
+const LABEL_BATCH = 200;
+
+export function createJudgeService(
+  remote: RemoteJudge | null,
+  store: VerdictStore,
+  labelStore: LabelStore,
+): JudgeService {
   return {
     hasRemote: remote !== null,
+    remoteKind: remote?.kind ?? null,
 
     async judge(entries) {
       const known: Verdict[] = [];
@@ -62,7 +83,7 @@ export function createJudgeService(remote: RemoteJudge | null, store: VerdictSto
       }
 
       if (!remote) {
-        return { verdicts: [...known, ...unknown.map(localVerdict)], mode: 'local' };
+        return { verdicts: [...known, ...unknown.map((e) => localVerdict(e))], mode: 'local' };
       }
       if (unknown.length === 0) return { verdicts: known, mode: 'online' };
 
@@ -117,9 +138,29 @@ export function createJudgeService(remote: RemoteJudge | null, store: VerdictSto
       return resolved;
     },
 
-    async appeal(phrase) {
-      if (!remote) throw new Error('Appeals need the AI judge');
-      await remote.appeal(phrase);
+    label(label) {
+      labelStore.add({ ...label, at: new Date().toISOString() });
     },
+
+    labels: () => labelStore.all(),
+
+    unsentLabelCount: () => (remote ? labelStore.outbox().length : 0),
+
+    async syncLabels() {
+      if (!remote) return 0;
+      const batch = labelStore.outbox().slice(0, LABEL_BATCH);
+      if (batch.length === 0) return 0;
+      try {
+        await remote.submitLabels(batch);
+      } catch (error) {
+        // A request the judge refuses would fail forever; drop it rather than retrying.
+        if (error instanceof JudgeRequestError && !error.retryable) labelStore.markSent(batch.length);
+        return 0;
+      }
+      labelStore.markSent(batch.length);
+      return batch.length;
+    },
+
+    isRemoteReachable: () => (remote ? remote.isReachable() : Promise.resolve(false)),
   };
 }

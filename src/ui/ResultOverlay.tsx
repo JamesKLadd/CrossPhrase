@@ -9,12 +9,15 @@ export function ResultOverlay({
   onNext,
   onRetry,
   onExit,
+  onReview,
 }: {
   state: GameState;
   hasNext: boolean;
   onNext: () => void;
   onRetry: () => void;
   onExit: () => void;
+  /** Hides this card so the player can read (and correct) the owl's verdicts. */
+  onReview: () => void;
 }) {
   const result = state.lastResult;
   if (!result || (state.phase !== 'won' && state.phase !== 'lost')) return null;
@@ -46,6 +49,7 @@ export function ResultOverlay({
         <View style={styles.buttons}>
           {won && hasNext && <Button label="Next level" primary onPress={onNext} />}
           <Button label={won ? 'Replay' : 'Try again'} primary={!won} onPress={onRetry} />
+          <Button label="See the owl's verdicts" onPress={onReview} />
           <Button label="Levels" onPress={onExit} />
         </View>
       </View>

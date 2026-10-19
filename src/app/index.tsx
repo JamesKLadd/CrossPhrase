@@ -1,13 +1,15 @@
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LEVELS } from '../data/levels';
 import { THEMES } from '../data/themes';
-import { judgeService } from '../judge';
+import { labellingEnabled } from '../ui/devAccess';
 import { colors } from '../ui/theme';
+import { useJudgeStatus } from '../ui/useJudgeStatus';
 
 export default function LevelSelect() {
+  const judgeStatus = useJudgeStatus();
   return (
     <SafeAreaView style={styles.screen}>
       <FlatList
@@ -16,14 +18,16 @@ export default function LevelSelect() {
         contentContainerStyle={styles.list}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.owl}>🦉</Text>
+            {/* Long-press the owl for the PIN-locked labelling screen (developer only). */}
+            <Pressable
+              onLongPress={() => labellingEnabled && router.push('/dev/label')}
+              delayLongPress={800}
+            >
+              <Text style={styles.owl}>🦉</Text>
+            </Pressable>
             <Text style={styles.title}>CrossPhrase</Text>
             <Text style={styles.subtitle}>A crossword where every square is a word.</Text>
-            {!judgeService.hasRemote && (
-              <Text style={styles.devNote}>
-                Dev mode: no backend configured, so a lenient local judge grades phrases.
-              </Text>
-            )}
+            <Text style={styles.devNote}>{judgeStatus}</Text>
           </View>
         }
         renderItem={({ item: level, index }) => {

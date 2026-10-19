@@ -34,10 +34,13 @@ export default function PlayScreen() {
 }
 
 function Game({ level }: { level: LevelDef }) {
-  const { state, dispatch, submit, restart, error, mode, notice, appealed, appeal, canAppeal } =
+  const { state, dispatch, submit, restart, error, mode, notice, corrections, correct } =
     useGame(level);
   const [selection, setSelection] = useState<Selection>(null);
   const [highlightedEntry, setHighlightedEntry] = useState<string | null>(null);
+  /** The result card is hidden while the player reviews the verdicts of a finished level. */
+  const [reviewing, setReviewing] = useState(false);
+  const finished = state.phase === 'won' || state.phase === 'lost';
   const { width, height } = useWindowDimensions();
 
   const contentWidth = Math.min(width, 520) - 32;
@@ -52,7 +55,8 @@ function Game({ level }: { level: LevelDef }) {
   const stars = starThresholds(level);
   const boardValue = state.entries.reduce(
     (sum, entry) =>
-      sum + entry.cells.reduce((s, c) => s + (state.board[c] ? wordValue(state.board[c].word) : 0), 0),
+      sum +
+      entry.cells.reduce((s, c) => s + (state.board[c] ? wordValue(state.board[c].word) : 0), 0),
     0,
   );
 
@@ -62,7 +66,9 @@ function Game({ level }: { level: LevelDef }) {
   );
 
   const onTilePress = (tile: Tile) =>
-    setSelection((s) => (s?.kind === 'hand' && s.tileId === tile.id ? null : { kind: 'hand', tileId: tile.id }));
+    setSelection((s) =>
+      s?.kind === 'hand' && s.tileId === tile.id ? null : { kind: 'hand', tileId: tile.id },
+    );
 
   const onCellPress = (cell: CellKey) => {
     if (selection?.kind === 'hand') {
@@ -144,9 +150,8 @@ function Game({ level }: { level: LevelDef }) {
               notice={notice}
               highlighted={highlightedEntry}
               onEntryPress={(id) => setHighlightedEntry((h) => (h === id ? null : id))}
-              canAppeal={canAppeal}
-              appealed={appealed}
-              onAppeal={appeal}
+              corrections={corrections}
+              onCorrect={correct}
             />
           </ScrollView>
 
@@ -157,43 +162,58 @@ function Game({ level }: { level: LevelDef }) {
             onTilePress={onTilePress}
           />
 
-          <View style={styles.actions}>
-            {selection?.kind === 'cell' ? (
-              <ActionButton label="Return to hand" onPress={returnSelected} enabled={playing} />
-            ) : (
+          {finished && reviewing ? (
+            <View style={styles.actions}>
               <ActionButton
-                label={`Swap (${state.swapsLeft})`}
-                onPress={swapSelected}
-                enabled={playing && selection?.kind === 'hand' && state.swapsLeft > 0}
+                label="Done reviewing"
+                primary
+                onPress={() => setReviewing(false)}
+                enabled
               />
-            )}
-            <ActionButton
-              label={
-                state.phase === 'judging'
-                  ? 'Judging…'
-                  : canSubmit(state)
-                    ? 'Submit'
-                    : isBoardFull(state)
-                      ? 'Change a line first'
-                      : `${filled}/${state.entries.length} lines filled`
-              }
-              primary
-              onPress={submit}
-              enabled={canSubmit(state)}
-            />
-          </View>
+            </View>
+          ) : (
+            <View style={styles.actions}>
+              {selection?.kind === 'cell' ? (
+                <ActionButton label="Return to hand" onPress={returnSelected} enabled={playing} />
+              ) : (
+                <ActionButton
+                  label={`Swap (${state.swapsLeft})`}
+                  onPress={swapSelected}
+                  enabled={playing && selection?.kind === 'hand' && state.swapsLeft > 0}
+                />
+              )}
+              <ActionButton
+                label={
+                  state.phase === 'judging'
+                    ? 'Judging…'
+                    : canSubmit(state)
+                      ? 'Submit'
+                      : isBoardFull(state)
+                        ? 'Change a line first'
+                        : `${filled}/${state.entries.length} lines filled`
+                }
+                primary
+                onPress={submit}
+                enabled={canSubmit(state)}
+              />
+            </View>
+          )}
         </View>
 
-        <ResultOverlay
-          state={state}
-          hasNext={next !== undefined}
-          onNext={() => router.replace(`/play/${next!.id}`)}
-          onRetry={() => {
-            setSelection(null);
-            restart();
-          }}
-          onExit={() => router.back()}
-        />
+        {!reviewing && (
+          <ResultOverlay
+            state={state}
+            hasNext={next !== undefined}
+            onNext={() => router.replace(`/play/${next!.id}`)}
+            onRetry={() => {
+              setSelection(null);
+              setReviewing(false);
+              restart();
+            }}
+            onExit={() => router.back()}
+            onReview={() => setReviewing(true)}
+          />
+        )}
       </DragProvider>
     </SafeAreaView>
   );

@@ -1,4 +1,5 @@
 import type { JudgeEntry, Tier, Verdict } from '../../core/types';
+import { createLabelStore, type Label } from '../labelStore';
 import { createJudgeService, JudgeRequestError, type RemoteJudge } from '../service';
 import { createVerdictStore, type KeyValueStorage } from '../verdictStore';
 
@@ -15,9 +16,10 @@ function memoryStorage(): KeyValueStorage & { data: Map<string, string> } {
 /** A fake AI judge that grades every phrase with `tier`, or fails when `down`. */
 function fakeRemote(tier: Tier = 'great') {
   const remote = {
+    kind: 'pc' as const,
     down: false as false | JudgeRequestError,
     calls: [] as JudgeEntry[][],
-    appeals: [] as string[],
+    labels: [] as Label[],
     async judge(entries: JudgeEntry[]): Promise<Verdict[]> {
       remote.calls.push(entries);
       if (remote.down) throw remote.down;
@@ -30,8 +32,12 @@ function fakeRemote(tier: Tier = 'great') {
         quip: 'Hoot.',
       }));
     },
-    async appeal(phrase: string) {
-      remote.appeals.push(phrase);
+    async submitLabels(labels: Label[]) {
+      if (remote.down) throw remote.down;
+      remote.labels.push(...labels);
+    },
+    async isReachable() {
+      return !remote.down;
     },
   };
   return remote satisfies RemoteJudge;
@@ -49,7 +55,7 @@ describe('judge service', () => {
 
   it('uses the AI judge and caches its verdicts on the device', async () => {
     const remote = fakeRemote('great');
-    const service = createJudgeService(remote, createVerdictStore(memoryStorage()));
+    const service = createJudgeService(remote, createVerdictStore(memoryStorage()), createLabelStore(memoryStorage()));
     const first = await service.judge(entries);
     expect(first.mode).toBe('online');
     expect(first.verdicts.map((v) => v.tier)).toEqual(['great', 'great']);
@@ -61,7 +67,7 @@ describe('judge service', () => {
 
   it('only sends phrases the device has not seen', async () => {
     const remote = fakeRemote();
-    const service = createJudgeService(remote, createVerdictStore(memoryStorage()));
+    const service = createJudgeService(remote, createVerdictStore(memoryStorage()), createLabelStore(memoryStorage()));
     await service.judge([entries[0]]);
     await service.judge(entries);
     expect(remote.calls[1].map((e) => e.id)).toEqual(['1D']);
@@ -72,7 +78,7 @@ describe('judge service', () => {
     const seed = {
       'the golden toast': { valid: true, tier: 'poetic' as const, reading: '', reason: '', quip: '' },
     };
-    const service = createJudgeService(remote, createVerdictStore(memoryStorage(), seed));
+    const service = createJudgeService(remote, createVerdictStore(memoryStorage(), seed), createLabelStore(memoryStorage()));
     const { verdicts } = await service.judge([entries[0]]);
     expect(verdicts[0].tier).toBe('poetic');
     expect(remote.calls).toHaveLength(0);
@@ -81,7 +87,7 @@ describe('judge service', () => {
   it('grades provisionally with the local rules when the judge is unreachable', async () => {
     const remote = fakeRemote();
     remote.down = new JudgeRequestError('offline', true);
-    const service = createJudgeService(remote, createVerdictStore(memoryStorage()));
+    const service = createJudgeService(remote, createVerdictStore(memoryStorage()), createLabelStore(memoryStorage()));
     const { verdicts, mode } = await service.judge(entries);
     expect(mode).toBe('offline');
     expect(verdicts.every((v) => v.provisional && v.tier === 'ok')).toBe(true);
@@ -91,7 +97,7 @@ describe('judge service', () => {
   it('re-checks offline phrases once the judge is back, then remembers them', async () => {
     const remote = fakeRemote('poetic');
     remote.down = new JudgeRequestError('offline', true);
-    const service = createJudgeService(remote, createVerdictStore(memoryStorage()));
+    const service = createJudgeService(remote, createVerdictStore(memoryStorage()), createLabelStore(memoryStorage()));
     await service.judge(entries);
 
     expect(await service.reconcile()).toEqual([]);
@@ -115,27 +121,52 @@ describe('judge service', () => {
   it('drops queued phrases the judge refuses, so they are not retried forever', async () => {
     const remote = fakeRemote();
     remote.down = new JudgeRequestError('offline', true);
-    const service = createJudgeService(remote, createVerdictStore(memoryStorage()));
+    const service = createJudgeService(remote, createVerdictStore(memoryStorage()), createLabelStore(memoryStorage()));
     await service.judge(entries);
     remote.down = new JudgeRequestError('bad request', false);
     expect(await service.reconcile()).toEqual([]);
     expect(service.pendingCount()).toBe(0);
   });
 
-  it('uses the local rules as the real judge when no backend is configured', async () => {
-    const service = createJudgeService(null, createVerdictStore(memoryStorage()));
+  it('uses the built-in judge as the real judge when no remote judge is configured', async () => {
+    const service = createJudgeService(null, createVerdictStore(memoryStorage()), createLabelStore(memoryStorage()));
     const { verdicts, mode } = await service.judge(entries);
     expect(mode).toBe('local');
     expect(verdicts.some((v) => v.provisional)).toBe(false);
     expect(service.pendingCount()).toBe(0);
-    await expect(service.appeal('the golden toast')).rejects.toThrow();
+    service.label({ phrase: 'the golden toast', tier: 'great', source: 'play', judged: 'ok' });
+    expect(service.labels()).toHaveLength(1);
+    expect(await service.syncLabels()).toBe(0);
   });
 
-  it('forwards appeals to the AI judge', async () => {
+  it('keeps labels until the remote judge has them', async () => {
     const remote = fakeRemote();
-    const service = createJudgeService(remote, createVerdictStore(memoryStorage()));
-    await service.appeal('the the moon');
-    expect(remote.appeals).toEqual(['the the moon']);
+    remote.down = new JudgeRequestError('offline', true);
+    const service = createJudgeService(remote, createVerdictStore(memoryStorage()), createLabelStore(memoryStorage()));
+    service.label({ phrase: 'the moon glows', tier: 'poetic', source: 'labeler' });
+    service.label({ phrase: 'the golden toast', tier: 'ok', source: 'play', judged: 'great' });
+    expect(await service.syncLabels()).toBe(0);
+    expect(service.unsentLabelCount()).toBe(2);
+
+    remote.down = false;
+    expect(await service.syncLabels()).toBe(2);
+    expect(service.unsentLabelCount()).toBe(0);
+    expect(remote.labels.map((l) => [l.phrase, l.tier, l.source])).toEqual([
+      ['the moon glows', 'poetic', 'labeler'],
+      ['the golden toast', 'ok', 'play'],
+    ]);
+    expect(remote.labels[0].at).toMatch(/^\d{4}-/);
+    expect(service.labels()).toHaveLength(2);
+  });
+
+  it('drops labels the remote judge refuses, so they are not retried forever', async () => {
+    const remote = fakeRemote();
+    remote.down = new JudgeRequestError('bad request', false);
+    const service = createJudgeService(remote, createVerdictStore(memoryStorage()), createLabelStore(memoryStorage()));
+    service.label({ phrase: 'the moon glows', tier: 'poetic', source: 'labeler' });
+    expect(await service.syncLabels()).toBe(0);
+    expect(service.unsentLabelCount()).toBe(0);
+    expect(service.labels()).toHaveLength(1);
   });
 });
 

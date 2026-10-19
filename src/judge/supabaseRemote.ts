@@ -1,6 +1,7 @@
 import { FunctionsHttpError, type SupabaseClient } from '@supabase/supabase-js';
 
 import type { Tier, Verdict } from '../core/types';
+import type { Label } from './labelStore';
 import { JudgeRequestError, type RemoteJudge } from './service';
 
 const TIMEOUT_MS = 15_000;
@@ -40,6 +41,8 @@ export function createSupabaseRemote(supabase: SupabaseClient): RemoteJudge {
   }
 
   return {
+    kind: 'cloud',
+
     async judge(entries) {
       if (entries.length === 0) return [];
       await ensureSignedIn();
@@ -61,10 +64,26 @@ export function createSupabaseRemote(supabase: SupabaseClient): RemoteJudge {
       return verdicts as Verdict[];
     },
 
-    async appeal(phrase) {
+    /** The cloud judge has no label store: a "Wrong?" on a rejected phrase becomes an appeal. */
+    async submitLabels(labels: Label[]) {
+      const appeals = labels.filter((l) => l.source === 'play' && l.judged === 'invalid' && l.tier !== 'invalid');
+      if (appeals.length === 0) return;
       await ensureSignedIn();
-      const { error } = await supabase.from('appeals').insert({ phrase });
-      if (error && error.code !== ALREADY_APPEALED) throw new Error(error.message);
+      for (const { phrase } of appeals) {
+        const { error } = await supabase.from('appeals').insert({ phrase });
+        if (error && error.code !== ALREADY_APPEALED) {
+          throw new JudgeRequestError(`Appeal failed: ${error.message}`, true);
+        }
+      }
+    },
+
+    async isReachable() {
+      try {
+        await ensureSignedIn();
+        return true;
+      } catch {
+        return false;
+      }
     },
   };
 }

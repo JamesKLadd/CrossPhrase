@@ -1,7 +1,9 @@
 // The judge's request handling, free of Supabase and Anthropic specifics so
 // it can be tested with fakes (see judge_test.ts).
 
-export const TIERS = ["invalid", "ok", "great", "poetic"] as const;
+import { TIERS } from "../_shared/judgePrompt.ts";
+
+export { TIERS };
 export type Tier = (typeof TIERS)[number];
 
 export const MAX_ENTRIES = 40;

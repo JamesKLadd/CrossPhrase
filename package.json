@@ -24,11 +24,13 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.10",
     "@types/jest": "30.0.0",
+    "@types/node": "^22.20.5",
     "@types/react": "~19.3.0",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~58.0.4",
     "jest": "~30.5.2",
     "jest-expo": "~58.0.11",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -41,18 +43,23 @@
     "preweb": "node scripts/check-node.mjs",
     "web": "expo start --web",
     "test": "jest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p pc-judge",
     "lint": "expo lint",
     "build:words": "python3 scripts/build_words.py",
     "test:db": "node --test supabase/tests/database.test.mjs",
-    "test:functions": "deno test --no-lock supabase/functions"
+    "test:functions": "deno test --no-lock supabase/functions",
+    "train:judge": "tsx scripts/train-judge.ts",
+    "pc-judge": "tsx pc-judge/server.ts",
+    "pc-judge:setup": "tsx pc-judge/setup.ts",
+    "test:pc-judge": "tsx --test pc-judge/app.test.ts"
   },
   "private": true,
   "jest": {
     "preset": "jest-expo",
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "<rootDir>/supabase/"
+      "<rootDir>/supabase/",
+      "<rootDir>/pc-judge/"
     ]
   },
   "engines": {
