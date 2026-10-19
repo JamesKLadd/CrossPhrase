@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BUNDLED_MODEL, localVerdict } from '../../core/localJudge';
@@ -8,7 +8,8 @@ import { labellingCandidate, Rng } from '../../core/phraseGen';
 import type { Tier } from '../../core/types';
 import { displayWord } from '../../core/words';
 import { judgeService } from '../../judge';
-import { isUnlocked, labellingEnabled, unlock } from '../../ui/devAccess';
+import { devToolsEnabled, isUnlocked } from '../../ui/devAccess';
+import { DevToolsOff, PinGate } from '../../ui/PinGate';
 import { colors, TIER_LABEL } from '../../ui/theme';
 
 const TIERS: Tier[] = ['invalid', 'ok', 'great', 'poetic'];
@@ -32,11 +33,8 @@ export default function LabelScreen() {
           <Text style={styles.title}>Label phrases</Text>
           <View style={styles.headerSpacer} />
         </View>
-        {!labellingEnabled ? (
-          <Text style={styles.note}>
-            Labelling is turned off. Add EXPO_PUBLIC_DEV_PIN=your-pin to .env.local and restart the
-            app with `npx expo start --clear`.
-          </Text>
+        {!devToolsEnabled ? (
+          <DevToolsOff />
         ) : open ? (
           <Labeller />
         ) : (
@@ -44,38 +42,6 @@ export default function LabelScreen() {
         )}
       </View>
     </SafeAreaView>
-  );
-}
-
-function PinGate({ onUnlock }: { onUnlock: () => void }) {
-  const [pin, setPin] = useState('');
-  const [wrong, setWrong] = useState(false);
-  const submit = () => {
-    if (unlock(pin)) onUnlock();
-    else {
-      setWrong(true);
-      setPin('');
-    }
-  };
-  return (
-    <View style={styles.gate}>
-      <Text style={styles.owl}>🦉</Text>
-      <Text style={styles.note}>Developer PIN</Text>
-      <TextInput
-        value={pin}
-        onChangeText={setPin}
-        onSubmitEditing={submit}
-        secureTextEntry
-        keyboardType="number-pad"
-        autoFocus
-        style={styles.pin}
-        testID="dev-pin"
-      />
-      {wrong && <Text style={styles.wrong}>{"That's not it."}</Text>}
-      <Pressable onPress={submit} style={[styles.button, styles.buttonPrimary]}>
-        <Text style={[styles.buttonText, styles.buttonTextPrimary]}>Unlock</Text>
-      </Pressable>
-    </View>
   );
 }
 
@@ -173,20 +139,6 @@ const styles = StyleSheet.create({
   title: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.ink },
   headerSpacer: { width: 70 },
   note: { textAlign: 'center', fontSize: 14, color: colors.inkSoft, lineHeight: 20 },
-  gate: { alignItems: 'center', gap: 12, marginTop: 40 },
-  owl: { fontSize: 56 },
-  pin: {
-    width: 180,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.tileEdge,
-    backgroundColor: colors.white,
-    fontSize: 22,
-    textAlign: 'center',
-    letterSpacing: 6,
-  },
-  wrong: { color: colors.tier.invalid, fontWeight: '700' },
   labeller: { flex: 1, gap: 12 },
   stats: { textAlign: 'center', fontSize: 13, color: colors.inkSoft, lineHeight: 19 },
   card: {
@@ -214,7 +166,5 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.wood,
   },
-  buttonPrimary: { backgroundColor: colors.wood, alignSelf: 'stretch', marginHorizontal: 40 },
   buttonText: { fontSize: 15, fontWeight: '700', color: colors.wood },
-  buttonTextPrimary: { color: colors.white },
 });

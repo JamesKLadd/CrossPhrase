@@ -1,18 +1,23 @@
-import { HAND_SIZE, MAX_SUBMITS } from './config';
+import { HAND_SIZE, MAX_SUBMITS, WILDCARD_CHANCE } from './config';
 import { buildPool, drawWord, type DrawPool } from './draw';
 import { extractEntries, openCells } from './grid';
+import { evaluateObjectives } from './objectives';
+import { nextRandom } from './rng';
 import { scoreSubmission } from './scoring';
-import type {
-  CellKey,
-  Entry,
-  JudgeEntry,
-  LevelDef,
-  PhraseVerdict,
-  SubmitResult,
-  Tier,
-  Tile,
-  Verdict,
+import {
+  WILDCARD,
+  type CellKey,
+  type Entry,
+  type JudgeEntry,
+  type LevelDef,
+  type ObjectiveResult,
+  type PhraseVerdict,
+  type SubmitResult,
+  type Tier,
+  type Tile,
+  type Verdict,
 } from './types';
+import { isWord } from './words';
 
 export type GamePhase = 'playing' | 'judging' | 'won' | 'lost';
 
@@ -26,6 +31,8 @@ export interface GameState {
   board: Record<CellKey, Tile | null>;
   hand: Tile[];
   rng: number;
+  /** How many of the level's scripted deck words have been dealt. */
+  deckIndex: number;
   nextTileId: number;
   swapsLeft: number;
   submitsUsed: number;
@@ -40,7 +47,8 @@ export interface GameState {
 }
 
 export type GameAction =
-  | { type: 'place'; tileId: number; cell: CellKey }
+  /** `word` is required when placing a wildcard: the dictionary word it becomes. */
+  | { type: 'place'; tileId: number; cell: CellKey; word?: string }
   | { type: 'move'; from: CellKey; to: CellKey }
   | { type: 'remove'; cell: CellKey }
   | { type: 'swap'; tileId: number }
@@ -76,6 +84,7 @@ export function createGame(level: LevelDef): GameState {
     board,
     hand: [],
     rng: level.seed,
+    deckIndex: 0,
     nextTileId,
     swapsLeft: level.swaps,
     submitsUsed: 0,
@@ -87,10 +96,26 @@ export function createGame(level: LevelDef): GameState {
   return refillHand(state);
 }
 
+/** Deals the next scripted deck word if there is one, else a random draw. */
 function drawTile(state: GameState): [Tile, GameState] {
-  const [word, rng] = drawWord(poolFor(state.level.theme), state.rng);
-  const tile = { id: state.nextTileId, word };
-  return [tile, { ...state, rng, nextTileId: state.nextTileId + 1 }];
+  const id = state.nextTileId;
+  const deck = state.level.deck ?? [];
+  if (state.deckIndex < deck.length) {
+    const word = deck[state.deckIndex];
+    const tile: Tile = word === WILDCARD ? { id, word, wildcard: true } : { id, word };
+    return [tile, { ...state, deckIndex: state.deckIndex + 1, nextTileId: id + 1 }];
+  }
+  const [roll, afterRoll] = nextRandom(state.rng);
+  if (roll < WILDCARD_CHANCE) {
+    return [{ id, word: WILDCARD, wildcard: true }, { ...state, rng: afterRoll, nextTileId: id + 1 }];
+  }
+  const [word, rng] = drawWord(poolFor(state.level.theme), afterRoll);
+  return [{ id, word }, { ...state, rng, nextTileId: id + 1 }];
+}
+
+/** A tile going back to the hand. A wildcard forgets its word, so it can be anything again. */
+function toHand(tile: Tile): Tile {
+  return tile.wildcard ? { ...tile, word: WILDCARD } : tile;
 }
 
 /** Draws until the hand holds HAND_SIZE tiles. A larger hand is left alone. */
@@ -109,15 +134,20 @@ export function phraseKey(words: string[]): string {
   return words.join(' ');
 }
 
-/** The words currently in an entry, or null if any of its cells is empty. */
-export function entryWords(state: GameState, entry: Entry): string[] | null {
-  const words: string[] = [];
+/** The tiles currently in an entry, or null if any of its cells is empty. */
+export function entryTiles(state: GameState, entry: Entry): Tile[] | null {
+  const tiles: Tile[] = [];
   for (const cell of entry.cells) {
     const tile = state.board[cell];
     if (!tile) return null;
-    words.push(tile.word);
+    tiles.push(tile);
   }
-  return words;
+  return tiles;
+}
+
+/** The words currently in an entry, or null if any of its cells is empty. */
+export function entryWords(state: GameState, entry: Entry): string[] | null {
+  return entryTiles(state, entry)?.map((tile) => tile.word) ?? null;
 }
 
 export function isBoardFull(state: GameState): boolean {
@@ -145,18 +175,44 @@ export function pendingJudgeEntries(state: GameState): JudgeEntry[] {
   return pending;
 }
 
-/** Scores the board from cached verdicts, or null if any entry is unjudged. */
-function scoreFromCache(state: GameState, cache: Record<string, CachedVerdict>): SubmitResult | null {
-  const wordsByEntry: Record<string, string[]> = {};
-  const verdicts: Record<string, Verdict> = {};
+/** The level's bonus objectives, judged against the board and the verdicts so far. */
+export function objectiveProgress(
+  state: GameState,
+  cache: Record<string, CachedVerdict> = state.verdictCache,
+): ObjectiveResult[] {
+  const tiers: Record<string, Tier | undefined> = {};
   for (const entry of state.entries) {
     const words = entryWords(state, entry);
-    const cached = words && cache[phraseKey(words)];
-    if (!words || !cached) return null;
-    wordsByEntry[entry.id] = words;
+    if (words) tiers[entry.id] = cache[phraseKey(words)]?.tier;
+  }
+  return evaluateObjectives({
+    level: state.level,
+    entries: state.entries,
+    board: state.board,
+    tiers,
+    swapsLeft: state.swapsLeft,
+  });
+}
+
+/** Scores the board from cached verdicts, or null if any entry is unjudged. */
+function scoreFromCache(state: GameState, cache: Record<string, CachedVerdict>): SubmitResult | null {
+  const tilesByEntry: Record<string, Tile[]> = {};
+  const verdicts: Record<string, Verdict> = {};
+  for (const entry of state.entries) {
+    const tiles = entryTiles(state, entry);
+    const cached = tiles && cache[phraseKey(tiles.map((t) => t.word))];
+    if (!tiles || !cached) return null;
+    tilesByEntry[entry.id] = tiles;
     verdicts[entry.id] = { entryId: entry.id, ...cached };
   }
-  return scoreSubmission(state.level, state.entries, wordsByEntry, verdicts, state.failedSubmits);
+  return scoreSubmission(
+    state.level,
+    state.entries,
+    tilesByEntry,
+    verdicts,
+    state.failedSubmits,
+    objectiveProgress(state, cache),
+  );
 }
 
 /**
@@ -193,11 +249,17 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const index = state.hand.findIndex((t) => t.id === action.tileId);
       const target = state.board[action.cell];
       if (index === -1 || target === undefined || target?.anchor) return state;
+      let tile = state.hand[index];
+      if (tile.wildcard) {
+        // Only dictionary words, so nothing but known words ever reaches the judge.
+        if (!action.word || !isWord(action.word)) return state;
+        tile = { ...tile, word: action.word };
+      }
       const hand = [...state.hand];
       // A tile already in the cell goes back to the hand in the placed tile's slot.
-      if (target) hand.splice(index, 1, target);
+      if (target) hand.splice(index, 1, toHand(target));
       else hand.splice(index, 1);
-      const board = { ...state.board, [action.cell]: state.hand[index] };
+      const board = { ...state.board, [action.cell]: tile };
       return refillHand({ ...state, hand, board });
     }
 
@@ -215,7 +277,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return {
         ...state,
         board: { ...state.board, [action.cell]: null },
-        hand: [...state.hand, tile],
+        hand: [...state.hand, toHand(tile)],
       };
     }
 

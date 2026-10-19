@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { MAX_SUBMITS, TIER_MULTIPLIER } from '../core/config';
-import { entryWords, phraseKey, verdictFor, type GameState } from '../core/game';
-import { starThresholds, wordValue } from '../core/scoring';
+import { entryTiles, phraseKey, verdictFor, type GameState } from '../core/game';
+import { starThresholds, tileValue } from '../core/scoring';
 import type { Tier } from '../core/types';
 import { displayWord } from '../core/words';
 import type { JudgeMode } from '../judge';
@@ -23,7 +23,10 @@ function speech(
     return "I couldn't reach the big judge, so my pocket edition graded these. I'll double-check later, and I never take back a pass.";
   }
   if (!result) {
-    return `Fill every square. Each row and column must read as a phrase, and rarer words score more. You get ${MAX_SUBMITS} submits. I'll be judging.`;
+    return (
+      state.level.intro ??
+      `Fill every square. Each row and column must read as a phrase, and rarer words score more. You get ${MAX_SUBMITS} submits. I'll be judging.`
+    );
   }
   const left = MAX_SUBMITS - state.submitsUsed;
   const anyInvalid = state.entries.some((e) => verdictFor(state, e)?.tier === 'invalid');
@@ -69,9 +72,10 @@ export function OwlPanel({
       {state.submitsUsed > 0 && (
         <View style={styles.entries}>
           {state.entries.map((entry) => {
-            const words = entryWords(state, entry);
+            const tiles = entryTiles(state, entry);
+            const words = tiles?.map((t) => t.word) ?? null;
             const verdict = verdictFor(state, entry);
-            const base = words?.reduce((sum, w) => sum + wordValue(w), 0) ?? 0;
+            const base = tiles?.reduce((sum, t) => sum + tileValue(t), 0) ?? 0;
             const phrase = words && phraseKey(words);
             const corrected = phrase ? corrections.get(phrase) : undefined;
             return (

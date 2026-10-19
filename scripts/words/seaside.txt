@@ -1,0 +1,8 @@
+# Theme: Seaside
+noun: sea ocean wave beach sand shell seagull crab boat sail anchor lighthouse harbor
+noun: pier island tide shore pebble starfish whale dolphin fish jellyfish sandcastle
+noun: bucket towel umbrella breeze sunset surf coral treasure pirate captain seaweed
+noun: puffin
+verb: swim/swims splash/splashes surf/surfs sail/sails dive/dives crash/crashes
+verb: paddle/paddles wash/washes sparkle/sparkles bob/bobs roll/rolls
+adj: salty sandy breezy wet blue deep stormy calm sunburnt shiny foamy tropical sunlit

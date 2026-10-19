@@ -1,5 +1,5 @@
 import { buildPool, drawWeight, drawWord } from '../draw';
-import { CORE_POOL, poolWords } from '../words';
+import { CORE_POOL, poolWords, wordInfo } from '../words';
 
 describe('draw', () => {
   it('includes the core pool and the theme pool', () => {
@@ -8,9 +8,12 @@ describe('draw', () => {
     expect(pool.words).not.toContain('pancake');
   });
 
-  it('caps the weight of very common words and boosts theme words', () => {
+  it('caps the weight of very common words and boosts theme words and nouns', () => {
     expect(drawWeight('the', false)).toBe(6);
     expect(drawWeight('tulip', true)).toBeCloseTo(drawWeight('tulip', false) * 1.5);
+    const plain = (word: string) => Math.min(6, 2 ** (wordInfo(word).zipf - 3));
+    expect(drawWeight('garden', false)).toBeCloseTo(plain('garden') * 1.5);
+    expect(drawWeight('lazy', false)).toBeCloseTo(plain('lazy'));
   });
 
   it('is deterministic for a given seed', () => {

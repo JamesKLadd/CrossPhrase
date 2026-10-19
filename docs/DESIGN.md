@@ -19,7 +19,7 @@ Status: pre-production · Target: mobile (iOS + Android) · Team: solo · First 
 | Strictness | **Tiered quality**: invalid / OK / great / poetic. The tier feeds into score |
 | AI feedback | **Witty mascot commentary** plus an **appeal button** that logs disputes |
 | Scoring | Word rarity (corpus frequency) × the phrase's AI quality multiplier |
-| Draw | Pure random from the dictionary. Glue words (the, a, of, is) arrive through the normal draw. **Wildcard** tiles are rare draws that let you type any dictionary word |
+| Draw | Pure random from the dictionary, weighted by word frequency (nouns and theme words a little more likely). Glue words (the, a, of, is) arrive through the normal draw. **Wildcard** tiles are rare draws (1.5%) that become any dictionary word, at half its value |
 | Win condition | 1–3 stars from score thresholds, plus **bonus objectives** |
 | Stack | React Native + Expo (TypeScript) |
 | Monetization | Lives/energy, IAP boosters, rewarded ads (all deferred to a late phase) |
@@ -49,11 +49,12 @@ Status: pre-production · Target: mobile (iOS + Android) · Team: solo · First 
 - Each level starts with 7 drawn words. Placing a word draws a replacement at once.
 - **Removing a word from the board returns it to the hand.** The hand can grow above 7, but draws only refill up to 7. That stops players farming draws by placing and removing.
 - **Swaps:** each level grants N (by difficulty, roughly 3–5). A swap discards one hand word and draws a new one. The *+Swaps* booster adds more.
-- **Wildcard tile:** rare, around 1–2% of draws. When placed, the player types a word, which must be in the game dictionary (see §5.4: this also blocks prompt injection).
+- **Wildcard tile:** rare, 1.5% of draws. When placed, the player searches the game dictionary and picks a word (see §5.4: only dictionary words, which also blocks prompt injection). It scores half that word's rarity value, rounded up, so it fills a gap rather than handing out free rare words. A wildcard sent back to the hand forgets its word.
 
 ### 2.3 Draw distribution
 - Each level has a **theme** (Breakfast, Night Sky, Garden…). The draw pool is the theme's own word list plus a shared **core pool** of glue words and everyday verbs, adjectives and pronouns.
-- Draws are random **with replacement** (repeats are allowed). Each word's chance is weighted by its corpus frequency, with a cap so "the" doesn't flood the hand, and theme words get a small boost so the theme comes through. The hand naturally gets the mix of glue and content words that real phrases need, and the weighting curve is a tuning knob (`src/core/config.ts`).
+- Draws are random **with replacement** (repeats are allowed). Each word's chance is weighted by its corpus frequency, with a cap so "the" doesn't flood the hand. Theme words get a small boost so the theme comes through, and so do nouns: they only come from theme pools, and most phrases need one. The hand naturally gets the mix of glue and content words that real phrases need, and the weighting curve is a tuning knob (`src/core/config.ts`).
+- Tutorial levels can script their first draws (a **deck**); random draws take over when it runs out.
 - Draws are seeded per level, so a replay of the same level deals the same sequence.
 
 ### 2.4 Submit loop
@@ -79,14 +80,14 @@ levelScore     = Σ entryScore(all entries) + bonusObjectivePoints
 - Rarity comes from a **local, deterministic** frequency table (e.g. the `wordfreq` Zipf values, baked into the app). Only the quality tier depends on the AI.
 - Stars: 1★ = pass threshold, 2★ and 3★ are higher thresholds. Thresholds come from the level generator (§6).
 
-### 2.6 Bonus objectives (examples)
-- Use a word with 8 or more letters
-- Score "poetic" on any line
-- Use 3 words from a theme set (animals, food, colors)
-- Finish with swaps left over
-- Put a rarity-10 word on a crossing cell
+### 2.6 Bonus objectives
+- Use a word of N+ letters (7 mid-game, 8 late)
+- Get a line judged Great or better
+- Use N words from the level's theme
+- Finish with N swaps to spare
+- Put a word worth N+ points on a crossing cell
 
-Each level gets 0–2 objectives. They add points or count toward 3★.
+Each level gets 0–2 objectives (none in the first generated band). Each one met adds points, 20% of the level's 1★ threshold, before stars are counted. They never rescue a board with an invalid line. Anchors don't count toward them; wildcards do. Progress shows live under the star bar.
 
 ---
 
@@ -95,7 +96,7 @@ Each level gets 0–2 objectives. They add points or count toward 3★.
 - **Mascot:** a smart-looking owl in reading glasses, a little snarky. It's the voice of the judge. It reacts to each line on submit ("'Moonlit soup whispers'? Bold. I respect it.") and celebrates poetic tiers. The commentary is the main source of personality, the way MeowDoku leans on its cats.
 - **Juice:** satisfying tile snap, a staggered line-by-line verdict reveal (which also hides API latency), confetti/ink-splash on poetic lines, haptics on placement and verdicts, and a star-burst on level clear.
 - **Latency budget:** a submit should feel like 1–2 seconds. The reveal animation starts at once and resolves line by line as verdicts arrive.
-- **FTUE:** the first 5 levels are tiny (a 2-entry L-shape, then a 2×2) with scripted hands, so new players learn crossings, swaps and tiers before randomness starts.
+- **FTUE:** the first 10 levels are a scripted tutorial ("Owl School") with fixed decks and an owl tip each: placing words, crossings, anchors, swaps, tiers, rarity, hints, wildcards and bonus goals, then a 4×4 "final exam". Randomness starts at level 11.
 
 ---
 
@@ -192,26 +193,28 @@ The appeal button stores `{entry, verdict, user, timestamp}`. You review the que
 
 ## 6. Procedural level generation
 
-Generator inputs (difficulty profile by level band):
+Built in Phase 3 (`src/core/levelGen.ts`, `src/core/levelBot.ts`). Difficulty bands (`LEVEL_BANDS` in `src/core/config.ts`):
 
-| Param | Early (1–20) | Mid (21–100) | Late (100+) |
-|---|---|---|---|
-| Grid size | 3×3 | 5×5 | 7×7+ |
-| Entries | 2–4 | 6–10 | 12+ |
-| Entry length | 2–3 | 2–4 | 3–5 |
-| Crossing density | low | medium | high |
-| Anchors | 1–2 | 1–3 | 0–2 |
-| POS hints | many | some | few |
-| Swaps | 5 | 4 | 3 |
-| Bonus objectives | 0 | 1 | 1–2 |
+| Band | Levels | Max grid | Entries | Words per entry | Loop chance | Anchors | Hints | Swaps | Objectives | 1★ vs bot |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Tutorial | 1–10 | 4×4 | 2–4 | 2–4 | – | scripted | scripted | 5 | scripted | 2★ = the intended fill |
+| Warm-up | 11–20 | 4×4 | 3–4 | 2–3 | 0 | 1–2 | 50% of cells | 5 | 0 | 0.75 |
+| Early | 21–40 | 5×5 | 4–6 | 2–4 | 15% | 1–2 | 35% | 4 | 1 | 0.80 |
+| Mid | 41–70 | 5×5 | 5–8 | 2–4 | 30% | 1–2 | 25% | 4 | 1 | 0.85 |
+| Hard | 71–100 | 6 rows × 5 | 6–9 | 3–5 | 40% | 1–3 | 15% | 4 | 1 | 0.90 |
+| Late | 101+ | 6×6 | 8–10 | 2–5 | 50% | 1–2 | 10% | 3 | 1–2 | 0.95 |
+
+Grids stop at 6×6: past that, word tiles get too small to read on a phone.
 
 Steps:
-1. **Layout:** place blocked cells under symmetry rules, then reject layouts with entries that are too long or open cells not in any entry, or with disconnected regions.
-2. **Anchors/hints:** pick cells (prefer crossings for hints), and pick anchor words from a curated "friendly" list.
-3. **Thresholds:** estimate expected score by **simulation**. A greedy bot fills the grid with high-frequency words using POS templates; that gives a baseline score, and 1★/2★/3★ = baseline × (1.0 / 1.4 / 1.8). Tune the multipliers from real completion telemetry later.
-4. **Seed it:** `level(N) = generate(seed=N, profile=band(N))`. Deterministic, no level files to ship.
+1. **Layout:** grow a crossword one entry at a time. Each new entry crosses an existing one and must add exactly one across/down run (no merging into another run, no stray side-by-side cells). Entries that cross two or more others close loops, which makes boards much harder; each band sets how often that's allowed. Sprawling layouts (under 42% open) and ones made mostly of two-word entries are rejected.
+2. **Anchors:** at most one per entry, from a friendly list by position: an opener ("the", "we") where entries start, a link word ("of", "and") mid-entry, otherwise a common theme noun.
+3. **Bot playthroughs:** a bot plays the level by the real rules (same deal, refills and swaps) and is judged by the built-in judge. It fills one entry at a time, trying every way to put its hand words in, swaps when stuck and backs up when it paints itself into a corner. A careful bot picks the phrases the judge is surest of; a greedy one chases rare words. A layout is kept only if the careful bot clears the level's own deal, plus 2 of 4 other deals (fallback: the best attempt with 2 of 5).
+4. **Thresholds:** 1★ = the careful bot's median score × the band factor, but never more than it scored on the level's own deal. 3★ = 0.95 × the greedy bot's median, at least 40% above 1★. 2★ sits halfway. Tune from real completion data later.
+5. **Hints and objectives:** soft POS hints come from the bot's own solution (so they agree with at least one real fill), preferring crossings. Bonus objectives are picked from the five kinds, favouring ones the greedy bot met sometimes but not always.
+6. **Shipped, not generated on the phone:** `npm run generate:levels` writes levels 11–120 to `src/data/levels.generated.json` (~50 KB, about a minute to run). Everything is seeded, so the output is reproducible. Generating at runtime would mean levels (and earned stars) silently changing whenever the built-in judge is retrained; shipping the file keeps every player's levels identical until we regenerate on purpose.
 
-Hand-tune the first ~10 levels (scripted tutorial), then go fully procedural.
+Levels 1–10 are the hand-written tutorial; everything after is procedural. Themes rotate in chapters of 10: Breakfast, Night Sky, Garden, Seaside, Library.
 
 ---
 
@@ -285,6 +288,18 @@ Each phase ends in a **playable build** with a clear exit test.
 - Level map (scrolling path), local save, cloud save via Supabase.
 - Scripted FTUE for levels 1–10.
 - **Exit:** 100+ levels with a sensible difficulty curve, and testers progress without a wall.
+
+**Status (Phase 3):**
+- [x] Procedural generator (§6): grown crossword layouts, friendly anchors, bot-checked solvability on each level's own deal, star thresholds from careful/greedy bot playthroughs, hints from the bot's solution
+- [x] 120 levels: a 10-level scripted tutorial with fixed decks and owl tips, then 110 generated levels in five bands; tests check every layout, the rising difficulty, and that the bot clears each tutorial level
+- [x] Two new themes, Seaside and Library (now 502 words); built-in judge retrained on them
+- [x] Anchors, POS hint badges, wildcard tiles (1.5% of draws, dictionary picker, half value)
+- [x] Star bar with live score estimate, bonus objectives with live progress, level-complete card with score breakdown, objectives and "New best!"
+- [x] Level map: winding path in theme chapters, stars per level, locked levels, scrolls to the next level to play
+- [x] Local save (best stars and score per level; unlocking); PIN-locked developer menu with labelling, unlock-all and reset
+- [x] Nouns drawn a little more often (draw balance)
+- [ ] Cloud save via Supabase (waits on the backend being switched on)
+- [ ] Playtest the curve: are 1★ targets fair with the PC judge (stricter than the built-in judge the bot uses)? Adjust `LEVEL_BANDS` / `STAR_BASELINE` and regenerate
 
 ### Phase 4: Identity & juice (≈3 weeks)
 - Mascot design (commission an artist or use a placeholder style), idle and reaction animations.

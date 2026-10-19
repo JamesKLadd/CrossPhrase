@@ -60,6 +60,15 @@ Docs: https://docs.expo.dev/eas/index.md
   `src/data/judgeModel.json`, retrained by `npm run train:judge`), and the
   optional Claude judge (Supabase). Never commit test labels or verdicts in
   `training/`; it holds the developer's real data.
+- Levels 1-10 are the scripted tutorial in `src/data/tutorial.ts`; tests check
+  the bot can clear each one with its deck. Levels 11+ are in
+  `src/data/levels.generated.json`, written by `npm run generate:levels`
+  (`src/core/levelGen.ts` + the bot in `levelBot.ts`). Never hand-edit that
+  file. Changing word lists, the built-in judge model, `LEVEL_BANDS` or other
+  knobs in `src/core/config.ts` changes what the generator makes, so only
+  regenerate deliberately (it reshuffles levels players have already seen).
+- Player progress lives in `src/progress/` (device storage); the developer
+  tools behind the PIN are `src/app/dev/`.
 - Before declaring work done: `npm test`, `npm run typecheck`, `npm run lint`,
   plus `npm run test:pc-judge` when touching `pc-judge/`, and `npm run test:db` /
   `npm run test:functions` when touching `supabase/`.

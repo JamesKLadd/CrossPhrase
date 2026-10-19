@@ -56,11 +56,18 @@ function wordsByPos(): Map<Pos, string[]> {
   return byPos;
 }
 
+/** The first template that some reading of the words' parts of speech matches. */
+export function templateTags(words: string[]): Pos[] | null {
+  return (
+    TEMPLATES.find(
+      (t) => t.length === words.length && t.every((pos, i) => wordInfo(words[i]).pos.includes(pos)),
+    ) ?? null
+  );
+}
+
 /** True if some reading of the words' parts of speech matches a template. */
 export function matchesTemplate(words: string[]): boolean {
-  return TEMPLATES.some(
-    (t) => t.length === words.length && t.every((pos, i) => wordInfo(words[i]).pos.includes(pos)),
-  );
+  return templateTags(words) !== null;
 }
 
 export function templatePhrase(rng: Rng): string[] {

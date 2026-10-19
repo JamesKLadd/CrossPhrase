@@ -6,8 +6,9 @@ AI judge) grades each phrase. Rare words and great phrasing score the points
 needed to clear the level.
 
 The full game design and phase plan are in [docs/DESIGN.md](docs/DESIGN.md).
-This repo is at **Phase 2: judge and scoring hardening**, using free judges
-you can train.
+This repo is at **Phase 3: levels and progression**: 120 levels on a level map
+(a 10-level tutorial, then generated levels across five themes), stars, bonus
+objectives and wildcards, judged by free judges you can train.
 
 ## Run it
 
@@ -65,8 +66,8 @@ Every label you give becomes training data in [`training/`](training/README.md):
 - **While playing:** tap **Wrong?** on any verdict and pick the right tier. On
   a cleared level, use **See the owl's verdicts** first.
 - **Labelling screen** (only you): set `EXPO_PUBLIC_DEV_PIN` in `.env.local`,
-  then **long-press the owl** on the home screen and enter the PIN. Tap a tier
-  for each phrase; about 10 seconds a phrase.
+  then **long-press the owl** on the home screen, enter the PIN and choose
+  **Label phrases**. Tap a tier for each phrase; about 10 seconds a phrase.
 
 With the PC judge running, labels go straight into `training/labels.jsonl` on
 the computer. Then retrain the built-in judge, which takes a few seconds:
@@ -80,6 +81,37 @@ gets better simply by you playing with the PC judge on. Once there are a few
 hundred labels, the same data can fine-tune Gemma itself (a LoRA, like the
 Study App's training kit) on the NVIDIA desktop.
 
+## Levels
+
+- **Levels 1–10** are a scripted tutorial ([`src/data/tutorial.ts`](src/data/tutorial.ts)).
+  Each teaches one thing (crossings, anchors, swaps, tiers, rarity, hints,
+  wildcards, bonus goals) and deals a fixed hand that can solve it.
+- **Levels 11–120** come from the procedural generator
+  ([`src/core/levelGen.ts`](src/core/levelGen.ts)). It grows a crossword
+  layout to suit the level's difficulty band, adds anchors, then has a bot
+  ([`src/core/levelBot.ts`](src/core/levelBot.ts)) play it by the real rules
+  with the built-in judge. Layouts the bot can't clear with the level's own
+  deal are thrown away. The bot's scores set the star thresholds, its solution
+  places the soft hints, and its runs show which bonus goals are in reach.
+- The levels are generated ahead of time into `src/data/levels.generated.json`,
+  so everyone plays the same levels and the game never runs the generator:
+
+  ```sh
+  npm run generate:levels    # about a minute
+  ```
+
+  Regenerating after changing word lists, the built-in judge or the knobs in
+  `src/core/config.ts` (draw weighting, `LEVEL_BANDS`, `STAR_BASELINE`) can
+  change every level, so do it on purpose and commit the result.
+- Progress (best stars and score per level) is saved on the device. A level
+  unlocks when the one before it is cleared.
+
+### Developer tools
+
+With `EXPO_PUBLIC_DEV_PIN` set in `.env.local`, **long-press the owl** on the
+home screen and enter the PIN for: the labelling screen, **Unlock all levels**
+(to try any level) and **Reset progress**.
+
 ## Commands
 
 | Command | What it does |
@@ -89,6 +121,7 @@ Study App's training kit) on the NVIDIA desktop.
 | `npm run test:pc-judge` | PC judge server tests |
 | `npm run test:functions` | Claude judge function tests (needs [Deno](https://deno.com)) |
 | `npm run train:judge` | Retrains the built-in judge from `training/` |
+| `npm run generate:levels` | Regenerates levels 11–120 (see Levels above) |
 | `npm run pc-judge:setup` / `npm run pc-judge` | Sets up / starts the PC judge |
 | `npm run typecheck` | TypeScript |
 | `npm run lint` | ESLint (Expo config) |
@@ -97,7 +130,9 @@ Study App's training kit) on the NVIDIA desktop.
 ## Word data
 
 The curated word lists live in `scripts/words/`: `core.txt` is shared by
-every level, and the other files are theme pools. Each line is
+every level, and the other files are theme pools (Breakfast, Night Sky,
+Garden, Seaside, Library). A new theme also needs an entry in
+`src/data/themes.ts`. Each line is
 `<pos>: word word ...`. Nouns are singular, since the judge may read any noun
 as plural. Slash-joined words (`eat/eats/ate`) are forms of one word and share
 its rarity, so an inflected form isn't worth more than its base form. To add or
@@ -118,17 +153,20 @@ dictionary words). Commit both.
 
 ```
 src/
-  app/            Expo Router screens: level select, play/[levelId]
+  app/            Expo Router screens: the level map, play/[levelId]
+  app/dev/        The PIN-locked developer tools and labelling screen
   core/           Pure TypeScript game logic, no React: grid, draws, scoring,
-                  the game reducer, the built-in judge (rules + tiny model) and
-                  its phrase generator. Unit-tested in core/__tests__.
-  data/           Word data and the built-in judge's model (both generated),
-                  themes, hand-authored levels
+                  bonus objectives, the game reducer, the built-in judge
+                  (rules + tiny model), the level generator and its bot.
+                  Unit-tested in core/__tests__.
+  data/           Word data, the built-in judge's model and the generated
+                  levels (all generated), themes, the tutorial levels
   judge/          Judge service: picks the judge, on-device verdict cache,
                   labels, offline grading and re-checks
-  app/dev/        The PIN-locked labelling screen
+  progress/       Saved stars and scores, and what's unlocked
   lib/            Supabase client
-  ui/             Board, hand tray, drag-and-drop, owl panel, result overlay
+  ui/             Board, hand tray, drag-and-drop, owl panel, star bar and
+                  goals, wildcard picker, result overlay
 pc-judge/         The free PC judge: llama.cpp + Gemma behind a small HTTP server
 training/         Labels and PC-judge verdicts for training
 supabase/
@@ -137,12 +175,14 @@ supabase/
                   testable request core, shared with the PC judge)
   migrations/     Verdict cache, appeals, rate limits, usage log and cost view
   tests/          Database tests
-scripts/          Word list builder, word sources, judge eval, train-judge.ts
+scripts/          Word list builder, word sources, judge eval, train-judge.ts,
+                  generate-levels.ts
 docs/DESIGN.md    Game design and phase plan
 ```
 
 Tuning knobs (hand size, submits, penalties, tier multipliers, rarity curve,
-draw weighting, star thresholds) are all in `src/core/config.ts`.
+draw weighting, wildcards, bonus points, star thresholds and the generator's
+difficulty bands) are all in `src/core/config.ts`.
 
 ## Optional: the Claude judge (paid, off by default)
 

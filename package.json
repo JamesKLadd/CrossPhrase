@@ -50,6 +50,7 @@
     "test:db": "node --test supabase/tests/database.test.mjs",
     "test:functions": "deno test --no-lock supabase/functions",
     "train:judge": "tsx scripts/train-judge.ts",
+    "generate:levels": "tsx scripts/generate-levels.ts",
     "pc-judge": "tsx pc-judge/server.ts",
     "pc-judge:setup": "tsx pc-judge/setup.ts",
     "test:pc-judge": "tsx --test pc-judge/app.test.ts"

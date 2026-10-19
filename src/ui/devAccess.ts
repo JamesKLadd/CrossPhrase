@@ -1,18 +1,18 @@
-// The labelling screen is for the developer only: it needs a PIN from
-// .env.local (EXPO_PUBLIC_DEV_PIN). Without one, the screen doesn't exist.
+// The developer tools (labelling screen, unlock-all, reset progress) need a
+// PIN from .env.local (EXPO_PUBLIC_DEV_PIN). Without one, they don't exist.
 // This keeps friends and testers out; it isn't real security, since the PIN
 // ships inside development builds. Leave it unset for release builds.
 
 const PIN = process.env.EXPO_PUBLIC_DEV_PIN ?? '';
 let unlocked = false;
 
-export const labellingEnabled = PIN.length > 0;
+export const devToolsEnabled = PIN.length > 0;
 
 export function isUnlocked(): boolean {
-  return labellingEnabled && unlocked;
+  return devToolsEnabled && unlocked;
 }
 
 export function unlock(attempt: string): boolean {
-  unlocked = labellingEnabled && attempt === PIN;
+  unlocked = devToolsEnabled && attempt === PIN;
   return unlocked;
 }

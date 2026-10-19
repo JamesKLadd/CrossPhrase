@@ -123,6 +123,7 @@ function Cell({
           source={{ kind: 'cell', cell }}
           selected={selected}
           locked={tile.anchor}
+          wildcard={tile.wildcard}
           enabled={playing}
           onTap={onPress}
         />
@@ -155,7 +156,16 @@ const styles = StyleSheet.create({
   highlighted: { backgroundColor: colors.paperDeep },
   hovered: { borderColor: colors.selected, borderWidth: 2.5, borderStyle: 'solid' },
   empty: { alignSelf: 'stretch', flex: 1, alignItems: 'center', justifyContent: 'center' },
-  hint: { fontStyle: 'italic', color: colors.inkSoft, fontSize: 13 },
+  hint: {
+    overflow: 'hidden',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+    fontStyle: 'italic',
+    fontSize: 13,
+    color: colors.inkSoft,
+    backgroundColor: colors.paperDeep,
+  },
   number: {
     position: 'absolute',
     left: 5,

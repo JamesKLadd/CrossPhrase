@@ -1,10 +1,13 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { GameState } from '../core/game';
+import { describeObjective } from '../core/objectives';
 import { colors } from './theme';
 
 export function ResultOverlay({
   state,
+  levelNumber,
+  newBest,
   hasNext,
   onNext,
   onRetry,
@@ -12,6 +15,9 @@ export function ResultOverlay({
   onReview,
 }: {
   state: GameState;
+  levelNumber: number;
+  /** This clear beat the player's earlier best on the level. */
+  newBest: boolean;
   hasNext: boolean;
   onNext: () => void;
   onRetry: () => void;
@@ -27,18 +33,31 @@ export function ResultOverlay({
     <View style={styles.backdrop}>
       <View style={styles.card}>
         <Text style={styles.owl}>🦉</Text>
-        <Text style={styles.title}>{won ? 'Level cleared!' : 'Out of submits'}</Text>
+        <Text style={styles.title}>{won ? `Level ${levelNumber} cleared!` : 'Out of submits'}</Text>
         {won && (
-          <Text style={styles.stars}>
+          <Text style={styles.stars} testID="result-stars">
             {'★'.repeat(result.stars)}
             <Text style={styles.starsEmpty}>{'★'.repeat(3 - result.stars)}</Text>
           </Text>
         )}
-        <Text style={styles.score}>
-          {result.penalty > 0
-            ? `${result.raw} − ${result.penalty} penalty = ${result.total} points`
-            : `${result.total} points`}
-        </Text>
+        {won && newBest && <Text style={styles.best}>New best!</Text>}
+        <Text style={styles.score}>{result.total} points</Text>
+        {(result.bonus > 0 || result.penalty > 0) && (
+          <Text style={styles.breakdown}>
+            {result.raw} from lines
+            {result.bonus > 0 ? ` + ${result.bonus} bonus` : ''}
+            {result.penalty > 0 ? ` − ${result.penalty} penalty` : ''}
+          </Text>
+        )}
+        {result.objectives.length > 0 && (
+          <View style={styles.objectives}>
+            {result.objectives.map((o, i) => (
+              <Text key={i} style={[styles.objective, o.met && styles.objectiveMet]}>
+                {o.met ? '✓' : '✗'} {describeObjective(o.objective)} {o.met ? `+${o.objective.points}` : ''}
+              </Text>
+            ))}
+          </View>
+        )}
         <Text style={styles.remark}>
           {won
             ? result.stars === 3
@@ -88,9 +107,23 @@ const styles = StyleSheet.create({
   },
   owl: { fontSize: 56 },
   title: { fontSize: 24, fontWeight: '800', color: colors.ink },
-  stars: { fontSize: 36, color: colors.selected, letterSpacing: 4 },
-  starsEmpty: { color: colors.tileEdge },
-  score: { fontSize: 16, fontWeight: '600', color: colors.ink },
+  stars: { fontSize: 36, color: colors.star, letterSpacing: 4 },
+  starsEmpty: { color: colors.starEmpty },
+  best: {
+    overflow: 'hidden',
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.white,
+    backgroundColor: colors.tier.great,
+  },
+  score: { fontSize: 18, fontWeight: '800', color: colors.ink },
+  breakdown: { fontSize: 13, color: colors.inkSoft },
+  objectives: { alignSelf: 'stretch', gap: 2, marginTop: 4 },
+  objective: { fontSize: 13, color: colors.inkSoft, textAlign: 'center' },
+  objectiveMet: { color: colors.tier.great, fontWeight: '700' },
   remark: { fontStyle: 'italic', color: colors.inkSoft, textAlign: 'center' },
   buttons: { marginTop: 8, gap: 8, alignSelf: 'stretch' },
   button: {

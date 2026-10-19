@@ -14,6 +14,9 @@ export const colors = {
   cell: '#FBF7EE',
   anchor: '#E4D8BF',
   selected: '#E9A23B',
+  wildcard: '#FFF4DC',
+  star: '#E9A23B',
+  starEmpty: '#D9CBAE',
   white: '#FFFFFF',
   tier: {
     invalid: '#C9473F',

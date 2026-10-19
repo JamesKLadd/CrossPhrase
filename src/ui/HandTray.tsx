@@ -35,6 +35,7 @@ export function HandTray({
           size={HAND_TILE_SIZE}
           source={{ kind: 'hand', tileId: tile.id }}
           selected={selectedTile === tile.id}
+          wildcard={tile.wildcard}
           enabled={enabled}
           onTap={() => onTilePress(tile)}
         />

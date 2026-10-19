@@ -35,7 +35,7 @@ export function poolNames(): string[] {
   return Object.keys(POOLS);
 }
 
-/** Words are stored lowercase; this restores the few that need capitals. */
+/** Words are stored lowercase; this restores the few that need capitals. A blank wildcard is a star. */
 export function displayWord(word: string): string {
-  return word === 'i' ? 'I' : word;
+  return word === 'i' ? 'I' : word === '*' ? '★' : word;
 }

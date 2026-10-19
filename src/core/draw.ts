@@ -9,8 +9,9 @@ export interface DrawPool {
 }
 
 export function drawWeight(word: string, fromTheme: boolean): number {
-  const { base, pivot, cap, themeBoost } = DRAW_WEIGHTING;
-  const weight = Math.min(cap, base ** (wordInfo(word).zipf - pivot));
+  const { base, pivot, cap, themeBoost, nounBoost } = DRAW_WEIGHTING;
+  const { zipf, pos } = wordInfo(word);
+  const weight = Math.min(cap, base ** (zipf - pivot)) * (pos.includes('noun') ? nounBoost : 1);
   return fromTheme ? weight * themeBoost : weight;
 }
 

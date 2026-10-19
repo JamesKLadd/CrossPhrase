@@ -3,12 +3,13 @@ import {
   canSubmit,
   createGame,
   gameReducer,
+  objectiveProgress,
   pendingJudgeEntries,
   verdictFor,
   type GameAction,
   type GameState,
 } from '../game';
-import type { CellKey, LevelDef, Tier, Verdict } from '../types';
+import { WILDCARD, type CellKey, type LevelDef, type Tier, type Verdict } from '../types';
 
 const level: LevelDef = {
   id: 'test',
@@ -267,5 +268,83 @@ describe('reconcile (offline verdicts re-checked online)', () => {
       verdicts: phrases(state).map((p) => real(p, 'poetic')),
     });
     expect(next).toBe(state);
+  });
+});
+
+describe('scripted decks', () => {
+  const scripted: LevelDef = {
+    ...level,
+    anchors: {},
+    deck: ['the', 'golden', 'toast', 'chef', 'sleepy', 'hot', 'tea', 'muffin', 'jam'],
+  };
+
+  it('deals the deck in order, then draws at random', () => {
+    let state = createGame(scripted);
+    expect(state.hand.map((t) => t.word)).toEqual(scripted.deck!.slice(0, HAND_SIZE));
+    state = gameReducer(state, { type: 'place', tileId: state.hand[0].id, cell: '0,0' });
+    expect(state.hand[HAND_SIZE - 1].word).toBe('muffin');
+    state = gameReducer(state, { type: 'swap', tileId: state.hand[0].id });
+    expect(state.hand[0].word).toBe('jam');
+    expect(state.deckIndex).toBe(scripted.deck!.length);
+    state = gameReducer(state, { type: 'swap', tileId: state.hand[0].id });
+    expect(state.rng).not.toBe(scripted.seed);
+  });
+});
+
+describe('wildcards', () => {
+  const wild: LevelDef = { ...level, anchors: {}, deck: ['*', 'the', 'golden', 'toast', 'chef', 'tea', 'hot'] };
+  const wildcard = (state: GameState) => state.hand.find((t) => t.wildcard)!;
+
+  it('need a dictionary word to be placed', () => {
+    const state = createGame(wild);
+    const tile = wildcard(state);
+    expect(tile.word).toBe(WILDCARD);
+    expect(gameReducer(state, { type: 'place', tileId: tile.id, cell: '0,0' })).toBe(state);
+    expect(gameReducer(state, { type: 'place', tileId: tile.id, cell: '0,0', word: 'zzz' })).toBe(state);
+    expect(gameReducer(state, { type: 'place', tileId: tile.id, cell: '0,0', word: '*' })).toBe(state);
+    const next = gameReducer(state, { type: 'place', tileId: tile.id, cell: '0,0', word: 'nebula' });
+    expect(next.board['0,0']).toEqual({ id: tile.id, word: 'nebula', wildcard: true });
+  });
+
+  it('forget their word when they go back to the hand', () => {
+    let state = createGame(wild);
+    const tile = wildcard(state);
+    state = gameReducer(state, { type: 'place', tileId: tile.id, cell: '0,0', word: 'nebula' });
+    const removed = gameReducer(state, { type: 'remove', cell: '0,0' });
+    expect(wildcard(removed)).toEqual({ id: tile.id, word: WILDCARD, wildcard: true });
+    const displaced = gameReducer(state, { type: 'place', tileId: state.hand[0].id, cell: '0,0' });
+    expect(wildcard(displaced)).toEqual({ id: tile.id, word: WILDCARD, wildcard: true });
+  });
+
+  it('turn up now and then in random draws', () => {
+    let wildcards = 0;
+    for (let seed = 1; seed <= 300; seed++) {
+      wildcards += createGame({ ...level, seed }).hand.filter((t) => t.wildcard).length;
+    }
+    // 2100 draws at 1.5% is about 32.
+    expect(wildcards).toBeGreaterThan(10);
+    expect(wildcards).toBeLessThan(70);
+  });
+});
+
+describe('bonus objectives', () => {
+  it('add their points to a winning submit', () => {
+    const withGoal: LevelDef = { ...level, objectives: [{ kind: 'swapsLeft', count: 2, points: 7 }] };
+    let state = fillBoard(createGame(withGoal));
+    state = gameReducer(state, { type: 'submitStart' });
+    state = gameReducer(state, { type: 'submitResult', verdicts: judgeAll(state, 'ok') });
+    expect(state.lastResult!.bonus).toBe(7);
+    expect(state.lastResult!.total).toBe(state.lastResult!.raw + 7);
+    expect(state.lastResult!.objectives).toEqual([
+      { objective: withGoal.objectives![0], met: true, have: 2, need: 2 },
+    ]);
+  });
+
+  it('report progress while playing', () => {
+    const withGoal: LevelDef = { ...level, objectives: [{ kind: 'swapsLeft', count: 2, points: 7 }] };
+    let state = createGame(withGoal);
+    expect(objectiveProgress(state)[0]).toMatchObject({ met: true, have: 2 });
+    state = gameReducer(state, { type: 'swap', tileId: state.hand[0].id });
+    expect(objectiveProgress(state)[0]).toMatchObject({ met: false, have: 1 });
   });
 });

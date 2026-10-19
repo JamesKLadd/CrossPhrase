@@ -1,0 +1,240 @@
+import { TIER_MULTIPLIER } from './config';
+import { createGame, entryTiles, gameReducer, type GameState } from './game';
+import { BUNDLED_MODEL, ruleProblem } from './localJudge';
+import { scoreSubmission, tileValue } from './scoring';
+import { predict, type TinyModel } from './tinyJudge';
+import type { CellKey, Entry, LevelDef, Pos, Tier, Tile, Verdict } from './types';
+import { wordInfo } from './words';
+
+// A simulated player, used by the level generator to check that a level can be
+// solved with the hand it deals and to set its star thresholds. It plays by the
+// real rules (the game reducer: same deals, refills and swaps) and is judged by
+// the built-in judge. It fills one entry at a time, trying every way to put
+// hand words into the entry's empty cells, and swaps when it's stuck. If it
+// paints itself into a corner it backs up and tries its next-best phrases, the
+// way a player would rearrange (the deal order never changes, so this is fair).
+//
+//   careful: picks the phrase the judge is surest about (a cautious player)
+//   greedy:  picks the highest-scoring valid phrase (a player chasing rare words)
+
+export type BotStyle = 'careful' | 'greedy';
+
+export interface BotRun {
+  solved: boolean;
+  /** Board score before bonuses and penalties; 0 if unsolved. */
+  score: number;
+  swapsUsed: number;
+  /** The final game state, filled when solved. */
+  state: GameState;
+  /** The built-in judge's tier for each entry of a solved board. */
+  tiers: Record<string, Tier>;
+}
+
+const GLUE: ReadonlySet<Pos> = new Set(['det', 'prep', 'conj']);
+
+function glueOnly(word: string): boolean {
+  return wordInfo(word).pos.every((pos) => GLUE.has(pos));
+}
+
+function detOnly(word: string): boolean {
+  return wordInfo(word).pos.every((pos) => pos === 'det');
+}
+
+/** Problems a half-filled entry already has, whatever goes in its empty cells. */
+function partialProblem(words: (string | null)[]): boolean {
+  const last = words[words.length - 1];
+  if (last && glueOnly(last)) return true;
+  for (let i = 1; i < words.length; i++) {
+    const [a, b] = [words[i - 1], words[i]];
+    if (!a || !b) continue;
+    if (a === b && glueOnly(a)) return true;
+    if (detOnly(a) && detOnly(b)) return true;
+  }
+  return false;
+}
+
+interface Judged {
+  tier: Tier;
+  pValid: number;
+}
+
+function makeJudge(model: TinyModel) {
+  const memo = new Map<string, Judged>();
+  return (words: string[]): Judged => {
+    const key = words.join(' ');
+    let judged = memo.get(key);
+    if (!judged) {
+      judged = ruleProblem(words)
+        ? { tier: 'invalid', pValid: 0 }
+        : (({ tier, pValid }) => ({ tier, pValid }))(predict(model, words));
+      memo.set(key, judged);
+    }
+    return judged;
+  };
+}
+
+type Judge = ReturnType<typeof makeJudge>;
+
+interface Choice {
+  /** Hand tile id for each empty cell of the entry, in order. */
+  tileIds: number[];
+  utility: number;
+}
+
+/** How many alternatives to keep per entry when backing up. */
+const BRANCHING = 4;
+/** Entries the bot may try filling per playthrough, so a hopeless level fails fast. */
+const SEARCH_BUDGET = 150;
+
+/** The best few ways to fill an entry's empty cells from the hand, best first. */
+function bestChoices(state: GameState, entry: Entry, style: BotStyle, judge: Judge): Choice[] {
+  const empty = entry.cells.filter((cell) => !state.board[cell]);
+  const hand = state.hand.filter((tile) => !tile.wildcard);
+  if (empty.length > hand.length) return [];
+  const crossers = new Map<CellKey, Entry>();
+  for (const other of state.entries) {
+    if (other === entry) continue;
+    for (const cell of other.cells) if (empty.includes(cell)) crossers.set(cell, other);
+  }
+
+  const best: Choice[] = [];
+  const tried = new Set<string>();
+  const used = new Array<boolean>(hand.length).fill(false);
+  const picked: Tile[] = [];
+
+  const evaluate = () => {
+    const key = picked.map((t) => t.word).join(' ');
+    if (tried.has(key)) return;
+    tried.add(key);
+    const placed = new Map(empty.map((cell, i) => [cell, picked[i]]));
+    const wordAt = (cell: CellKey) => placed.get(cell)?.word ?? state.board[cell]?.word ?? null;
+
+    const words = entry.cells.map(wordAt) as string[];
+    const own = judge(words);
+    if (own.tier === 'invalid') return;
+    const tileAt = (cell: CellKey) => (placed.get(cell) ?? state.board[cell])!;
+    let points = entry.cells.reduce((s, c) => s + tileValue(tileAt(c)), 0) * TIER_MULTIPLIER[own.tier];
+    let confidence = own.pValid;
+
+    for (const other of new Set(crossers.values())) {
+      const otherWords = other.cells.map(wordAt);
+      if (otherWords.every((w) => w !== null)) {
+        const judged = judge(otherWords as string[]);
+        if (judged.tier === 'invalid') return;
+        points += other.cells.reduce((s, c) => s + tileValue(tileAt(c)), 0) * TIER_MULTIPLIER[judged.tier];
+        confidence += judged.pValid;
+      } else if (partialProblem(otherWords)) {
+        return;
+      }
+    }
+
+    const utility = style === 'careful' ? confidence : points + confidence * 0.1;
+    if (best.length < BRANCHING || utility > best[best.length - 1].utility) {
+      best.push({ tileIds: picked.map((t) => t.id), utility });
+      best.sort((a, b) => b.utility - a.utility);
+      if (best.length > BRANCHING) best.pop();
+    }
+  };
+
+  const search = (depth: number) => {
+    if (depth === empty.length) return evaluate();
+    for (let i = 0; i < hand.length; i++) {
+      if (used[i]) continue;
+      used[i] = true;
+      picked.push(hand[i]);
+      search(depth + 1);
+      picked.pop();
+      used[i] = false;
+    }
+  };
+  search(0);
+  return best;
+}
+
+/** The unfinished entry to fill next: the most constrained one (most cells already filled). */
+function nextEntry(state: GameState): Entry | null {
+  let best: Entry | null = null;
+  let bestKey = -1;
+  for (const entry of state.entries) {
+    const filled = entry.cells.filter((cell) => state.board[cell]).length;
+    if (filled === entry.cells.length) continue;
+    const key = filled * 10 + entry.cells.length;
+    if (key > bestKey) {
+      best = entry;
+      bestKey = key;
+    }
+  }
+  return best;
+}
+
+/** Words that carry little meaning alone: glue, pronouns and auxiliaries like "is". */
+function functionWord(word: string): boolean {
+  return glueOnly(word) || wordInfo(word).zipf >= 6.5;
+}
+
+/**
+ * When stuck: swap out an unusable wildcard, then a surplus function word, then
+ * the rarest word (the hardest to fit).
+ */
+function tileToSwap(hand: Tile[]): Tile {
+  const wildcard = hand.find((t) => t.wildcard);
+  if (wildcard) return wildcard;
+  const fillers = hand.filter((t) => functionWord(t.word));
+  if (fillers.length > 3) return fillers[fillers.length - 1];
+  return hand.reduce((a, b) => (wordInfo(b.word).zipf < wordInfo(a.word).zipf ? b : a));
+}
+
+export function playLevel(
+  level: LevelDef,
+  style: BotStyle,
+  options: { seed?: number; model?: TinyModel } = {},
+): BotRun {
+  const judge = makeJudge(options.model ?? BUNDLED_MODEL);
+  let state = createGame(options.seed === undefined ? level : { ...level, seed: options.seed });
+  const failed = (): BotRun => ({ solved: false, score: 0, swapsUsed: 0, state, tiers: {} });
+
+  // Anchors alone can complete an entry; the bot can't change those.
+  for (const entry of state.entries) {
+    const tiles = entryTiles(state, entry);
+    if (tiles && judge(tiles.map((t) => t.word)).tier === 'invalid') return failed();
+  }
+
+  let budget = SEARCH_BUDGET;
+  const solve = (current: GameState): GameState | null => {
+    const entry = nextEntry(current);
+    if (!entry) return current;
+    if (budget-- <= 0) return null;
+    let choices = bestChoices(current, entry, style, judge);
+    while (choices.length === 0 && current.swapsLeft > 0) {
+      current = gameReducer(current, { type: 'swap', tileId: tileToSwap(current.hand).id });
+      choices = bestChoices(current, entry, style, judge);
+    }
+    const empty = entry.cells.filter((cell) => !current.board[cell]);
+    for (const choice of choices) {
+      const placed = choice.tileIds.reduce(
+        (s, tileId, i) => gameReducer(s, { type: 'place', tileId, cell: empty[i] }),
+        current,
+      );
+      const solved = solve(placed);
+      if (solved) return solved;
+    }
+    return null;
+  };
+  const solved = solve(state);
+  if (!solved) return failed();
+  state = solved;
+
+  const tiers: Record<string, Tier> = {};
+  const verdicts: Record<string, Verdict> = {};
+  const tilesByEntry: Record<string, Tile[]> = {};
+  for (const entry of state.entries) {
+    const tiles = entryTiles(state, entry)!;
+    const { tier } = judge(tiles.map((t) => t.word));
+    if (tier === 'invalid') return failed();
+    tiers[entry.id] = tier;
+    tilesByEntry[entry.id] = tiles;
+    verdicts[entry.id] = { entryId: entry.id, valid: true, tier, reading: '', reason: '', quip: '' };
+  }
+  const { raw } = scoreSubmission(level, state.entries, tilesByEntry, verdicts, 0);
+  return { solved: true, score: raw, swapsUsed: level.swaps - state.swapsLeft, state, tiers };
+}

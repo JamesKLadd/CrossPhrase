@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 
-import { wordValue } from '../core/scoring';
+import { tileValue } from '../core/scoring';
+import { WILDCARD } from '../core/types';
 import { displayWord } from '../core/words';
 import { useDraggable, type DragSource } from './drag';
 import { colors, wordFontSize } from './theme';
@@ -12,6 +13,7 @@ export function WordTile({
   source,
   selected,
   locked,
+  wildcard,
   enabled,
   onTap,
 }: {
@@ -21,6 +23,8 @@ export function WordTile({
   selected: boolean;
   /** Anchors: shown differently and never draggable. */
   locked?: boolean;
+  /** A wildcard: blank until placed, then marked with a star. */
+  wildcard?: boolean;
   enabled: boolean;
   onTap: () => void;
 }) {
@@ -32,22 +36,33 @@ export function WordTile({
     onTap,
   });
 
+  const blank = wildcard && word === WILDCARD;
   return (
     <GestureDetector gesture={gesture}>
       <View
-        testID={`tile-${word}`}
+        testID={blank ? 'tile-wildcard' : `tile-${word}`}
         style={[
           styles.tile,
           { width: size, height: size },
           locked && styles.locked,
+          wildcard && styles.wildcard,
           selected && styles.selected,
           isDragged && styles.dragged,
         ]}
       >
-        <Text numberOfLines={1} style={[styles.word, { fontSize: wordFontSize(word, size) }]}>
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.word,
+            { fontSize: blank ? size * 0.42 : wordFontSize(word, size) },
+            blank && styles.star,
+          ]}
+        >
           {displayWord(word)}
         </Text>
-        {!locked && <Text style={styles.value}>{wordValue(word)}</Text>}
+        {blank && <Text style={styles.anyWord}>any word</Text>}
+        {wildcard && !blank && <Text style={styles.wildMark}>★</Text>}
+        {!locked && !blank && <Text style={styles.value}>{tileValue({ word, wildcard })}</Text>}
       </View>
     </GestureDetector>
   );
@@ -73,8 +88,18 @@ const styles = StyleSheet.create({
     borderWidth: 2.5,
     borderBottomWidth: 4,
   },
+  wildcard: { backgroundColor: colors.wildcard, borderColor: colors.selected },
   dragged: { opacity: 0.3 },
   word: { color: colors.ink, fontWeight: '700' },
+  star: { color: colors.selected },
+  anyWord: { fontSize: 9, fontWeight: '700', color: colors.inkSoft, marginTop: -2 },
+  wildMark: {
+    position: 'absolute',
+    right: 5,
+    top: 2,
+    fontSize: 10,
+    color: colors.selected,
+  },
   value: {
     position: 'absolute',
     right: 5,

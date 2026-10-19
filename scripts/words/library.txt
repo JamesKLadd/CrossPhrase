@@ -1,0 +1,7 @@
+# Theme: Library
+noun: book page library shelf story poem novel chapter word letter ink pen pencil
+noun: paper desk lamp librarian reader author dictionary map atlas poet riddle
+noun: secret mystery legend bookmark spine cover candle scroll tale owl
+verb: read/reads write/writes borrow/borrows study/studies scribble/scribbles
+verb: turn/turns ponder/ponders learn/learns wonder/wonders shush/shushes browse/browses
+adj: dusty wise clever curious thick hushed overdue forgotten magical bookish famous
