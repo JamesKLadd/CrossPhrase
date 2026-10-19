@@ -24,10 +24,15 @@ Status: pre-production · Target: mobile (iOS + Android) · Team: solo · First 
 | Stack | React Native + Expo (TypeScript) |
 | Monetization | Lives/energy, IAP boosters, rewarded ads (all deferred to a late phase) |
 | Modes | Level map, then Daily puzzle, Zen/endless, and Leaderboards |
-| Art | Cozy mascot who delivers the AI commentary |
+| Art | Cozy mascot: **a smart-looking owl in reading glasses**, and it's allowed to be snarky |
 | Offline | Offline fallback (cached verdicts + lenient local check, re-verified later) |
-| Levels | Procedurally generated |
-| AI provider | **Open.** See §5 for the cost analysis and recommendation |
+| Levels | Procedurally generated, each with a **theme that has its own word pool** |
+| Submits | **3 submits per level.** Each failed submit costs points; failing the third fails the level |
+| POS hints | Always soft. They're never enforced, so players keep creative freedom |
+| Repeats | The same word can appear more than once on a board |
+| Word forms | A noun can be read as singular or plural in each phrase. Every other word must be used exactly as drawn |
+| Language | English only at launch |
+| AI provider | **Claude Haiku 5.5** behind our own `/judge` endpoint (see §5) |
 
 ---
 
@@ -38,7 +43,7 @@ Status: pre-production · Target: mobile (iOS + Android) · Team: solo · First 
 - An **entry** is any maximal horizontal or vertical run of at least 2 open cells. Each entry must form an acceptable phrase, read left→right or top→bottom.
 - A cell where two entries cross is a **crossing cell**. Its word must work in both phrases. This is where most of the puzzle's difficulty, and its strategy, comes from.
 - Some cells are **anchors**: pre-filled, locked words.
-- Some cells carry a **POS hint** (noun / verb / adjective / adverb / function word). Hints are *soft* in v1: they show as a badge and the judge prompt gets them, but placement isn't blocked. We can make them hard rules later if testing shows that's needed.
+- Some cells carry a **POS hint** (noun / verb / adjective / adverb / function word). Hints are always *soft*: they show on the cell (dictionary-style, e.g. *n.*, *adj.*), but placement isn't blocked and the judge never sees them.
 
 ### 2.2 Hand & swaps
 - Each level starts with 7 drawn words. Placing a word draws a replacement at once.
@@ -46,8 +51,10 @@ Status: pre-production · Target: mobile (iOS + Android) · Team: solo · First 
 - **Swaps:** each level grants N (by difficulty, roughly 3–5). A swap discards one hand word and draws a new one. The *+Swaps* booster adds more.
 - **Wildcard tile:** rare, around 1–2% of draws. When placed, the player types a word, which must be in the game dictionary (see §5.4: this also blocks prompt injection).
 
-### 2.3 Draw distribution (pure random, with one caution)
-"Pure random" over a 50k-word dictionary will often deal 7 obscure nouns and no way to build a phrase. Recommendation: **keep it random, but weight each word's draw probability by its corpus frequency** (with a cap, so "the" doesn't flood the hand). That's still honestly random, and the hand naturally gets the mix of glue words and content words that real phrases need. Expose the weighting curve as a tuning knob and settle it in playtesting.
+### 2.3 Draw distribution
+- Each level has a **theme** (Breakfast, Night Sky, Garden…). The draw pool is the theme's own word list plus a shared **core pool** of glue words and everyday verbs, adjectives and pronouns.
+- Draws are random **with replacement** (repeats are allowed). Each word's chance is weighted by its corpus frequency, with a cap so "the" doesn't flood the hand, and theme words get a small boost so the theme comes through. The hand naturally gets the mix of glue and content words that real phrases need, and the weighting curve is a tuning knob (`src/core/config.ts`).
+- Draws are seeded per level, so a replay of the same level deals the same sequence.
 
 ### 2.4 Submit loop
 1. Every open cell is filled → the **Submit** button lights up.
@@ -56,7 +63,7 @@ Status: pre-production · Target: mobile (iOS + Android) · Team: solo · First 
 4. If any entry is invalid, those lines glow red with their reason, and the player fixes them and resubmits. Lines that already passed stay cached, so resubmitting only re-judges the changed entries.
 5. All entries valid → score → star check → level complete.
 
-Open item: should submits be limited (e.g. 3 per level, or each failed submit costs a life)? Unlimited resubmits are friendlier but cost API calls. Proposal: unlimited for the prototype, then tune with telemetry.
+**Submit limit:** each level allows **3 submits**. A submit *fails* if any entry is invalid **or** the score (after penalties) is below the 1★ threshold. Each failed submit subtracts a penalty, currently 15% of the 1★ threshold (tunable). Failing the third submit fails the level, and the player can retry it.
 
 ### 2.5 Scoring
 
@@ -85,7 +92,7 @@ Each level gets 0–2 objectives. They add points or count toward 3★.
 
 ## 3. Experience & feel
 
-- **Mascot:** a cozy character (bookworm, owl or cat; still to decide). It's the voice of the judge. It reacts to each line on submit ("'Moonlit soup whispers'? Bold. I respect it.") and celebrates poetic tiers. The commentary is the main source of personality, the way MeowDoku leans on its cats.
+- **Mascot:** a smart-looking owl in reading glasses, a little snarky. It's the voice of the judge. It reacts to each line on submit ("'Moonlit soup whispers'? Bold. I respect it.") and celebrates poetic tiers. The commentary is the main source of personality, the way MeowDoku leans on its cats.
 - **Juice:** satisfying tile snap, a staggered line-by-line verdict reveal (which also hides API latency), confetti/ink-splash on poetic lines, haptics on placement and verdicts, and a star-burst on level clear.
 - **Latency budget:** a submit should feel like 1–2 seconds. The reveal animation starts at once and resolves line by line as verdicts arrive.
 - **FTUE:** the first 5 levels are tiny (a 2-entry L-shape, then a 2×2) with scripted hands, so new players learn crossings, swaps and tiers before randomness starts.
@@ -136,15 +143,15 @@ Each level gets 0–2 objectives. They add points or count toward 3★.
 Request:
 ```json
 { "entries": [
-  { "id": "A1", "words": ["quiet", "foxes", "dream"], "hints": [null, "noun", "verb"] },
-  { "id": "D2", "words": ["foxes", "eat", "plums"], "hints": [...] }
+  { "id": "1A", "words": ["quiet", "fox", "dream"] },
+  { "id": "2D", "words": ["fox", "eat", "plum"] }
 ]}
 ```
 Response:
 ```json
 { "verdicts": [
-  { "id": "A1", "valid": true, "tier": "great", "reason": "", "quip": "Sleepy foxes? Adorable." },
-  { "id": "D2", "valid": true, "tier": "ok", "reason": "", "quip": "Nutritious." }
+  { "entryId": "1A", "valid": true, "tier": "great", "reading": "quiet foxes dream", "reason": "", "quip": "Sleepy foxes? Adorable." },
+  { "entryId": "2D", "valid": true, "tier": "ok", "reading": "foxes eat plums", "reason": "", "quip": "Nutritious." }
 ]}
 ```
 Use the provider's structured-output / JSON-schema mode so the response always parses.
@@ -155,6 +162,7 @@ Use the provider's structured-output / JSON-schema mode so the response always p
 - **great:** vivid, funny, or a clever use of the words.
 - **poetic:** genuinely striking, idiomatic or lyrical.
 - Phrases don't have to be complete sentences. Noun phrases and imperatives count.
+- Any noun may be read as singular or plural, chosen separately in each phrase. The judge returns the `reading` it used so the UI can show it. Every other word must stay exactly as written.
 - Leniency is a dial. Build a **50–100 phrase eval set** with your own expected verdicts, and re-run it after every prompt change.
 
 ### 5.4 Safety & abuse
@@ -216,6 +224,19 @@ Each phase ends in a **playable build** with a clear exit test.
 - Scoring and the 1-star pass check. No stars UI polish, no mascot art (placeholder text quips).
 - **Exit:** you can hand the phone to someone and they can finish a level without help, and want to try another.
 
+**Status (Phase 1 setup):**
+- [x] Expo SDK 58 + Expo Router + TypeScript, Jest, ESLint
+- [x] `src/core`: grid/entries, seeded frequency-weighted draws with theme pools, scoring, game reducer (place/move/remove/swap, 3 submits, failed-submit penalty, verdict cache with partial re-judging)
+- [x] Word data: core pool + 3 themes (Breakfast, Night Sky, Garden) with `wordfreq` rarity
+- [x] 8 hand-authored levels with anchors and soft POS hints
+- [x] Board, hand tray, drag-and-drop plus tap-to-place, owl panel with per-line verdicts, result screen
+- [x] `/judge` Supabase Edge Function → Claude Haiku 5.5 with structured output, dictionary-only input, reading check
+- [x] Local rule-based judge (dev mode, and the base for the offline fallback)
+- [x] Judge eval set + runner (`scripts/judge-eval`)
+- [ ] Deploy the judge and run the eval against the real model; tune the prompt
+- [ ] Playtest on real phones; tune hand size, draw weighting, star thresholds
+- [ ] Known tuning item: inflected verb forms ("munches") read rarer than their base form and score high
+
 ### Phase 2: Judge & scoring hardening (≈2 weeks)
 - Quality tiers with multipliers, crossing double-scoring, rarity curve tuning.
 - Server verdict cache (normalized phrases), partial re-judging on resubmit.
@@ -274,13 +295,13 @@ Each phase ends in a **playable build** with a clear exit test.
 
 ---
 
-## 9. Open questions (to settle before or during Phase 1)
+## 9. Resolved questions
 
-1. Mascot species/name, and the game's tone of voice (snarky vs. wholesome)?
-2. Submit limits: unlimited, capped per level, or costing a life?
-3. Should POS hints ever become hard constraints?
-4. Can the same word appear twice on a board? (Proposal: yes for glue words, no for content words.)
-5. Should a crossing word be allowed to change form (e.g. "run" reading as "runs")? (Proposal: no; exact words only.)
-6. Themes per level (food, space…) affecting draws, or only bonus objectives?
-7. English only at launch? (Affects dictionary, frequency data and judge prompt.)
-8. AI provider: confirm Haiku via the `/judge` endpoint for the prototype?
+1. Mascot: a smart-looking owl with reading glasses, and it can be snarky. (Name still to pick.)
+2. Submits: 3 per level, and each failed submit costs points.
+3. POS hints: always soft. Creative freedom wins.
+4. Repeated words: allowed.
+5. Word forms: nouns can be read as singular or plural; everything else is used exactly as drawn.
+6. Themes: yes, each level theme has its own word pool.
+7. Language: English only at launch.
+8. AI provider: Claude Haiku 5.5 via the `/judge` endpoint.
