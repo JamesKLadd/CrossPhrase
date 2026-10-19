@@ -10,11 +10,20 @@ This repo is at **Phase 2: judge and scoring hardening**.
 
 ## Run it
 
+You need **Node.js 22.13 or newer** (the current LTS from nodejs.org). Older
+versions fail with confusing errors or a blank white page; `npm start` checks
+and says so.
+
 ```sh
 npm install
 npm run web      # in a browser
 npm start        # then scan the QR code with Expo Go (SDK 58) on a phone
 ```
+
+If the phone sits on "loading" forever after scanning, it can't reach your
+computer: check both are on the same Wi-Fi (not a guest network or VPN), and on
+Windows allow Node.js through the firewall when asked. Or skip the network
+question entirely with `npx expo start --tunnel`.
 
 With no judge configured, the app uses a **lenient local rule-based judge**,
 which is enough for working on the UI. It only ever grades phrases "OK" or

@@ -32,9 +32,13 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "prestart": "node scripts/check-node.mjs",
     "start": "expo start",
+    "preandroid": "node scripts/check-node.mjs",
     "android": "expo start --android",
+    "preios": "node scripts/check-node.mjs",
     "ios": "expo start --ios",
+    "preweb": "node scripts/check-node.mjs",
     "web": "expo start --web",
     "test": "jest",
     "typecheck": "tsc --noEmit",
@@ -50,5 +54,8 @@
       "/node_modules/",
       "<rootDir>/supabase/"
     ]
+  },
+  "engines": {
+    "node": "^22.13.0 || ^24.3.0 || >=26.0.0"
   }
 }
