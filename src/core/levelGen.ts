@@ -1,4 +1,4 @@
-import { LEVEL_BANDS, STAR_BASELINE, type LevelBand } from './config';
+import { LEVEL_BANDS, STAR_BASELINE, ZEN_BAND, ZEN_SWAPS, type LevelBand } from './config';
 import { cellKey, extractEntries, openCells, parseCellKey } from './grid';
 import { playLevel, type BotRun } from './levelBot';
 import { crossingCells, evaluateObjectives } from './objectives';
@@ -313,8 +313,10 @@ export function generateLevel(options: {
   theme: string;
   seed: number;
   takenNames?: ReadonlySet<string>;
+  /** Overrides the band for the level number (e.g. for daily puzzles). */
+  band?: LevelBand;
 }): GeneratedLevel {
-  const band = bandFor(options.number);
+  const band = options.band ?? bandFor(options.number);
   const rng = new Rng(options.seed);
 
   let best: Attempt | null = null;
@@ -376,5 +378,27 @@ export function generateLevel(options: {
       careful: median(solved.map((r) => r.score)),
       greedy: greedy.length ? median(greedy.map((r) => r.score)) : 0,
     },
+  };
+}
+
+/**
+ * A zen board, made on the spot: a grown layout with friendly anchors and no
+ * bot checks (zen boards can't be failed, so they don't need them).
+ */
+export function zenLevel(seed: number, theme: string): LevelDef {
+  const rng = new Rng(seed);
+  let layout: string[] | null = null;
+  for (let attempt = 0; !layout && attempt < 200; attempt++) layout = growLayout(rng, ZEN_BAND);
+  layout ??= ['....', '.###', '.###', '.###'];
+  const anchors = pickAnchors(rng, layout, theme, randInt(rng, ZEN_BAND.anchors[0], ZEN_BAND.anchors[1]));
+  return {
+    id: `zen-${seed}`,
+    name: levelName(rng, theme, new Set()),
+    theme,
+    layout,
+    anchors,
+    swaps: ZEN_SWAPS,
+    seed,
+    zen: true,
   };
 }

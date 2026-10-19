@@ -6,11 +6,11 @@ AI judge) grades each phrase. Rare words and great phrasing score the points
 needed to clear the level.
 
 The full game design and phase plan are in [docs/DESIGN.md](docs/DESIGN.md).
-This repo is at **Phase 4: identity and juice**: the owl has a face (and
-moods), verdicts are revealed line by line with sounds, haptics and confetti,
-and there's music, a settings screen and accessibility options. Underneath:
-120 levels on a level map, stars, bonus objectives and wildcards, judged by
-free judges you can train.
+This repo is at **Phase 5: modes and social**: a daily puzzle you can share,
+an endless zen mode, and leaderboards (on a free backend, switched off until
+you set it up). Underneath: 120 levels on a level map, stars, bonus objectives
+and wildcards, an owl with moods and quips, sound and music, judged by free
+judges you can train.
 
 ## Run it
 
@@ -116,6 +116,54 @@ With `EXPO_PUBLIC_DEV_PIN` set in `.env.local`, **long-press the owl** on the
 home screen and enter the PIN for: the labelling screen, a gallery of **the
 owl's moods**, **Unlock all levels** (to try any level) and **Reset progress**.
 
+## Modes
+
+- **Daily puzzle** (📅 on the home screen): the same board for everyone each
+  day, one attempt. It's saved move by move, so leaving and coming back picks
+  up where you were; once finished it stays finished. **Share** sends a
+  spoiler-free card (the board as coloured squares, no words). Winning on
+  consecutive days builds a 🔥 streak. Daily puzzles are always judged by the
+  built-in judge, so everyone, and the leaderboard, judges them the same way.
+  A year of them is generated ahead of time (`npm run generate:dailies`) into
+  `src/data/dailies.generated.json`; regenerate with a later start date
+  before it runs out (it covers 19 Oct 2026 to 19 Oct 2027).
+- **Zen** (🧘): endless boards made on the spot. No star targets, no penalty,
+  no limit on submits or swaps; a board clears when every line reads.
+- **Leaderboards** (🏆): today's daily puzzle and each level, with display
+  names. They need the backend below; until then the screen says how to
+  switch them on.
+
+### Switch on the leaderboards (free)
+
+Leaderboards use Supabase's free tier and no paid API. Scores are checked on
+the server: the `scores` function ([`supabase/functions/scores`](supabase/functions/scores/index.ts))
+replays each run's moves from the level's own deal with the app's game core
+and re-judges every line with the built-in judge, so a phone can't just claim
+a score. (That's also why a level judged by the PC judge can score a little
+differently on the board.)
+
+1. Create a Supabase project and turn on **anonymous sign-ins**
+   (Authentication → Sign In / Providers). Then, from the repo root:
+   ```sh
+   npx supabase login
+   npx supabase link --project-ref <your-project-ref>
+   npx supabase db push                      # creates the tables in supabase/migrations
+   npx supabase functions deploy scores
+   ```
+2. In `.env.local`, fill in `EXPO_PUBLIC_SUPABASE_URL` and
+   `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (Project Settings → API keys) and
+   restart with `npx expo start --clear`. This does **not** switch on the
+   paid Claude judge (that needs `EXPO_PUBLIC_CLAUDE_JUDGE=on` as well).
+3. Give friends a build with the same settings. Each phone signs in
+   anonymously; players pick a name on the Leaderboards screen.
+
+The function bundles the game core (`npm run bundle:server` writes
+`supabase/functions/_shared/scores.bundle.js`). After changing the core, the
+word lists, the built-in judge, the levels or the dailies, rebuild it and
+redeploy the function; `npm test` fails while the bundle is out of date.
+Score submissions are rate limited (60 per 15 minutes per player;
+`SCORES_LIMIT_PER_15_MIN` secret).
+
 ## The owl, sound and settings
 
 - **The owl** ([`src/ui/Owl.tsx`](src/ui/Owl.tsx)) is drawn in vector shapes:
@@ -146,9 +194,11 @@ owl's moods**, **Unlock all levels** (to try any level) and **Reset progress**.
 | `npm test` | Unit tests for the game core, judge client and content (Jest) |
 | `npm run test:db` | Database migration tests in an in-process Postgres (PGlite) |
 | `npm run test:pc-judge` | PC judge server tests |
-| `npm run test:functions` | Claude judge function tests (needs [Deno](https://deno.com)) |
+| `npm run test:functions` | Edge Function tests: the judge and scores (needs [Deno](https://deno.com)) |
 | `npm run train:judge` | Retrains the built-in judge from `training/` |
 | `npm run generate:levels` | Regenerates levels 11–120 (see Levels above) |
+| `npm run generate:dailies` | Regenerates a year of daily puzzles |
+| `npm run bundle:server` | Rebuilds the leaderboard server's copy of the game core |
 | `npm run make:sounds` | Regenerates the sound effects and music in `assets/sounds/` |
 | `npm run pc-judge:setup` / `npm run pc-judge` | Sets up / starts the PC judge |
 | `npm run typecheck` | TypeScript |
@@ -191,7 +241,10 @@ src/
                   levels (all generated), themes, the tutorial levels
   judge/          Judge service: picks the judge, on-device verdict cache,
                   labels, offline grading and re-checks
-  progress/       Saved stars and scores, and what's unlocked
+  app/daily.tsx, zen.tsx, leaderboards.tsx   The other modes
+  progress/       Saved stars and scores, daily attempts, zen totals, unlocks
+  scores/         Leaderboard client: sends runs, queues them offline, reads boards
+  server/         What the leaderboard server runs (scoring by replay), bundled for Supabase
   settings/       Sound, music, vibration, motion and colour settings
   lib/            Supabase client
   ui/             The owl, board, hand tray, drag-and-drop, owl panel, star
@@ -203,11 +256,14 @@ training/         Labels and PC-judge verdicts for training
 supabase/
   functions/      _shared/judgePrompt.ts is the judge prompt every judge uses;
                   judge/ is the optional Claude judge (judge.ts is the
-                  testable request core, shared with the PC judge)
-  migrations/     Verdict cache, appeals, rate limits, usage log and cost view
+                  testable request core, shared with the PC judge);
+                  scores/ checks and saves leaderboard runs
+  migrations/     Verdict cache, appeals, rate limits, usage log, cost view,
+                  leaderboards
   tests/          Database tests
 scripts/          Word list builder, word sources, judge eval, train-judge.ts,
-                  generate-levels.ts, make-sounds.mjs
+                  generate-levels.ts, generate-dailies.ts, make-sounds.mjs,
+                  bundle-server.mjs
 docs/DESIGN.md    Game design and phase plan
 ```
 
@@ -218,8 +274,8 @@ difficulty bands) are all in `src/core/config.ts`.
 ## Optional: the Claude judge (paid, off by default)
 
 Kept for later, e.g. for launch. Nothing here is needed to develop or test the
-game. It's used only when `EXPO_PUBLIC_JUDGE_URL` is empty and the Supabase
-settings are filled in.
+game. It's used only when `EXPO_PUBLIC_JUDGE_URL` is empty, the Supabase
+settings are filled in **and** `EXPO_PUBLIC_CLAUDE_JUDGE=on`.
 
 The judge is a Supabase Edge Function ([`supabase/functions/judge`](supabase/functions/judge/index.ts))
 that sends a board's phrases to `claude-haiku-5-5` and returns a tier, reason
@@ -254,8 +310,8 @@ How a submit is judged:
    npx supabase functions deploy judge
    ```
 3. In `.env.local`, fill in the Supabase URL and publishable key (Project
-   Settings → API keys), leave `EXPO_PUBLIC_JUDGE_URL` empty, then restart with
-   `npx expo start --clear`.
+   Settings → API keys), set `EXPO_PUBLIC_CLAUDE_JUDGE=on`, leave
+   `EXPO_PUBLIC_JUDGE_URL` empty, then restart with `npx expo start --clear`.
 
 To run everything locally instead (needs Docker): put `ANTHROPIC_API_KEY=...`
 in `supabase/functions/.env`, run `npx supabase start` (it applies the

@@ -30,6 +30,7 @@
     "@types/jest": "29.5.14",
     "@types/node": "^22.20.5",
     "@types/react": "~19.2.4",
+    "esbuild": "0.28.2",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
     "jest": "~29.7.0",
@@ -54,7 +55,9 @@
     "test:functions": "deno test --no-lock supabase/functions",
     "train:judge": "tsx scripts/train-judge.ts",
     "generate:levels": "tsx scripts/generate-levels.ts",
+    "generate:dailies": "tsx scripts/generate-dailies.ts",
     "make:sounds": "node scripts/make-sounds.mjs",
+    "bundle:server": "node scripts/bundle-server.mjs",
     "pc-judge": "tsx pc-judge/server.ts",
     "pc-judge:setup": "tsx pc-judge/setup.ts",
     "test:pc-judge": "tsx --test pc-judge/app.test.ts"

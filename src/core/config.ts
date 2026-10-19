@@ -98,3 +98,15 @@ export const LEVEL_BANDS: LevelBand[] = [
   { name: 'hard', from: 71, maxRows: 6, maxCols: 5, entries: [5, 7], length: [4, 5], loops: 0.4, anchors: [1, 3], hints: 0.15, swaps: 4, objectives: [1, 1], oneStar: 0.9 },
   { name: 'late', from: 101, maxRows: 6, maxCols: 6, entries: [6, 8], length: [4, 6], loops: 0.5, anchors: [1, 2], hints: 0.1, swaps: 3, objectives: [1, 2], oneStar: 0.95 },
 ];
+
+/** The daily puzzle: the same mid-sized board for everyone, generated ahead of time like the levels. */
+export const DAILY_BAND: LevelBand = { name: 'daily', from: 0, maxRows: 5, maxCols: 5, entries: [3, 5], length: [4, 5], loops: 0.2, anchors: [1, 2], hints: 0.2, swaps: 4, objectives: [1, 1], oneStar: 0.85 };
+
+/**
+ * Zen boards are made on the phone as you go, so they skip the bot's checks
+ * (a zen board can't be failed: submits and swaps are unlimited).
+ */
+export const ZEN_BAND: LevelBand = { name: 'zen', from: 0, maxRows: 5, maxCols: 5, entries: [2, 4], length: [4, 5], loops: 0.1, anchors: [1, 2], hints: 0, swaps: 0, objectives: [0, 0], oneStar: 1 };
+
+/** Swaps per zen board: enough to never run out. */
+export const ZEN_SWAPS = 99;

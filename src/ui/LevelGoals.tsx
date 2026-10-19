@@ -43,6 +43,17 @@ export function LevelGoals({ state }: { state: GameState }) {
   }, [fraction, still, fill]);
   const fillStyle = useAnimatedStyle(() => ({ width: `${fill.get() * 100}%` }));
 
+  if (state.level.zen) {
+    return (
+      <View style={styles.zen}>
+        <Text style={styles.score} testID="score-estimate" maxFontSizeMultiplier={1.2}>
+          {score}
+        </Text>
+        <Text style={styles.zenNote}>No targets: every line that reads clears the board.</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.goals}>
       <View style={styles.barRow}>
@@ -85,6 +96,8 @@ export function LevelGoals({ state }: { state: GameState }) {
 
 const styles = StyleSheet.create({
   goals: { gap: 6 },
+  zen: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 4 },
+  zenNote: { flex: 1, fontSize: 13, color: colors.inkSoft },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 12 },
   score: { minWidth: 34, fontSize: 18, fontWeight: '900', color: colors.ink, textAlign: 'right' },
   bar: {

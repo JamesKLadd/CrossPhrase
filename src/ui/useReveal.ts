@@ -26,7 +26,12 @@ export function useReveal(
   onLine: (entry: Entry, tier: Tier, index: number) => void,
   onDone: () => void,
 ): Reveal {
-  const [progress, setProgress] = useState({ submit: 0, shown: 0 });
+  // Verdicts already there when the screen opens (a resumed game) show at once.
+  const [progress, setProgress] = useState(() => ({
+    submit: state.submitsUsed,
+    shown: state.entries.length,
+  }));
+  const [initialSubmits] = useState(state.submitsUsed);
   const latest = useRef({ state, onLine, onDone });
   useLayoutEffect(() => {
     latest.current = { state, onLine, onDone };
@@ -35,7 +40,7 @@ export function useReveal(
   const total = state.entries.length;
 
   useEffect(() => {
-    if (submitsUsed === 0) return;
+    if (submitsUsed === 0 || submitsUsed === initialSubmits) return;
     let shown = 0;
     const timer = setInterval(() => {
       const { state: current, onLine: line, onDone: done } = latest.current;
@@ -49,7 +54,7 @@ export function useReveal(
       }
     }, fast ? FAST_STEP_MS : STEP_MS);
     return () => clearInterval(timer);
-  }, [submitsUsed, total, fast]);
+  }, [submitsUsed, total, fast, initialSubmits]);
 
   const shown = submitsUsed === 0 ? total : progress.submit === submitsUsed ? progress.shown : 0;
   const active = shown < total;

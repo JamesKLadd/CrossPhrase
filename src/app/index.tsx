@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -15,7 +15,16 @@ import type { LevelDef } from '../core/types';
 import { LEVEL_IDS, LEVELS } from '../data/levels';
 import { THEMES } from '../data/themes';
 import { TUTORIAL } from '../data/tutorial';
-import { currentLevelIndex, isUnlocked, totalStars, useProgress, type ProgressSnapshot } from '../progress';
+import { addDays, dailyLevel, dayKey } from '../data/dailies';
+import {
+  currentLevelIndex,
+  dailyStreak,
+  isUnlocked,
+  totalStars,
+  useProgress,
+  type ProgressSnapshot,
+} from '../progress';
+import { flushScores } from '../scores';
 import { useReduceMotion } from '../settings';
 import { devToolsEnabled } from '../ui/devAccess';
 import { haptic, playSound } from '../ui/feedback';
@@ -76,12 +85,18 @@ export default function LevelMap() {
   const still = useReduceMotion();
   const [hoots, setHoots] = useState(0);
 
-  // Start with the next level to play in view (near the top, the header shows it already).
+  // Send any leaderboard scores that couldn't go when they were made.
+  useEffect(() => {
+    flushScores().catch(() => {});
+  }, []);
+
+  // Start with the next level to play in view. For the first few levels the
+  // header (and today's daily puzzle) matter more, so the map starts at the top.
   const onCurrentLayout = (e: LayoutChangeEvent) => {
     if (scrolled.current) return;
     scrolled.current = true;
     const { y } = e.nativeEvent.layout;
-    if (y < height * 0.6) return;
+    if (current < 3 || y < height * 0.6) return;
     requestAnimationFrame(() => scroll.current?.scrollTo({ y: y - height / 3, animated: false }));
   };
 
@@ -118,6 +133,7 @@ export default function LevelMap() {
             ★ {totalStars(saved)} of {LEVELS.length * 3}
           </Text>
           <Text style={styles.devNote}>{judgeStatus}</Text>
+          <Modes saved={saved} />
         </View>
 
         {ROWS.map((row) =>
@@ -140,6 +156,57 @@ export default function LevelMap() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/** Today's daily puzzle, zen mode and the leaderboards. */
+function Modes({ saved }: { saved: ProgressSnapshot }) {
+  const [today] = useState(() => dayKey());
+  const record = saved.daily[today];
+  const streak = dailyStreak(saved, today, (day) => addDays(day, -1));
+  const daily = !dailyLevel(today)
+    ? 'No puzzle today: update the game'
+    : record?.finished
+      ? record.won
+        ? `Solved ${'★'.repeat(record.stars)}${'☆'.repeat(3 - record.stars)} · see you tomorrow`
+        : 'Out of submits · see you tomorrow'
+      : record
+        ? 'Pick up where you left off'
+        : 'The same board for everyone · one try';
+  return (
+    <View style={styles.modes}>
+      <Pressable
+        style={[styles.mode, styles.modeDaily]}
+        onPress={() => router.push('/daily')}
+        accessibilityRole="button"
+        testID="mode-daily"
+      >
+        <Text style={styles.modeTitle}>📅 Daily puzzle{streak > 1 ? `  🔥 ${streak}` : ''}</Text>
+        <Text style={styles.modeNote}>{daily}</Text>
+      </Pressable>
+      <View style={styles.modeRow}>
+        <Pressable
+          style={[styles.mode, styles.modeHalf]}
+          onPress={() => router.push('/zen')}
+          accessibilityRole="button"
+          testID="mode-zen"
+        >
+          <Text style={styles.modeTitle}>🧘 Zen</Text>
+          <Text style={styles.modeNote}>
+            {saved.zen.boards > 0 ? `${saved.zen.boards} boards so far` : 'Endless, no limits'}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.mode, styles.modeHalf]}
+          onPress={() => router.push('/leaderboards')}
+          accessibilityRole="button"
+          testID="mode-leaderboards"
+        >
+          <Text style={styles.modeTitle}>🏆 Leaderboards</Text>
+          <Text style={styles.modeNote}>Daily and levels</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -249,6 +316,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paperDeep,
     textAlign: 'center',
   },
+  modes: { alignSelf: 'stretch', gap: 8, marginTop: 12 },
+  modeRow: { flexDirection: 'row', gap: 8 },
+  mode: {
+    gap: 2,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: colors.tile,
+    borderWidth: 1.5,
+    borderColor: colors.tileEdge,
+    borderBottomWidth: 4,
+  },
+  modeHalf: { flex: 1 },
+  modeDaily: { borderColor: colors.selected },
+  modeTitle: { fontSize: 16, fontWeight: '800', color: colors.ink },
+  modeNote: { fontSize: 13, color: colors.inkSoft },
   chapter: {
     alignItems: 'center',
     marginTop: 20,

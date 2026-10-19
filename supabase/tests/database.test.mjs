@@ -169,3 +169,63 @@ describe('cost tracking', () => {
     await assert.rejects(asPlayer(ALICE, () => q('select * from judge_cost_daily')), /permission denied/);
   });
 });
+
+describe('leaderboards', () => {
+  const CAROL = '33333333-3333-3333-3333-333333333333';
+  const saveDaily = (user, score, submits = 1, won = true) =>
+    one(
+      `select save_daily_score($1, '2026-10-20', $2, $3, $4, $5, '[]'::jsonb, 'v1') as saved`,
+      [user, won, score, won ? 2 : 0, submits],
+    );
+
+  before(async () => {
+    await q('insert into auth.users values ($1)', [CAROL]);
+  });
+
+  test('a daily result is final: the first run counts', async () => {
+    assert.equal((await saveDaily(ALICE, 40)).saved, true);
+    assert.equal((await saveDaily(ALICE, 99)).saved, false);
+    assert.equal((await one(`select score from daily_scores where user_id = $1`, [ALICE])).score, 40);
+  });
+
+  test('ranks by score, then fewer submits, with the player shown even below the cut', async () => {
+    await saveDaily(BOB, 40, 2);
+    await saveDaily(CAROL, 10, 3, false);
+    await asPlayer(ALICE, () => q(`select set_player_name('  Alice  ')`));
+    const rows = (await asPlayer(BOB, () => q(`select * from daily_leaderboard('2026-10-20', 1)`))).rows;
+    assert.deepEqual(
+      rows.map((r) => [Number(r.rank), r.name, r.score, r.is_me]),
+      [
+        [1, 'Alice', 40, false],
+        [2, 'Anonymous owl', 40, true],
+      ],
+    );
+  });
+
+  test('level bests only go up', async () => {
+    const save = (score) =>
+      one(`select save_level_score($1, 'level-11', $2, 2::smallint, '[]'::jsonb, 'v1') as saved`, [ALICE, score]);
+    assert.equal((await save(30)).saved, true);
+    assert.equal((await save(20)).saved, false);
+    assert.equal((await save(35)).saved, true);
+    const rows = (await asPlayer(ALICE, () => q(`select * from level_leaderboard('level-11')`))).rows;
+    assert.deepEqual(rows.map((r) => [Number(r.rank), r.score, r.is_me]), [[1, 35, true]]);
+  });
+
+  test('players cannot write scores, read moves or rename others', async () => {
+    await assert.rejects(
+      asPlayer(ALICE, () => q(`select save_daily_score($1, '2026-10-21', true, 999, 3::smallint, 1::smallint, '[]', 'x')`, [ALICE])),
+      /permission denied/,
+    );
+    await assert.rejects(asPlayer(ALICE, () => q('select * from daily_scores')), /permission denied/);
+    await assert.rejects(asPlayer(ALICE, () => q(`insert into level_scores values ($1, 'x', 1, 1, '[]', 'v', now())`, [ALICE])), /permission denied/);
+    await assert.rejects(asPlayer(ALICE, () => q(`update profiles set name = 'Mallory'`)), /permission denied/);
+    const seen = await asPlayer(BOB, () => q('select * from profiles'));
+    assert.equal(seen.rows.length, 0);
+  });
+
+  test('names must be 1-20 characters', async () => {
+    await assert.rejects(asPlayer(BOB, () => q(`select set_player_name('   ')`)), /check/);
+    await assert.rejects(asPlayer(BOB, () => q(`select set_player_name(repeat('x', 21))`)), /check/);
+  });
+});

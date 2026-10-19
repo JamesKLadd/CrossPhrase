@@ -53,13 +53,16 @@ function speech(
   if (notice) return notice;
   const result = state.lastResult;
   if (result && mode === 'offline') return owlLine('offline', seed);
-  if (!result) return state.level.intro ?? owlLine('intro', state.level.id, { submits: MAX_SUBMITS });
-  if (state.phase === 'won') return owlLine(`win${result.stars as 1 | 2 | 3}`, seed);
+  const zen = state.level.zen === true;
+  if (!result) {
+    return state.level.intro ?? owlLine(zen ? 'zenIntro' : 'intro', state.level.id, { submits: MAX_SUBMITS });
+  }
+  if (state.phase === 'won') return zen ? owlLine('zenWin', seed) : owlLine(`win${result.stars as 1 | 2 | 3}`, seed);
   if (state.phase === 'lost') return owlLine('lose', seed);
   const remaining = MAX_SUBMITS - state.submitsUsed;
   const left = `${remaining} submit${remaining === 1 ? '' : 's'}`;
   if (state.entries.some((e) => verdictFor(state, e)?.tier === 'invalid')) {
-    return owlLine('fixLines', seed, { left });
+    return zen ? owlLine('zenFix', seed) : owlLine('fixLines', seed, { left });
   }
   return owlLine('short', seed, { score: result.total, need: starThresholds(state.level)[0], left });
 }

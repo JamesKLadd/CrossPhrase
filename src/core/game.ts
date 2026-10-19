@@ -224,10 +224,15 @@ export function hasNewPhrases(state: GameState): boolean {
   return pendingJudgeEntries(state).length > 0 || (scoreFromCache(state, state.verdictCache)?.passed ?? true);
 }
 
+/** Submits allowed on a level: MAX_SUBMITS, or no limit in zen mode. */
+export function maxSubmits(level: LevelDef): number {
+  return level.zen ? Infinity : MAX_SUBMITS;
+}
+
 export function canSubmit(state: GameState): boolean {
   return (
     state.phase === 'playing' &&
-    state.submitsUsed < MAX_SUBMITS &&
+    state.submitsUsed < maxSubmits(state.level) &&
     isBoardFull(state) &&
     hasNewPhrases(state)
   );
@@ -322,7 +327,7 @@ function applyVerdicts(state: GameState, verdicts: Verdict[]): GameState {
     submitsUsed,
     failedSubmits: state.failedSubmits + 1,
     lastResult: result,
-    phase: submitsUsed >= MAX_SUBMITS ? 'lost' : 'playing',
+    phase: submitsUsed >= maxSubmits(state.level) ? 'lost' : 'playing',
   };
 }
 

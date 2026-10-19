@@ -420,3 +420,9 @@ enabled = true
 [functions.judge]
 enabled = true
 verify_jwt = true
+
+# Leaderboard scores (supabase/functions/scores): replays and re-judges each
+# run before saving it. Signed-in players only.
+[functions.scores]
+enabled = true
+verify_jwt = true

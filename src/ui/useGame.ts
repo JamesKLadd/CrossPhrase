@@ -9,6 +9,7 @@ import {
   type GameAction,
   type GameState,
 } from '../core/game';
+import { builtinJudge, replayRun, runActionFor, type RunAction } from '../core/run';
 import type { LevelDef, Tier } from '../core/types';
 import { judgeService, type JudgeMode } from '../judge';
 import { haptic, playSound } from './feedback';
@@ -16,8 +17,43 @@ import { haptic, playSound } from './feedback';
 /** How often to retry offline phrases while any are queued. */
 const RECONCILE_INTERVAL_MS = 30_000;
 
-export function useGame(level: LevelDef) {
-  const [state, rawDispatch] = useReducer(gameReducer, level, createGame);
+interface Recorded {
+  game: GameState;
+  /** Every move that changed the game, for resuming and for the leaderboard. */
+  log: RunAction[];
+}
+
+function recordingReducer(current: Recorded, action: GameAction): Recorded {
+  const game = gameReducer(current.game, action);
+  if (game === current.game) return current;
+  const move = runActionFor(action, current.game, game);
+  return { game, log: move ? [...current.log, move] : current.log };
+}
+
+export interface GameOptions {
+  /**
+   * 'builtin' always uses the built-in judge, the same one the leaderboard
+   * server replays runs with (the daily puzzle). 'auto' uses the best judge
+   * available (see src/judge).
+   */
+  judge?: 'auto' | 'builtin';
+  /** Moves to replay first, to resume a saved game. Only with the built-in judge. */
+  resume?: readonly RunAction[];
+}
+
+function start(level: LevelDef, options: GameOptions): Recorded {
+  if (!options.resume?.length) return { game: createGame(level), log: [] };
+  const replay = replayRun(level, options.resume, builtinJudge);
+  // A log that no longer replays (an update changed the level or the judge)
+  // can't be trusted, so the game starts again from the deal.
+  if (replay.error) return { game: createGame(level), log: [] };
+  return { game: replay.state, log: options.resume.slice(0, options.resume.length - replay.extraMoves) };
+}
+
+export function useGame(level: LevelDef, options: GameOptions = {}) {
+  const [recorded, rawDispatch] = useReducer(recordingReducer, undefined, () => start(level, options));
+  const state = recorded.game;
+  const builtinOnly = options.judge === 'builtin';
   const [error, setError] = useState<string | null>(null);
   /** How the last submit was judged. */
   const [mode, setMode] = useState<JudgeMode | null>(null);
@@ -77,6 +113,11 @@ export function useGame(level: LevelDef) {
       setError(null);
       setNotice(null);
       rawDispatch({ type: 'submitStart' });
+      if (builtinOnly) {
+        setMode('local');
+        rawDispatch({ type: 'submitResult', verdicts: builtinJudge(pendingJudgeEntries(current)) });
+        return;
+      }
       try {
         const outcome = await judgeService.judge(pendingJudgeEntries(current));
         setMode(outcome.mode);
@@ -90,7 +131,7 @@ export function useGame(level: LevelDef) {
         rawDispatch({ type: 'submitError' });
       }
     },
-    [reconcile],
+    [reconcile, builtinOnly],
   );
 
   /**
@@ -111,6 +152,7 @@ export function useGame(level: LevelDef) {
 
   return {
     state,
+    log: recorded.log,
     dispatch,
     submit: () => submit(state),
     error,

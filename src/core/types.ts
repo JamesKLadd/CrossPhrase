@@ -61,6 +61,11 @@ export interface LevelDef {
   /** The owl's opening line, e.g. a tutorial tip. */
   intro?: string;
   objectives?: Objective[];
+  /**
+   * Zen mode: no star targets, no penalties and no limit on submits. The
+   * board is cleared as soon as every line is valid.
+   */
+  zen?: boolean;
 }
 
 /** A deck entry that deals a wildcard tile. */

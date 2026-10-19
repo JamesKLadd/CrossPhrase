@@ -101,6 +101,18 @@ export const OWL_LINES = {
     'Out of submits. Even I have off days. Not today, mind you.',
     'Hoo boy. Once more, with feeling?',
   ],
+  /** Zen mode. */
+  zenIntro: [
+    'Zen mode. No stars, no limits. Just make every line read nicely.',
+    'Take your time. Nothing is counting but me, and I am very patient.',
+    'A quiet board for a quiet mind. Fill it however you like.',
+  ],
+  zenFix: [
+    'Not quite. Fix the lines marked ✗. No rush.',
+    'A few lines need another look. Take your time.',
+    'Some lines wobble. Try again whenever you are ready.',
+  ],
+  zenWin: ['Lovely. Another?', 'Every line reads. How restful.', 'Serene. Shall we turn the page?'],
   offline: [
     "I couldn't reach the big judge, so my pocket edition graded these. I'll double-check later, and I never take back a pass.",
   ],

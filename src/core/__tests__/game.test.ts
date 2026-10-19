@@ -348,3 +348,28 @@ describe('bonus objectives', () => {
     expect(objectiveProgress(state)[0]).toMatchObject({ met: false, have: 1 });
   });
 });
+
+describe('zen mode', () => {
+  const zen: LevelDef = { ...level, zen: true };
+
+  it('never runs out of submits and never charges a penalty', () => {
+    let state = fillBoard(createGame(zen));
+    for (let i = 0; i < MAX_SUBMITS + 2; i++) {
+      state = gameReducer(state, { type: 'submitStart' });
+      state = gameReducer(state, { type: 'submitResult', verdicts: judgeAll(state, 'invalid') });
+      expect(state.phase).toBe('playing');
+      expect(state.lastResult!.penalty).toBe(0);
+      // Change a word so there's something new to judge.
+      state = gameReducer(state, { type: 'remove', cell: '0,1' });
+      state = gameReducer(state, { type: 'place', tileId: state.hand[i % state.hand.length].id, cell: '0,1' });
+    }
+  });
+
+  it('clears the board when every line is valid, whatever the score', () => {
+    let state = fillBoard(createGame({ ...zen, stars: [999, 1000, 1001] }));
+    state = gameReducer(state, { type: 'submitStart' });
+    state = gameReducer(state, { type: 'submitResult', verdicts: judgeAll(state, 'ok') });
+    expect(state.phase).toBe('won');
+    expect(state.lastResult!.stars).toBe(0);
+  });
+});

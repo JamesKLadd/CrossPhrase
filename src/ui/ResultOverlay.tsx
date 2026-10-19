@@ -34,32 +34,36 @@ function Star({ index, earned, still }: { index: number; earned: boolean; still:
   );
 }
 
+export interface ResultAction {
+  label: string;
+  primary?: boolean;
+  onPress: () => void;
+}
+
 export function ResultOverlay({
   state,
-  levelNumber,
+  heading,
   newBest,
+  note,
   still,
-  hasNext,
-  onNext,
-  onRetry,
-  onExit,
+  actions,
   onReview,
 }: {
   state: GameState;
-  levelNumber: number;
-  /** This clear beat the player's earlier best on the level. */
+  heading: string;
+  /** This clear beat the player's earlier best. */
   newBest: boolean;
+  /** An extra line under the score, e.g. a streak. */
+  note: string | null;
   /** Reduced motion: no pops or entrance. */
   still: boolean;
-  hasNext: boolean;
-  onNext: () => void;
-  onRetry: () => void;
-  onExit: () => void;
+  actions: ResultAction[];
   /** Hides this card so the player can read (and correct) the owl's verdicts. */
   onReview: () => void;
 }) {
   const result = state.lastResult;
   const won = state.phase === 'won';
+  const zen = state.level.zen === true;
   const stars = won ? (result?.stars ?? 0) : 0;
   const finished = result !== null && (state.phase === 'won' || state.phase === 'lost');
 
@@ -96,8 +100,8 @@ export function ResultOverlay({
           mood={won ? (stars === 3 ? 'dazzled' : 'delighted') : 'disappointed'}
           still={still}
         />
-        <Text style={styles.title}>{won ? `Level ${levelNumber} cleared!` : 'Out of submits'}</Text>
-        {won && (
+        <Text style={styles.title}>{heading}</Text>
+        {won && !zen && (
           <View
             style={styles.stars}
             testID="result-stars"
@@ -111,6 +115,7 @@ export function ResultOverlay({
         )}
         {won && newBest && <Text style={styles.best}>New best!</Text>}
         <Text style={styles.score}>{result.total} points</Text>
+        {note && <Text style={styles.note}>{note}</Text>}
         {(result.bonus > 0 || result.penalty > 0) && (
           <Text style={styles.breakdown}>
             {result.raw} from lines
@@ -128,13 +133,13 @@ export function ResultOverlay({
           </View>
         )}
         <Text style={styles.remark}>
-          {won ? owlLine(`win${stars as 1 | 2 | 3}`, seed) : owlLine('lose', seed)}
+          {zen ? owlLine('zenWin', seed) : won ? owlLine(`win${stars as 1 | 2 | 3}`, seed) : owlLine('lose', seed)}
         </Text>
         <View style={styles.buttons}>
-          {won && hasNext && <Button label="Next level" primary onPress={onNext} />}
-          <Button label={won ? 'Replay' : 'Try again'} primary={!won} onPress={onRetry} />
+          {actions.map((action, i) => (
+            <Button key={i} label={action.label} primary={action.primary} onPress={action.onPress} />
+          ))}
           <Button label="See the owl's verdicts" onPress={onReview} />
-          <Button label="Levels" onPress={onExit} />
         </View>
       </Animated.View>
     </Animated.View>
@@ -196,6 +201,7 @@ const styles = StyleSheet.create({
   },
   score: { fontSize: 18, fontWeight: '800', color: colors.ink },
   breakdown: { fontSize: 13, color: colors.inkSoft },
+  note: { fontSize: 14, fontWeight: '700', color: colors.wood, textAlign: 'center' },
   objectives: { alignSelf: 'stretch', gap: 2, marginTop: 4 },
   objective: { fontSize: 13, color: colors.inkSoft, textAlign: 'center' },
   objectiveMet: { color: colors.tier.great, fontWeight: '700' },

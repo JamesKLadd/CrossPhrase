@@ -23,7 +23,7 @@ Status: pre-production · Target: mobile (iOS + Android) · Team: solo · First 
 | Win condition | 1–3 stars from score thresholds, plus **bonus objectives** |
 | Stack | React Native + Expo (TypeScript) |
 | Monetization | Lives/energy, IAP boosters, rewarded ads (all deferred to a late phase) |
-| Modes | Level map, then Daily puzzle, Zen/endless, and Leaderboards |
+| Modes | Level map, Daily puzzle (shareable, one attempt), Zen (endless) and Leaderboards (server-checked by replaying each run) |
 | Art | Cozy mascot: **a smart-looking owl in reading glasses**, and it's allowed to be snarky |
 | Offline | Offline fallback (cached verdicts + lenient local check, re-verified later) |
 | Levels | Procedurally generated, each with a **theme that has its own word pool** |
@@ -186,7 +186,7 @@ Use the provider's structured-output / JSON-schema mode so the response always p
 1. A local verdict cache, seeded with the most common judged phrases shipped in the app and grown from the player's own online verdicts.
 2. A **lenient local rule check** using POS patterns (e.g. rejects `the the the`, accepts `DET ADJ NOUN`). It can't grade beyond tier "ok".
 3. Offline results are **provisional**. When the device reconnects they're re-judged silently. To keep it friendly, a provisional pass is never revoked; the player just gains the extra tier points if the real verdict is higher.
-4. Daily puzzle and leaderboard submissions require online judging.
+4. Daily puzzles are judged by the built-in judge on every phone, and leaderboard submissions are re-judged on the server with the same judge (Phase 5), so they don't depend on the PC or Claude judge being reachable.
 
 ### 5.6 Appeals
 The appeal button stores `{entry, verdict, user, timestamp}`. You review the queue in a simple admin view (the Supabase table editor is fine at first). An upheld appeal overwrites the cached verdict, and recurring patterns feed back into the prompt and eval set. Optionally give a small reward for upheld appeals.
@@ -327,6 +327,16 @@ Each phase ends in a **playable build** with a clear exit test.
 - **Zen mode:** endless boards, no threshold, no lives.
 - **Leaderboards:** daily + per-level, with server-side score recomputation using the shared `core` module.
 - **Exit:** daily puzzle runs for 2 weeks with friends without exploits.
+
+**Status (Phase 5):**
+- [x] Daily puzzle: a year of boards generated ahead of time with the level generator (one shared mid-sized band, themes rotating daily), the same for everyone on a local date; one attempt, saved move by move and resumed by replaying the moves; finished means finished. Judged by the built-in judge everywhere, so verdicts match across phones and on the server
+- [x] Share card: the board as coloured squares (🟥 🟦 🟩 🟪 ⬛) with stars, score and submits, no words; streak of consecutive daily wins
+- [x] Zen mode: boards made on the phone (generator without the bot), no targets, no penalties, unlimited submits and swaps; totals kept
+- [x] Run logs and replay (`src/core/run.ts`): every game records its moves; replaying them from the seeded deal rebuilds the exact game
+- [x] Leaderboards on Supabase's free tier (switched off until configured): `scores` Edge Function replays each run with the bundled game core and re-judges it with the built-in judge before saving; first daily result is final, level boards keep each player's best; names via `set_player_name`; boards read through `daily_leaderboard` / `level_leaderboard` (top 50 plus you); players can't write scores or read others' moves; rate limited; offline submissions queued and retried
+- [x] The paid Claude judge now needs `EXPO_PUBLIC_CLAUDE_JUDGE=on`, so switching on Supabase for leaderboards never starts API spending
+- [ ] Set up the Supabase project and run the daily with friends for two weeks (the exit test)
+- [ ] Later: account linking so a player keeps their scores across devices (anonymous sign-in is per device)
 
 ### Phase 6: Monetization & live ops (≈3 weeks)
 - Switch to EAS dev builds.

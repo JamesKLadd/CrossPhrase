@@ -1,7 +1,8 @@
 import { TIER_MULTIPLIER } from './config';
-import { createGame, entryTiles, gameReducer, type GameState } from './game';
+import { createGame, entryTiles, gameReducer, type GameAction, type GameState } from './game';
 import { BUNDLED_MODEL, ruleProblem } from './localJudge';
 import { scoreSubmission, tileValue } from './scoring';
+import type { RunAction } from './run';
 import { predict, type TinyModel } from './tinyJudge';
 import type { CellKey, Entry, LevelDef, Pos, Tier, Tile, Verdict } from './types';
 import { wordInfo } from './words';
@@ -26,6 +27,8 @@ export interface BotRun {
   swapsUsed: number;
   /** The final game state, filled when solved. */
   state: GameState;
+  /** The moves that fill the board, as a run log (without the final submit). */
+  moves: RunAction[];
   /** The built-in judge's tier for each entry of a solved board. */
   tiers: Record<string, Tier>;
 }
@@ -191,7 +194,7 @@ export function playLevel(
 ): BotRun {
   const judge = makeJudge(options.model ?? BUNDLED_MODEL);
   let state = createGame(options.seed === undefined ? level : { ...level, seed: options.seed });
-  const failed = (): BotRun => ({ solved: false, score: 0, swapsUsed: 0, state, tiers: {} });
+  const failed = (): BotRun => ({ solved: false, score: 0, swapsUsed: 0, state, moves: [], tiers: {} });
 
   // Anchors alone can complete an entry; the bot can't change those.
   for (const entry of state.entries) {
@@ -200,29 +203,30 @@ export function playLevel(
   }
 
   let budget = SEARCH_BUDGET;
-  const solve = (current: GameState): GameState | null => {
+  type Path = { state: GameState; moves: RunAction[] };
+  const solve = (current: GameState, moves: RunAction[]): Path | null => {
     const entry = nextEntry(current);
-    if (!entry) return current;
+    if (!entry) return { state: current, moves };
     if (budget-- <= 0) return null;
     let choices = bestChoices(current, entry, style, judge);
     while (choices.length === 0 && current.swapsLeft > 0) {
-      current = gameReducer(current, { type: 'swap', tileId: tileToSwap(current.hand).id });
+      const swap: RunAction = { type: 'swap', tileId: tileToSwap(current.hand).id };
+      current = gameReducer(current, swap);
+      moves = [...moves, swap];
       choices = bestChoices(current, entry, style, judge);
     }
     const empty = entry.cells.filter((cell) => !current.board[cell]);
     for (const choice of choices) {
-      const placed = choice.tileIds.reduce(
-        (s, tileId, i) => gameReducer(s, { type: 'place', tileId, cell: empty[i] }),
-        current,
-      );
-      const solved = solve(placed);
+      const places: RunAction[] = choice.tileIds.map((tileId, i) => ({ type: 'place', tileId, cell: empty[i] }));
+      const placed = places.reduce((s, move) => gameReducer(s, move as GameAction), current);
+      const solved = solve(placed, [...moves, ...places]);
       if (solved) return solved;
     }
     return null;
   };
-  const solved = solve(state);
+  const solved = solve(state, []);
   if (!solved) return failed();
-  state = solved;
+  state = solved.state;
 
   const tiers: Record<string, Tier> = {};
   const verdicts: Record<string, Verdict> = {};
@@ -236,5 +240,5 @@ export function playLevel(
     verdicts[entry.id] = { entryId: entry.id, valid: true, tier, reading: '', reason: '', quip: '' };
   }
   const { raw } = scoreSubmission(level, state.entries, tilesByEntry, verdicts, 0);
-  return { solved: true, score: raw, swapsUsed: level.swaps - state.swapsLeft, state, tiers };
+  return { solved: true, score: raw, swapsUsed: level.swaps - state.swapsLeft, state, moves: solved.moves, tiers };
 }

@@ -33,6 +33,7 @@ export function starThresholds(level: LevelDef): [number, number, number] {
 }
 
 export function failedSubmitPenalty(level: LevelDef): number {
+  if (level.zen) return 0;
   return Math.max(1, Math.ceil(starThresholds(level)[0] * FAILED_SUBMIT_PENALTY));
 }
 
@@ -69,8 +70,11 @@ export function scoreSubmission(
   const bonus = objectives.reduce((sum, o) => sum + (o.met ? o.objective.points : 0), 0);
   const penalty = failedSubmits * failedSubmitPenalty(level);
   const total = Math.max(0, raw + bonus - penalty);
+  // Zen boards have no star targets: every line valid clears them.
   const thresholds = starThresholds(level);
-  const stars = allValid ? (thresholds.filter((t) => total >= t).length as 0 | 1 | 2 | 3) : 0;
+  const stars =
+    allValid && !level.zen ? (thresholds.filter((t) => total >= t).length as 0 | 1 | 2 | 3) : 0;
+  const passed = level.zen ? allValid : stars > 0;
 
-  return { passed: stars > 0, entryScores, raw, bonus, penalty, total, stars, objectives };
+  return { passed, entryScores, raw, bonus, penalty, total, stars, objectives };
 }
