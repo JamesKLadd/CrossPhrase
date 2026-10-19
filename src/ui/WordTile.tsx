@@ -28,7 +28,7 @@ export function WordTile({
   enabled: boolean;
   onTap: () => void;
 }) {
-  const { gesture, isDragged } = useDraggable({
+  const { ref, gesture, isDragged } = useDraggable({
     source,
     word,
     size,
@@ -43,6 +43,8 @@ export function WordTile({
   return (
     <GestureDetector gesture={gesture}>
       <View
+        ref={ref}
+        collapsable={false}
         testID={blank ? 'tile-wildcard' : `tile-${word}`}
         accessible
         accessibilityRole="button"

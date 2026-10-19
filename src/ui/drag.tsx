@@ -20,6 +20,11 @@ import { colors, wordFontSize } from './theme';
 // Drag-and-drop for word tiles. Drop zones (board cells and the hand tray)
 // register their views. On drop we hit-test the pointer against their
 // on-screen rectangles. Taps still work, so tap-to-place is a fallback.
+//
+// Every position here comes from measureInWindow: where the picked-up tile
+// is, plus how far the finger has moved since. (Mixing in the gesture's own
+// absolute coordinates put the dragged word off to one side on phones,
+// because the two don't share an origin there.)
 
 export type DragSource = { kind: 'hand'; tileId: number } | { kind: 'cell'; cell: CellKey };
 
@@ -42,9 +47,19 @@ interface DragState {
 
 interface DragActions {
   registerZone(id: ZoneId, view: ViewRef | null): void;
-  start(state: DragState, x: number, y: number): void;
-  move(x: number, y: number): void;
-  end(x: number, y: number): void;
+  /**
+   * `tile` is the view being dragged; `local` is where the finger is on it and
+   * `moved` how far the finger had already travelled when the drag began.
+   */
+  start(state: DragState, tile: ViewRef | null, local: Point, moved: Point): void;
+  /** `moved`: how far the finger has travelled since it touched down. */
+  move(moved: Point): void;
+  end(moved: Point): void;
+}
+
+interface Point {
+  x: number;
+  y: number;
 }
 
 interface DragView {
@@ -80,6 +95,9 @@ export function DragProvider({
   const rects = useRef(new Map<ZoneId, Rect>());
   const root = useRef<ViewRef>(null);
   const current = useRef<DragState | null>(null);
+  /** Where the finger touched down, in window coordinates, once the tile is measured. */
+  const origin = useRef<Point | null>(null);
+  const lastMoved = useRef<Point>({ x: 0, y: 0 });
   const onDropRef = useRef(onDrop);
   useLayoutEffect(() => {
     onDropRef.current = onDrop;
@@ -90,6 +108,9 @@ export function DragProvider({
   const y = useSharedValue(0);
   const originX = useSharedValue(0);
   const originY = useSharedValue(0);
+  const rootWidth = useSharedValue(0);
+  const rootHeight = useSharedValue(0);
+  const shown = useSharedValue(0);
 
   const actions = useMemo<DragActions>(() => {
     const hitTest = (px: number, py: number): ZoneId | null => {
@@ -116,43 +137,68 @@ export function DragProvider({
           rects.current.delete(id);
         }
       },
-      start(state, px, py) {
+      start(state, tile, local, moved) {
         // Re-measure everything; layout can shift as the hand changes size.
-        root.current?.measureInWindow((rx, ry) => {
+        root.current?.measureInWindow((rx, ry, width, height) => {
           originX.set(rx);
           originY.set(ry);
+          rootWidth.set(width);
+          rootHeight.set(height);
         });
         for (const [id, zoneView] of zones.current) {
           zoneView.measureInWindow((zx, zy, width, height) =>
             rects.current.set(id, { x: zx, y: zy, width, height }),
           );
         }
-        x.set(px);
-        y.set(py);
+        origin.current = null;
+        lastMoved.current = moved;
+        shown.set(0);
+        tile?.measureInWindow((tx, ty) => {
+          if (current.current !== state) return;
+          origin.current = { x: tx + local.x - moved.x, y: ty + local.y - moved.y };
+          x.set(origin.current.x + lastMoved.current.x);
+          y.set(origin.current.y + lastMoved.current.y);
+          shown.set(1);
+        });
         current.current = state;
         setView({ dragging: state, hoverZone: null });
       },
-      move(px, py) {
+      move(moved) {
+        lastMoved.current = moved;
+        if (!origin.current) return;
+        const px = origin.current.x + moved.x;
+        const py = origin.current.y + moved.y;
         x.set(px);
         y.set(py);
         const hoverZone = hitTest(px, py);
         setView((v) => (v.hoverZone === hoverZone ? v : { ...v, hoverZone }));
       },
-      end(px, py) {
+      end(moved) {
         const state = current.current;
+        const start = origin.current;
         current.current = null;
+        origin.current = null;
         setView({ dragging: null, hoverZone: null });
-        if (state) onDropRef.current(state.source, hitTest(px, py));
+        if (state) {
+          onDropRef.current(state.source, start ? hitTest(start.x + moved.x, start.y + moved.y) : null);
+        }
       },
     };
-  }, [originX, originY, x, y]);
+  }, [originX, originY, rootWidth, rootHeight, shown, x, y]);
 
-  const ghostStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: x.get() - originX.get() },
-      { translateY: y.get() - originY.get() },
-    ],
-  }));
+  /** Half the ghost, plus a little room, so it stops just inside the screen edge. */
+  const half = (view.dragging?.size ?? 0) / 2 + 6;
+  const ghostStyle = useAnimatedStyle(() => {
+    // Keep the whole ghost on screen, however far the finger goes.
+    const clamp = (v: number, max: number) => (max > 2 * half ? Math.min(Math.max(v, half), max - half) : v);
+    return {
+      opacity: shown.get(),
+      transform: [
+        { translateX: clamp(x.get() - originX.get(), rootWidth.get()) },
+        { translateY: clamp(y.get() - originY.get(), rootHeight.get()) },
+      ],
+    };
+  });
 
   const { dragging } = view;
   return (
@@ -207,6 +253,8 @@ export function useDraggable(props: {
 }) {
   const { start, move, end } = useActions();
   const { dragging } = useContext(ViewContext);
+  /** Attach to the tile's view, so a drag can find where the tile is. */
+  const ref = useRef<ViewRef>(null);
   const latest = useRef(props);
   useLayoutEffect(() => {
     latest.current = props;
@@ -215,9 +263,9 @@ export function useDraggable(props: {
   // Event handlers read the latest props, so the gesture itself only changes
   // when `enabled` does (rebuilding it mid-drag would cancel the drag).
   const handleStart = useCallback(
-    (x: number, y: number) => {
+    (local: Point, moved: Point) => {
       const { source, word, size } = latest.current;
-      start({ source, word, size }, x, y);
+      start({ source, word, size }, ref.current, local, moved);
     },
     [start],
   );
@@ -231,9 +279,9 @@ export function useDraggable(props: {
       // These callbacks run when a finger moves, never during render, so
       // reading the latest props from a ref here is safe.
       // eslint-disable-next-line react-hooks/refs
-      .onStart((e) => handleStart(e.absoluteX, e.absoluteY))
-      .onUpdate((e) => move(e.absoluteX, e.absoluteY))
-      .onEnd((e) => end(e.absoluteX, e.absoluteY));
+      .onStart((e) => handleStart({ x: e.x, y: e.y }, { x: e.translationX, y: e.translationY }))
+      .onUpdate((e) => move({ x: e.translationX, y: e.translationY }))
+      .onEnd((e) => end({ x: e.translationX, y: e.translationY }));
     const tap = Gesture.Tap()
       .enabled(props.enabled)
       .runOnJS(true)
@@ -245,7 +293,7 @@ export function useDraggable(props: {
     return Gesture.Race(pan, tap);
   }, [props.enabled, handleStart, handleTap, move, end]);
 
-  return { gesture, isDragged: dragging !== null && sameSource(dragging.source, props.source) };
+  return { ref, gesture, isDragged: dragging !== null && sameSource(dragging.source, props.source) };
 }
 
 const styles = StyleSheet.create({
