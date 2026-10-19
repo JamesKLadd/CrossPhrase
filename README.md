@@ -11,7 +11,7 @@ you can train.
 
 ## Run it
 
-You need **Node.js 20.19.4 or newer** (the current LTS from nodejs.org). Older
+You need **Node.js 20.19.4+, 22.13+ or 24.3+** (the current LTS from nodejs.org). Older
 versions fail with confusing errors or a blank white page; `npm start` checks
 and says so.
 
@@ -26,9 +26,10 @@ computer: check both are on the same Wi-Fi (not a guest network or VPN), and on
 Windows allow Node.js through the firewall when asked. Or skip the network
 question entirely with `npx expo start --tunnel`.
 
-The project stays on **Expo SDK 54** on purpose: it's the last SDK the App
-Store version of Expo Go runs. Moving to a newer SDK means building your own
-Expo Go or a development build (both need a paid Apple Developer account).
+The project's Expo SDK must match the Expo Go app on your phone; it's on
+**SDK 57**, which is what the App Store's Expo Go runs today. If Expo Go
+updates and says the project is incompatible, the SDK needs upgrading to match
+(`npx expo install expo@^<version>` then `npx expo install --fix`).
 
 ## The judges
 

@@ -234,7 +234,7 @@ Each phase ends in a **playable build** with a clear exit test.
 - **Exit:** you can hand the phone to someone and they can finish a level without help, and want to try another.
 
 **Status (Phase 1 setup):**
-- [x] Expo SDK 54 (the newest the App Store's Expo Go runs; started on 58 and moved down) + Expo Router + TypeScript, Jest, ESLint
+- [x] Expo SDK 57 (matches the App Store's Expo Go; started on 58, which it can't open) + Expo Router + TypeScript, Jest, ESLint
 - [x] `src/core`: grid/entries, seeded frequency-weighted draws with theme pools, scoring, game reducer (place/move/remove/swap, 3 submits, failed-submit penalty, verdict cache with partial re-judging)
 - [x] Word data: core pool + 3 themes (Breakfast, Night Sky, Garden) with `wordfreq` rarity
 - [x] 8 hand-authored levels with anchors and soft POS hints

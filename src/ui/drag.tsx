@@ -212,26 +212,38 @@ export function useDraggable(props: {
     latest.current = props;
   });
 
+  // Event handlers read the latest props, so the gesture itself only changes
+  // when `enabled` does (rebuilding it mid-drag would cancel the drag).
+  const handleStart = useCallback(
+    (x: number, y: number) => {
+      const { source, word, size } = latest.current;
+      start({ source, word, size }, x, y);
+    },
+    [start],
+  );
+  const handleTap = useCallback(() => latest.current.onTap(), []);
+
   const gesture = useMemo(() => {
     const pan = Gesture.Pan()
       .enabled(props.enabled)
       .runOnJS(true)
       .minDistance(6)
-      .onStart((e) => {
-        const { source, word, size } = latest.current;
-        start({ source, word, size }, e.absoluteX, e.absoluteY);
-      })
+      // These callbacks run when a finger moves, never during render, so
+      // reading the latest props from a ref here is safe.
+      // eslint-disable-next-line react-hooks/refs
+      .onStart((e) => handleStart(e.absoluteX, e.absoluteY))
       .onUpdate((e) => move(e.absoluteX, e.absoluteY))
       .onEnd((e) => end(e.absoluteX, e.absoluteY));
     const tap = Gesture.Tap()
       .enabled(props.enabled)
       .runOnJS(true)
+      // eslint-disable-next-line react-hooks/refs
       .onEnd((_e, success) => {
-        if (success) latest.current.onTap();
+        if (success) handleTap();
       });
     // Whichever is recognised first wins: a tap never starts a drag.
     return Gesture.Race(pan, tap);
-  }, [props.enabled, start, move, end]);
+  }, [props.enabled, handleStart, handleTap, move, end]);
 
   return { gesture, isDragged: dragging !== null && sameSource(dragging.source, props.source) };
 }
