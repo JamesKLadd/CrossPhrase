@@ -1,0 +1,15 @@
+# Core pool: shared by every theme. Glue words plus everyday verbs/adjectives.
+# Format: "<pos>: word word ..."  (a word listed under several POS gets all of them)
+# Nouns are listed in singular form only; the judge may read any noun as plural.
+det: the a an my your our their his her its this that these those some every no
+pron: i you we they he she it me us them everyone nobody
+prep: of in on with at by for from to under over into through near beside without
+conj: and but or so because
+verb: is are was were be will can might must has have had do does
+verb: eat eats ate sleep sleeps sing sings dance dances run runs walk walks love loves
+verb: see sees find finds make makes take takes want wants dream dreams fall falls
+verb: fly flies grow grows shine shines wait waits laugh laughs hide hides
+adj: big small little old new good bad warm cold soft loud quiet happy sad bright dark
+adj: sweet strange tiny wild lazy gentle brave
+adv: very slowly quickly always never often softly gently just still too only
+interj: oh
