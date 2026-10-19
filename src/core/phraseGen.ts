@@ -143,5 +143,5 @@ export function labellingCandidate(rng: Rng, model: TinyModel, skip: ReadonlySet
     if (words.length < MIN_ENTRY_LENGTH) continue;
     if (!skip.has(words.join(' ')) && !ruleProblem(words)) return words;
   }
-  return ['the', 'quiet', 'owl'];
+  return ['the', 'quiet', 'owl', 'reads'];
 }

@@ -20,13 +20,13 @@ describe('extractEntries', () => {
 
 describe('validateLayout', () => {
   it('accepts a connected layout where every cell is in an entry', () => {
-    expect(validateLayout(['...', '.##', '.##'])).toEqual([]);
+    expect(validateLayout(['....', '.###', '.###', '.###'])).toEqual([]);
   });
 
-  it('rejects lines shorter than three words', () => {
-    expect(validateLayout(['...', '.#.'])).toEqual([
-      'entry 1D has 2 words; lines need at least 3',
-      'entry 2D has 2 words; lines need at least 3',
+  it('rejects lines shorter than four words', () => {
+    expect(validateLayout(['....', '.##.', '.##.'])).toEqual([
+      'entry 1D has 3 words; lines need at least 4',
+      'entry 2D has 3 words; lines need at least 4',
     ]);
   });
 
