@@ -1,5 +1,6 @@
 import { DRAW_WEIGHTING } from './config';
 import { nextRandom } from './rng';
+import type { Pos } from './types';
 import { CORE_POOL, poolWords, wordInfo } from './words';
 
 export interface DrawPool {
@@ -15,10 +16,12 @@ export function drawWeight(word: string, fromTheme: boolean): number {
   return fromTheme ? weight * themeBoost : weight;
 }
 
-/** The core pool plus the theme's words. Words in both get the theme boost. */
-export function buildPool(theme: string): DrawPool {
+/** The core pool plus the theme's words (optionally only one part of speech, less `except`). Words in both get the theme boost. */
+export function buildPool(theme: string, only?: Pos, except: ReadonlySet<string> = new Set()): DrawPool {
   const themeWords = new Set(theme === CORE_POOL ? [] : poolWords(theme));
-  const words = [...new Set([...poolWords(CORE_POOL), ...themeWords])].sort();
+  const words = [...new Set([...poolWords(CORE_POOL), ...themeWords])]
+    .filter((word) => !only || (wordInfo(word).pos.includes(only) && !except.has(word)))
+    .sort();
   const cumulative: number[] = [];
   let total = 0;
   for (const word of words) {

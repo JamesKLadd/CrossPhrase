@@ -24,6 +24,12 @@ describe('daily puzzles', () => {
     }
   });
 
+  it('deal balanced hands from 21 Oct 2026, keeping the days played before as they were', () => {
+    expect(dailyLevel('2026-10-19')?.draw).toBeUndefined();
+    expect(dailyLevel('2026-10-20')?.draw).toBeUndefined();
+    for (let i = 2; i < 366; i++) expect(dailyLevel(addDays('2026-10-19', i))?.draw).toBe(2);
+  });
+
   it('use local dates', () => {
     expect(dayKey(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
     expect(addDays('2026-12-31', 1)).toBe('2027-01-01');

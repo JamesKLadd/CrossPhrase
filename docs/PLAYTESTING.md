@@ -8,8 +8,9 @@ to turn what you learn into changes, most of them without a new build.
 1. **Can people learn it without help?** Do the 10 Owl School levels teach
    placing, crossings, swaps and the four-word lines, or do people get stuck?
 2. **Is the difficulty curve fair?** Where do people fail, quit or call a level
-   too hard? The star targets were set by a bot judged by the built-in judge,
-   so real players may find some levels much harder or easier.
+   too hard? Every board has been solved by a bot playing real English with a
+   swap to spare, and the star targets come from its scores, but real players
+   may still find some levels much harder or easier.
 3. **Does the owl feel fair?** Which verdicts make people say "that's wrong"?
 4. **Do people come back for the daily puzzle?** Two weeks of the daily with
    friends, without anyone finding an exploit, is the Phase 5 exit test.

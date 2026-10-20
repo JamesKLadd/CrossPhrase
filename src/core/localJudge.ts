@@ -1,11 +1,14 @@
 import bundledModel from '../data/judgeModel.json';
+import { isGrammatical } from './grammar';
 import { quipFor } from './quips';
 import { predict, type TinyModel } from './tinyJudge';
 import type { JudgeEntry, Pos, Verdict } from './types';
 import { wordInfo } from './words';
 
 // The built-in judge: a few hard grammar rules, then the tiny trained model
-// (src/core/tinyJudge.ts) for everything the rules let through. It needs no
+// (src/core/tinyJudge.ts) for everything the rules let through. A line that
+// parses as plain English (src/core/grammar.ts) is never turned down, so a
+// player writing real sentences isn't told they're wrong. It needs no
 // network, so it's the default judge and the offline fallback. The PC judge
 // runs the same rules before asking its bigger model.
 
@@ -41,7 +44,8 @@ export function ruleProblem(words: string[]): string | null {
 export function localVerdict(entry: JudgeEntry, model: TinyModel = BUNDLED_MODEL): Verdict {
   const phrase = entry.words.join(' ');
   const rule = ruleProblem(entry.words);
-  const tier = rule ? 'invalid' : predict(model, entry.words).tier;
+  let tier = rule ? 'invalid' : predict(model, entry.words).tier;
+  if (tier === 'invalid' && !rule && isGrammatical(entry.words)) tier = 'ok';
   return {
     entryId: entry.id,
     valid: tier !== 'invalid',

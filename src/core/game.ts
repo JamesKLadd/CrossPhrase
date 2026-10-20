@@ -7,6 +7,7 @@ import { scoreSubmission } from './scoring';
 import {
   WILDCARD,
   type CellKey,
+  type Pos,
   type Entry,
   type JudgeEntry,
   type LevelDef,
@@ -17,7 +18,7 @@ import {
   type Tile,
   type Verdict,
 } from './types';
-import { isWord } from './words';
+import { isWord, wordInfo } from './words';
 
 export type GamePhase = 'playing' | 'judging' | 'won' | 'lost';
 
@@ -74,12 +75,29 @@ export type BoostAction =
   /** One more submit after a lost level, which carries on where it stopped. */
   | { type: 'extraSubmit' };
 
+/**
+ * What every hand keeps at least one of (draw 2): almost every four-word line
+ * needs a pronoun or determiner to start it, a verb and a noun, and purely
+ * random draws often left hands without one.
+ */
+const HAND_NEEDS: Pos[] = ['pron', 'det', 'verb', 'noun'];
+/** Verbs that only help another verb ("must"), so they don't count as the hand's verb. */
+const HELPERS = new Set(['will', 'can', 'might', 'must', 'do', 'does']);
+
+/** The first kind of word the hand has none of, if any. */
+function missingFromHand(hand: readonly Tile[]): Pos | undefined {
+  return HAND_NEEDS.find(
+    (pos) => !hand.some((t) => !t.wildcard && wordInfo(t.word).pos.includes(pos) && !(pos === 'verb' && HELPERS.has(t.word))),
+  );
+}
+
 const pools = new Map<string, DrawPool>();
-function poolFor(theme: string): DrawPool {
-  let pool = pools.get(theme);
+function poolFor(theme: string, only?: Pos): DrawPool {
+  const key = only ? `${theme}:${only}` : theme;
+  let pool = pools.get(key);
   if (!pool) {
-    pool = buildPool(theme);
-    pools.set(theme, pool);
+    pool = buildPool(theme, only, only === 'verb' ? HELPERS : undefined);
+    pools.set(key, pool);
   }
   return pool;
 }
@@ -114,8 +132,12 @@ export function createGame(level: LevelDef): GameState {
   return refillHand(state);
 }
 
-/** Deals the next scripted deck word if there is one, else a random draw. */
-function drawTile(state: GameState): [Tile, GameState] {
+/**
+ * Deals the next scripted deck word if there is one, else a random draw. With
+ * draw 2, a hand (`hand`, the tiles it keeps) missing a kind of word it needs
+ * gets one of those.
+ */
+function drawTile(state: GameState, hand: readonly Tile[]): [Tile, GameState] {
   const id = state.nextTileId;
   const deck = state.level.deck ?? [];
   if (state.deckIndex < deck.length) {
@@ -127,7 +149,8 @@ function drawTile(state: GameState): [Tile, GameState] {
   if (roll < WILDCARD_CHANCE) {
     return [{ id, word: WILDCARD, wildcard: true }, { ...state, rng: afterRoll, nextTileId: id + 1 }];
   }
-  const [word, rng] = drawWord(poolFor(state.level.theme), afterRoll);
+  const need = state.level.draw === 2 ? missingFromHand(hand) : undefined;
+  const [word, rng] = drawWord(poolFor(state.level.theme, need), afterRoll);
   return [{ id, word }, { ...state, rng, nextTileId: id + 1 }];
 }
 
@@ -142,7 +165,7 @@ function refillHand(state: GameState): GameState {
   const hand = [...state.hand];
   while (hand.length < HAND_SIZE) {
     let tile: Tile;
-    [tile, next] = drawTile(next);
+    [tile, next] = drawTile(next, hand);
     hand.push(tile);
   }
   return { ...next, hand };
@@ -316,7 +339,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'swap': {
       const index = state.hand.findIndex((t) => t.id === action.tileId);
       if (index === -1 || state.swapsLeft <= 0) return state;
-      const [tile, next] = drawTile(state);
+      const [tile, next] = drawTile(state, state.hand.filter((_, i) => i !== index));
       const hand = [...state.hand];
       hand[index] = tile;
       return { ...next, hand, swapsLeft: state.swapsLeft - 1 };

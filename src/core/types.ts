@@ -66,6 +66,13 @@ export interface LevelDef {
    * board is cleared as soon as every line is valid.
    */
   zen?: boolean;
+  /**
+   * How hands are dealt. 2: every hand keeps at least one pronoun,
+   * determiner, verb and noun (see drawTile in game.ts). Missing on boards
+   * made before that, which keep their original deals (old daily puzzles
+   * must replay exactly as they were played).
+   */
+  draw?: 2;
 }
 
 /** A deck entry that deals a wildcard tile. */

@@ -96,7 +96,8 @@ export const LEVEL_BANDS: LevelBand[] = [
   { name: 'early', from: 21, maxRows: 5, maxCols: 5, entries: [3, 4], length: [4, 5], loops: 0.15, anchors: [1, 2], hints: 0.35, swaps: 4, objectives: [1, 1], oneStar: 0.8 },
   { name: 'mid', from: 41, maxRows: 5, maxCols: 5, entries: [4, 6], length: [4, 5], loops: 0.3, anchors: [1, 2], hints: 0.25, swaps: 4, objectives: [1, 1], oneStar: 0.85 },
   { name: 'hard', from: 71, maxRows: 6, maxCols: 5, entries: [5, 7], length: [4, 5], loops: 0.4, anchors: [1, 3], hints: 0.15, swaps: 4, objectives: [1, 1], oneStar: 0.9 },
-  { name: 'late', from: 101, maxRows: 6, maxCols: 6, entries: [6, 8], length: [4, 6], loops: 0.5, anchors: [1, 2], hints: 0.1, swaps: 3, objectives: [1, 2], oneStar: 0.95 },
+  // Up to 7 lines of up to 5 words and 4 swaps: with 8 lines of up to 6 words and 3 swaps almost no board had an answer in plain English.
+  { name: 'late', from: 101, maxRows: 6, maxCols: 6, entries: [6, 7], length: [4, 5], loops: 0.5, anchors: [1, 2], hints: 0.1, swaps: 4, objectives: [1, 2], oneStar: 0.95 },
 ];
 
 /** The difficulty band of a generated level, by its number on the map. */
@@ -104,8 +105,8 @@ export function bandFor(levelNumber: number): LevelBand {
   return [...LEVEL_BANDS].reverse().find((b) => levelNumber >= b.from) ?? LEVEL_BANDS[0];
 }
 
-/** The daily puzzle: the same mid-sized board for everyone, generated ahead of time like the levels. */
-export const DAILY_BAND: LevelBand = { name: 'daily', from: 0, maxRows: 5, maxCols: 5, entries: [3, 5], length: [4, 5], loops: 0.2, anchors: [1, 2], hints: 0.2, swaps: 4, objectives: [1, 1], oneStar: 0.85 };
+/** The daily puzzle: the same mid-sized board for everyone, generated ahead of time like the levels. One attempt each, so its first star is a little easier than a level's. */
+export const DAILY_BAND: LevelBand = { name: 'daily', from: 0, maxRows: 5, maxCols: 5, entries: [3, 5], length: [4, 5], loops: 0.2, anchors: [1, 2], hints: 0.2, swaps: 4, objectives: [1, 1], oneStar: 0.75 };
 
 /**
  * Zen boards are made on the phone as you go, so they skip the bot's checks

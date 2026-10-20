@@ -27,12 +27,13 @@ function fakeStore(tuning: unknown = {}) {
 
 Deno.test("a real daily run is scored and saved once", async () => {
   const { store, daily } = fakeStore();
-  const actions = sampleRun(dailyLevel("2026-10-20"));
-  const first = await handleScore({ kind: "daily", day: "2026-10-20", actions }, "alice", store, NOW);
+  // The 21st: the first daily with balanced hands, which the bot (playing only plain English) can clear.
+  const actions = sampleRun(dailyLevel("2026-10-21"));
+  const first = await handleScore({ kind: "daily", day: "2026-10-21", actions }, "alice", store, NOW);
   assertEquals(first.status, 200);
   assertEquals(first.body.won, true);
   assertEquals(first.body.saved, true);
-  const again = await handleScore({ kind: "daily", day: "2026-10-20", actions }, "alice", store, NOW);
+  const again = await handleScore({ kind: "daily", day: "2026-10-21", actions }, "alice", store, NOW);
   assertEquals(again.body.saved, false);
   assertEquals(daily.size, 1);
 });

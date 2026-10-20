@@ -11,8 +11,8 @@ import { levelById, levelNumber } from '../data/levels';
 // the player's moves from the level's own deal with the shared game core and
 // re-judges every submit with the built-in judge, then scores the result.
 
-/** Which built-in judge model scored a run; stored with each score. */
-export const JUDGE_VERSION = BUNDLED_MODEL.trainedAt;
+/** Which built-in judge scored a run (its model, and the grammar that lets real English through); stored with each score. */
+export const JUDGE_VERSION = `${BUNDLED_MODEL.trainedAt}+grammar1`;
 
 export interface ScoredRun {
   won: boolean;

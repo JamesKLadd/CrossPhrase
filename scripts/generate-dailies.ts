@@ -7,8 +7,14 @@
 //
 // Regenerate (with a later START) before the last day runs out; the app says
 // "no daily puzzle today" past the end of the file.
+//
+//   npm run generate:dailies -- --from 2026-10-21
+//
+// keeps every day before --from exactly as it is in the file (days already
+// played must not change: their runs are replayed to resume and to check
+// leaderboard scores) and makes new boards from that day on.
 
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 import { DAILY_BAND } from '../src/core/config';
 import { generateLevel } from '../src/core/levelGen';
@@ -21,6 +27,12 @@ const START = '2026-10-19';
 const DAYS = 366;
 const OUT = new URL('../src/data/dailies.generated.json', import.meta.url);
 
+const fromFlag = process.argv.indexOf('--from');
+const FROM = fromFlag > 0 ? process.argv[fromFlag + 1] : START;
+const existing = new Map<string, LevelDef>(
+  (JSON.parse(readFileSync(OUT, 'utf8')).levels as LevelDef[]).map((l) => [l.id, l]),
+);
+
 const levels: LevelDef[] = [];
 const names = new Set<string>();
 const seeds = new Set(LEVELS.map((l) => l.seed));
@@ -28,6 +40,14 @@ const started = performance.now();
 
 for (let i = 0; i < DAYS; i++) {
   const day = addDays(START, i);
+  const kept = day < FROM ? existing.get(`${DAILY_ID_PREFIX}${day}`) : undefined;
+  if (day < FROM && !kept) throw new Error(`No existing daily for ${day} to keep`);
+  if (kept) {
+    names.add(kept.name);
+    seeds.add(kept.seed);
+    levels.push(kept);
+    continue;
+  }
   const theme = THEME_ORDER[i % THEME_ORDER.length];
   const { level } = generateLevel({
     number: 1000 + i,

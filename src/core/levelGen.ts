@@ -9,8 +9,9 @@ import { poolWords, wordInfo } from './words';
 
 // The procedural level generator (docs/DESIGN.md §6). For a level number and
 // theme it grows a crossword layout to fit the level's difficulty band, adds
-// anchors, then has the bot (src/core/levelBot.ts) play it. Layouts the bot
-// can't solve with the level's own deal are thrown away. The bot's scores set
+// anchors, then has the bot (src/core/levelBot.ts) play it in real English.
+// Layouts the bot can't solve with the level's own deal, with a swap to
+// spare, are thrown away. The bot's scores set
 // the star thresholds, its solution places the soft hints, and its runs show
 // which bonus objectives are within reach. Everything is seeded, so the same
 // inputs always give the same level. scripts/generate-levels.ts runs this and
@@ -291,7 +292,10 @@ const PLAYTHROUGHS = 5;
 const GOOD_ENOUGH = 3;
 /** If nothing reaches GOOD_ENOUGH, the best attempt is used, as long as it has this many. */
 const AT_LEAST = 2;
-const MAX_ATTEMPTS = 120;
+/** Attempts before settling for the best layout found, if it has AT_LEAST. Most levels stop far sooner. */
+const MAX_ATTEMPTS = 400;
+/** Attempts before giving up when nothing has reached AT_LEAST: the biggest boards rarely grow or clear in plain English. */
+const LAST_RESORT = 1500;
 
 interface Attempt {
   base: LevelDef;
@@ -302,7 +306,7 @@ interface Attempt {
 }
 
 /**
- * Generates level `number`. Throws if no layout passes within MAX_ATTEMPTS,
+ * Generates level `number`. Throws if no layout passes within LAST_RESORT attempts,
  * which means the band asks for more than the bot (and probably players) can do.
  */
 export function generateLevel(options: {
@@ -318,7 +322,9 @@ export function generateLevel(options: {
   const rng = new Rng(options.seed);
 
   let best: Attempt | null = null;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS && (best?.solved.length ?? 0) < GOOD_ENOUGH; attempt++) {
+  for (let attempt = 1; ; attempt++) {
+    const found = best?.solved.length ?? 0;
+    if (found >= GOOD_ENOUGH || attempt > LAST_RESORT || (attempt > MAX_ATTEMPTS && found >= AT_LEAST)) break;
     const layout = growLayout(rng, band);
     if (!layout) continue;
     const anchors = pickAnchors(rng, layout, options.theme, randInt(rng, band.anchors[0], band.anchors[1]));
@@ -332,13 +338,15 @@ export function generateLevel(options: {
       anchors,
       swaps: band.swaps,
       seed,
+      draw: 2,
     };
 
-    // The level's own deal first: if the bot can't solve what players are dealt, move on.
+    // The level's own deal first: if the bot can't solve what players are dealt
+    // in real English with a swap to spare, move on.
     // The other playthroughs stand in for players who are dealt differently by
     // swapping at other moments, and they steady the star thresholds.
     const first = playLevel(base, 'careful');
-    if (!first.solved) continue;
+    if (!first.solved || first.swapsUsed >= base.swaps) continue;
     const others = Array.from({ length: PLAYTHROUGHS - 1 }, (_, i) =>
       playLevel(base, 'careful', { seed: (seed + (i + 1) * 7919) | 0 }),
     );
@@ -346,7 +354,7 @@ export function generateLevel(options: {
     if (solved.length > (best?.solved.length ?? 0)) best = { base, first, solved, attempt };
   }
   if (!best || best.solved.length < AT_LEAST) {
-    throw new Error(`No solvable layout for level ${options.number} after ${MAX_ATTEMPTS} attempts`);
+    throw new Error(`No solvable layout for level ${options.number} after ${LAST_RESORT} attempts`);
   }
 
   const { base, first, solved, attempt } = best;
@@ -398,5 +406,6 @@ export function zenLevel(seed: number, theme: string): LevelDef {
     swaps: ZEN_SWAPS,
     seed,
     zen: true,
+    draw: 2,
   };
 }

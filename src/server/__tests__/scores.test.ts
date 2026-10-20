@@ -10,10 +10,13 @@ const NOW = new Date('2026-10-20T12:00:00Z');
 
 describe('server scoring', () => {
   it("scores a real run of today's daily puzzle", () => {
-    const run = sampleRun(dailyLevel('2026-10-20')!);
-    const scored = scoreDaily('2026-10-20', run, NOW);
+    // Tomorrow's, as the first with balanced hands: the bot only plays plain
+    // English, and today's board (dealt the old way) has no such answer.
+    const tomorrow = new Date('2026-10-21T12:00:00Z');
+    const run = sampleRun(dailyLevel('2026-10-21')!);
+    const scored = scoreDaily('2026-10-21', run, tomorrow);
     expect(scored).toMatchObject({ won: true, submits: 1 });
-    expect((scored as { score: number }).score).toBeGreaterThanOrEqual(dailyLevel('2026-10-20')!.stars![0]);
+    expect((scored as { score: number }).score).toBeGreaterThanOrEqual(dailyLevel('2026-10-21')!.stars![0]);
   });
 
   it('only takes daily puzzles from yesterday to tomorrow', () => {
@@ -24,10 +27,10 @@ describe('server scoring', () => {
   });
 
   it("rejects a run that doesn't match the deal, or isn't finished", () => {
-    const level = dailyLevel('2026-10-20')!;
+    const level = dailyLevel('2026-10-21')!;
     const run = sampleRun(level);
     // Another day's moves don't fit this day's deal.
-    expect(typeof scoreDaily('2026-10-20', sampleRun(dailyLevel('2026-10-21')!), NOW)).toBe('string');
+    expect(typeof scoreDaily('2026-10-20', run, NOW)).toBe('string');
     expect(scoreRun(level, run.slice(0, -1))).toBe("the game isn't finished");
     expect(scoreRun(level, 'nope')).toBe('actions must be a list');
   });

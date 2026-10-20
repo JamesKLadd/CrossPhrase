@@ -5,7 +5,8 @@ import type { LevelDef } from '../core/types';
 // out). Star thresholds are set so the fill the deck is built around earns 2★.
 // Everything after level 10 comes from the generator.
 
-export const TUTORIAL: LevelDef[] = [
+export const TUTORIAL: LevelDef[] = (
+  [
   {
     // the golden toast melts / the sleepy chef yawns
     id: 'first-light',
@@ -203,4 +204,6 @@ export const TUTORIAL: LevelDef[] = [
     objectives: [{ kind: 'longWord', letters: 9, points: 10 }],
     intro: 'Final exam: four lines, four crossings, three submits. Make me proud.',
   },
-];
+  ] satisfies LevelDef[]
+  // Balanced hands (see drawTile) once a level's scripted deck runs out.
+).map((level): LevelDef => ({ ...level, draw: 2 }));

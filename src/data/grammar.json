@@ -1,0 +1,729 @@
+{
+ "generatedBy": "scripts/build-grammar.mjs",
+ "verbs": {
+  "are": {
+   "base": "be",
+   "form": "past"
+  },
+  "ate": {
+   "base": "eat",
+   "form": "past"
+  },
+  "bake": {
+   "base": "bake",
+   "form": "base"
+  },
+  "bakes": {
+   "base": "bake",
+   "form": "s"
+  },
+  "be": {
+   "base": "be",
+   "form": "base"
+  },
+  "blink": {
+   "base": "blink",
+   "form": "base"
+  },
+  "blinks": {
+   "base": "blink",
+   "form": "s"
+  },
+  "bloom": {
+   "base": "bloom",
+   "form": "base"
+  },
+  "blooms": {
+   "base": "bloom",
+   "form": "s"
+  },
+  "bob": {
+   "base": "bob",
+   "form": "base"
+  },
+  "bobs": {
+   "base": "bob",
+   "form": "s"
+  },
+  "borrow": {
+   "base": "borrow",
+   "form": "base"
+  },
+  "borrows": {
+   "base": "borrow",
+   "form": "s"
+  },
+  "brew": {
+   "base": "brew",
+   "form": "base"
+  },
+  "brews": {
+   "base": "brew",
+   "form": "s"
+  },
+  "browse": {
+   "base": "browse",
+   "form": "base"
+  },
+  "browses": {
+   "base": "browse",
+   "form": "s"
+  },
+  "buzz": {
+   "base": "buzz",
+   "form": "base"
+  },
+  "buzzes": {
+   "base": "buzz",
+   "form": "s"
+  },
+  "can": {
+   "base": "can",
+   "form": "base"
+  },
+  "climb": {
+   "base": "climb",
+   "form": "base"
+  },
+  "climbs": {
+   "base": "climb",
+   "form": "s"
+  },
+  "crash": {
+   "base": "crash",
+   "form": "base"
+  },
+  "crashes": {
+   "base": "crash",
+   "form": "s"
+  },
+  "crawl": {
+   "base": "crawl",
+   "form": "base"
+  },
+  "crawls": {
+   "base": "crawl",
+   "form": "s"
+  },
+  "crunch": {
+   "base": "crunch",
+   "form": "base"
+  },
+  "crunches": {
+   "base": "crunch",
+   "form": "s"
+  },
+  "dance": {
+   "base": "dance",
+   "form": "base"
+  },
+  "dances": {
+   "base": "dance",
+   "form": "s"
+  },
+  "dig": {
+   "base": "dig",
+   "form": "base"
+  },
+  "digs": {
+   "base": "dig",
+   "form": "s"
+  },
+  "dive": {
+   "base": "dive",
+   "form": "base"
+  },
+  "dives": {
+   "base": "dive",
+   "form": "s"
+  },
+  "do": {
+   "base": "do",
+   "form": "base"
+  },
+  "does": {
+   "base": "do",
+   "form": "s"
+  },
+  "dream": {
+   "base": "dream",
+   "form": "base"
+  },
+  "dreams": {
+   "base": "dream",
+   "form": "s"
+  },
+  "drift": {
+   "base": "drift",
+   "form": "base"
+  },
+  "drifts": {
+   "base": "drift",
+   "form": "s"
+  },
+  "drip": {
+   "base": "drip",
+   "form": "base"
+  },
+  "drips": {
+   "base": "drip",
+   "form": "s"
+  },
+  "eat": {
+   "base": "eat",
+   "form": "base"
+  },
+  "eats": {
+   "base": "eat",
+   "form": "s"
+  },
+  "fall": {
+   "base": "fall",
+   "form": "base"
+  },
+  "falls": {
+   "base": "fall",
+   "form": "s"
+  },
+  "find": {
+   "base": "find",
+   "form": "base"
+  },
+  "finds": {
+   "base": "find",
+   "form": "s"
+  },
+  "flies": {
+   "base": "fly",
+   "form": "s"
+  },
+  "float": {
+   "base": "float",
+   "form": "base"
+  },
+  "floats": {
+   "base": "float",
+   "form": "s"
+  },
+  "fly": {
+   "base": "fly",
+   "form": "base"
+  },
+  "fries": {
+   "base": "fry",
+   "form": "s"
+  },
+  "fry": {
+   "base": "fry",
+   "form": "base"
+  },
+  "gaze": {
+   "base": "gaze",
+   "form": "base"
+  },
+  "gazes": {
+   "base": "gaze",
+   "form": "s"
+  },
+  "glow": {
+   "base": "glow",
+   "form": "base"
+  },
+  "glows": {
+   "base": "glow",
+   "form": "s"
+  },
+  "grow": {
+   "base": "grow",
+   "form": "base"
+  },
+  "grows": {
+   "base": "grow",
+   "form": "s"
+  },
+  "had": {
+   "base": "have",
+   "form": "past"
+  },
+  "has": {
+   "base": "have",
+   "form": "s"
+  },
+  "have": {
+   "base": "have",
+   "form": "base"
+  },
+  "hide": {
+   "base": "hide",
+   "form": "base"
+  },
+  "hides": {
+   "base": "hide",
+   "form": "s"
+  },
+  "hop": {
+   "base": "hop",
+   "form": "base"
+  },
+  "hops": {
+   "base": "hop",
+   "form": "s"
+  },
+  "howl": {
+   "base": "howl",
+   "form": "base"
+  },
+  "howls": {
+   "base": "howl",
+   "form": "s"
+  },
+  "hum": {
+   "base": "hum",
+   "form": "base"
+  },
+  "hums": {
+   "base": "hum",
+   "form": "s"
+  },
+  "is": {
+   "base": "be",
+   "form": "s"
+  },
+  "laugh": {
+   "base": "laugh",
+   "form": "base"
+  },
+  "laughs": {
+   "base": "laugh",
+   "form": "s"
+  },
+  "learn": {
+   "base": "learn",
+   "form": "base"
+  },
+  "learns": {
+   "base": "learn",
+   "form": "s"
+  },
+  "love": {
+   "base": "love",
+   "form": "base"
+  },
+  "loves": {
+   "base": "love",
+   "form": "s"
+  },
+  "make": {
+   "base": "make",
+   "form": "base"
+  },
+  "makes": {
+   "base": "make",
+   "form": "s"
+  },
+  "melt": {
+   "base": "melt",
+   "form": "base"
+  },
+  "melts": {
+   "base": "melt",
+   "form": "s"
+  },
+  "might": {
+   "base": "might",
+   "form": "base"
+  },
+  "munch": {
+   "base": "munch",
+   "form": "base"
+  },
+  "munches": {
+   "base": "munch",
+   "form": "s"
+  },
+  "must": {
+   "base": "must",
+   "form": "base"
+  },
+  "nibble": {
+   "base": "nibble",
+   "form": "base"
+  },
+  "nibbles": {
+   "base": "nibble",
+   "form": "s"
+  },
+  "orbit": {
+   "base": "orbit",
+   "form": "base"
+  },
+  "orbits": {
+   "base": "orbit",
+   "form": "s"
+  },
+  "paddle": {
+   "base": "paddle",
+   "form": "base"
+  },
+  "paddles": {
+   "base": "paddle",
+   "form": "s"
+  },
+  "plant": {
+   "base": "plant",
+   "form": "base"
+  },
+  "plants": {
+   "base": "plant",
+   "form": "s"
+  },
+  "ponder": {
+   "base": "ponder",
+   "form": "base"
+  },
+  "ponders": {
+   "base": "ponder",
+   "form": "s"
+  },
+  "pour": {
+   "base": "pour",
+   "form": "base"
+  },
+  "pours": {
+   "base": "pour",
+   "form": "s"
+  },
+  "prune": {
+   "base": "prune",
+   "form": "base"
+  },
+  "prunes": {
+   "base": "prune",
+   "form": "s"
+  },
+  "read": {
+   "base": "read",
+   "form": "base"
+  },
+  "reads": {
+   "base": "read",
+   "form": "s"
+  },
+  "roll": {
+   "base": "roll",
+   "form": "base"
+  },
+  "rolls": {
+   "base": "roll",
+   "form": "s"
+  },
+  "run": {
+   "base": "run",
+   "form": "base"
+  },
+  "runs": {
+   "base": "run",
+   "form": "s"
+  },
+  "rustle": {
+   "base": "rustle",
+   "form": "base"
+  },
+  "rustles": {
+   "base": "rustle",
+   "form": "s"
+  },
+  "sail": {
+   "base": "sail",
+   "form": "base"
+  },
+  "sails": {
+   "base": "sail",
+   "form": "s"
+  },
+  "scribble": {
+   "base": "scribble",
+   "form": "base"
+  },
+  "scribbles": {
+   "base": "scribble",
+   "form": "s"
+  },
+  "see": {
+   "base": "see",
+   "form": "base"
+  },
+  "sees": {
+   "base": "see",
+   "form": "s"
+  },
+  "shine": {
+   "base": "shine",
+   "form": "base"
+  },
+  "shines": {
+   "base": "shine",
+   "form": "s"
+  },
+  "shush": {
+   "base": "shush",
+   "form": "base"
+  },
+  "shushes": {
+   "base": "shush",
+   "form": "s"
+  },
+  "sing": {
+   "base": "sing",
+   "form": "base"
+  },
+  "sings": {
+   "base": "sing",
+   "form": "s"
+  },
+  "sip": {
+   "base": "sip",
+   "form": "base"
+  },
+  "sips": {
+   "base": "sip",
+   "form": "s"
+  },
+  "sizzle": {
+   "base": "sizzle",
+   "form": "base"
+  },
+  "sizzles": {
+   "base": "sizzle",
+   "form": "s"
+  },
+  "sleep": {
+   "base": "sleep",
+   "form": "base"
+  },
+  "sleeps": {
+   "base": "sleep",
+   "form": "s"
+  },
+  "soar": {
+   "base": "soar",
+   "form": "base"
+  },
+  "soars": {
+   "base": "soar",
+   "form": "s"
+  },
+  "sparkle": {
+   "base": "sparkle",
+   "form": "base"
+  },
+  "sparkles": {
+   "base": "sparkle",
+   "form": "s"
+  },
+  "spin": {
+   "base": "spin",
+   "form": "base"
+  },
+  "spins": {
+   "base": "spin",
+   "form": "s"
+  },
+  "splash": {
+   "base": "splash",
+   "form": "base"
+  },
+  "splashes": {
+   "base": "splash",
+   "form": "s"
+  },
+  "spread": {
+   "base": "spread",
+   "form": "base"
+  },
+  "spreads": {
+   "base": "spread",
+   "form": "s"
+  },
+  "sprout": {
+   "base": "sprout",
+   "form": "base"
+  },
+  "sprouts": {
+   "base": "sprout",
+   "form": "s"
+  },
+  "stir": {
+   "base": "stir",
+   "form": "base"
+  },
+  "stirs": {
+   "base": "stir",
+   "form": "s"
+  },
+  "studies": {
+   "base": "study",
+   "form": "s"
+  },
+  "study": {
+   "base": "study",
+   "form": "base"
+  },
+  "surf": {
+   "base": "surf",
+   "form": "base"
+  },
+  "surfs": {
+   "base": "surf",
+   "form": "s"
+  },
+  "swim": {
+   "base": "swim",
+   "form": "base"
+  },
+  "swims": {
+   "base": "swim",
+   "form": "s"
+  },
+  "take": {
+   "base": "take",
+   "form": "base"
+  },
+  "takes": {
+   "base": "take",
+   "form": "s"
+  },
+  "toast": {
+   "base": "toast",
+   "form": "base"
+  },
+  "toasts": {
+   "base": "toast",
+   "form": "s"
+  },
+  "turn": {
+   "base": "turn",
+   "form": "base"
+  },
+  "turns": {
+   "base": "turn",
+   "form": "s"
+  },
+  "twinkle": {
+   "base": "twinkle",
+   "form": "base"
+  },
+  "twinkles": {
+   "base": "twinkle",
+   "form": "s"
+  },
+  "wait": {
+   "base": "wait",
+   "form": "base"
+  },
+  "waits": {
+   "base": "wait",
+   "form": "s"
+  },
+  "wake": {
+   "base": "wake",
+   "form": "base"
+  },
+  "wakes": {
+   "base": "wake",
+   "form": "s"
+  },
+  "walk": {
+   "base": "walk",
+   "form": "base"
+  },
+  "walks": {
+   "base": "walk",
+   "form": "s"
+  },
+  "wander": {
+   "base": "wander",
+   "form": "base"
+  },
+  "wanders": {
+   "base": "wander",
+   "form": "s"
+  },
+  "want": {
+   "base": "want",
+   "form": "base"
+  },
+  "wants": {
+   "base": "want",
+   "form": "s"
+  },
+  "was": {
+   "base": "be",
+   "form": "past"
+  },
+  "wash": {
+   "base": "wash",
+   "form": "base"
+  },
+  "washes": {
+   "base": "wash",
+   "form": "s"
+  },
+  "water": {
+   "base": "water",
+   "form": "base"
+  },
+  "waters": {
+   "base": "water",
+   "form": "s"
+  },
+  "were": {
+   "base": "be",
+   "form": "past"
+  },
+  "whisper": {
+   "base": "whisper",
+   "form": "base"
+  },
+  "whispers": {
+   "base": "whisper",
+   "form": "s"
+  },
+  "will": {
+   "base": "will",
+   "form": "base"
+  },
+  "wilt": {
+   "base": "wilt",
+   "form": "base"
+  },
+  "wilts": {
+   "base": "wilt",
+   "form": "s"
+  },
+  "wonder": {
+   "base": "wonder",
+   "form": "base"
+  },
+  "wonders": {
+   "base": "wonder",
+   "form": "s"
+  },
+  "write": {
+   "base": "write",
+   "form": "base"
+  },
+  "writes": {
+   "base": "write",
+   "form": "s"
+  },
+  "yawn": {
+   "base": "yawn",
+   "form": "base"
+  },
+  "yawns": {
+   "base": "yawn",
+   "form": "s"
+  }
+ }
+}

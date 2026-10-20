@@ -51,7 +51,9 @@ The owl has three possible brains. The game uses the best one it can reach:
    quips, in a few seconds. See [pc-judge/README.md](pc-judge/README.md).
 2. **The built-in judge** (free, always there): a few grammar rules plus a
    tiny model that ships inside the game. It works offline and instantly, and
-   you train it yourself (below). When the PC judge is configured but out of
+   you train it yourself (below). It never rejects a line that reads as real
+   English to the grammar check ([`src/core/grammar.ts`](src/core/grammar.ts)),
+   so a correct answer can't be failed by the tiny model. When the PC judge is configured but out of
    reach, it fills in *provisionally* ("OK?"), and those lines are re-checked
    once the PC judge is back. A provisional pass is never taken back.
 3. **The Claude judge** (paid, switched off): see the last section.
@@ -97,15 +99,28 @@ Study App's training kit) on the NVIDIA desktop.
 - **Levels 11–120** come from the procedural generator
   ([`src/core/levelGen.ts`](src/core/levelGen.ts)). It grows a crossword
   layout to suit the level's difficulty band, adds anchors, then has a bot
-  ([`src/core/levelBot.ts`](src/core/levelBot.ts)) play it by the real rules
-  with the built-in judge. Layouts the bot can't clear with the level's own
-  deal are thrown away. The bot's scores set the star thresholds, its solution
+  ([`src/core/levelBot.ts`](src/core/levelBot.ts)) play it by the real rules.
+  **The bot only plays plain English**: every line must pass the grammar
+  check's strict mode ([`src/core/grammar.ts`](src/core/grammar.ts): word
+  order, a/an, agreement, an article or similar before each noun except a
+  headline-style first word, no noun pairs), so "she eats the warm toast" or
+  "moon drifts very slowly", but never "she eat toast", "he walks old book" or
+  "i dance tea butter". A layout is kept only if the bot clears the level's own deal **with
+  at least one swap to spare**, so every level has a solution a person would
+  actually write. The bot's scores set the star thresholds, its solution
   places the soft hints, and its runs show which bonus goals are in reach.
+- **Balanced hands:** the hand always holds at least one pronoun, one
+  determiner (a, the, this…), one verb (a real one, not just "must" or
+  "will") and one noun. When placing or swapping
+  leaves the hand without one, the next word is drawn from that kind. Levels
+  and dailies marked `draw: 2` deal this way (all levels, and dailies from
+  21 Oct 2026); older boards keep their original deal, so saved games and
+  leaderboard replays still match.
 - The levels are generated ahead of time into `src/data/levels.generated.json`,
   so everyone plays the same levels and the game never runs the generator:
 
   ```sh
-  npm run generate:levels    # about a minute
+  npm run generate:levels    # about half an hour (the hard bands search longest)
   ```
 
   Regenerating after changing word lists, the built-in judge or the knobs in
@@ -159,7 +174,11 @@ Then commit and push (the website rebuilds) and `npx supabase functions deploy s
   consecutive days builds a 🔥 streak. Daily puzzles are always judged by the
   built-in judge, so everyone, and the leaderboard, judges them the same way.
   A year of them is generated ahead of time (`npm run generate:dailies`) into
-  `src/data/dailies.generated.json`; regenerate with a later start date
+  `src/data/dailies.generated.json`, checked by the same real-English bot as
+  the levels (a swap to spare; the first star at 75% of the bot's score, since
+  there's only one attempt). `npm run generate:dailies -- --from <day>` remakes
+  the boards from that day on and keeps the earlier ones exactly as they were
+  (days already played must never change). Regenerate with a later start date
   before it runs out (it covers 19 Oct 2026 to 19 Oct 2027).
 - **Zen** (🧘): endless boards made on the spot. No star targets, no penalty,
   no limit on submits or swaps; a board clears when every line reads.
@@ -365,8 +384,8 @@ applies the tuning) and `npx supabase functions deploy account` (new).
 | `npm run train:judge` | Retrains the built-in judge from `training/` |
 | `npm run rescore:dailies` | One-off: fills in the points of unsolved daily runs saved as 0 before they kept their points (logs in as James) |
 | `npm run pull:labels` | Downloads approved training labels (yours and reviewed corrections) into `training/labels.jsonl` |
-| `npm run generate:levels` | Regenerates levels 11–120 (see Levels above) |
-| `npm run generate:dailies` | Regenerates a year of daily puzzles |
+| `npm run generate:levels` | Regenerates levels 11–120 (`-- --from <n>` keeps the ones before n; see Levels above) |
+| `npm run generate:dailies -- --from <day>` | Regenerates the daily puzzles from that day on (see Modes) |
 | `npm run bundle:server` | Rebuilds the leaderboard server's copy of the game core |
 | `npm run build:web` | Builds the website into `dist/` (see Play it as a website) |
 | `npm run make:sounds` | Regenerates the sound effects and music in `assets/sounds/` |
@@ -374,6 +393,7 @@ applies the tuning) and `npx supabase functions deploy account` (new).
 | `npm run typecheck` | TypeScript |
 | `npm run lint` | ESLint (Expo config) |
 | `npm run build:words` | Regenerates the word data from `scripts/words/*.txt` (see below) |
+| `npm run build:grammar` | Regenerates just the verb forms the grammar check uses (`build:words` runs it too) |
 
 ## Word data
 
@@ -395,7 +415,10 @@ npm run build:words
 This annotates each word with its corpus frequency (via `wordfreq`), which
 drives both draw odds and rarity points. It writes `src/data/words.json` (app)
 and `supabase/functions/_shared/dictionary.json` (the judge only accepts
-dictionary words). Commit both.
+dictionary words), then `src/data/grammar.json` (each verb's base, -s and past
+forms, read from the slash groups, for the grammar check's agreement). Commit
+all three, then regenerate the levels and future dailies so the bot plays the
+new words.
 
 ## Layout
 

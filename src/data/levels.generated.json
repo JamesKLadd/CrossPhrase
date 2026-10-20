@@ -3,86 +3,87 @@
  "levels": [
   {
    "id": "level-11",
-   "name": "Sugary Kitchen",
+   "name": "Butter & Honey",
    "theme": "breakfast",
    "layout": [
-    ".#.#",
     "....",
-    ".#.#",
-    ".#.#"
+    "###.",
+    "###.",
+    "...."
    ],
    "anchors": {
-    "2,0": "near"
+    "1,3": "under"
    },
    "swaps": 5,
-   "seed": 1393618841,
+   "seed": 513234033,
+   "draw": 2,
    "hints": {
-    "1,1": "prep",
-    "1,3": "verb",
-    "1,2": "det",
-    "3,0": "noun",
-    "3,2": "verb"
+    "0,3": "noun",
+    "0,2": "det",
+    "3,1": "det",
+    "3,0": "verb",
+    "3,3": "noun"
    },
    "stars": [
-    26,
-    33,
-    39
+    24,
+    29,
+    34
    ]
   },
   {
    "id": "level-12",
-   "name": "Grandma & Plate",
+   "name": "Banana & Egg",
    "theme": "breakfast",
    "layout": [
-    "#.##",
     "....",
-    "#.##",
-    "...."
+    ".###",
+    ".###",
+    ".###"
    ],
    "anchors": {
-    "1,1": "through"
+    "0,0": "a"
    },
    "swaps": 5,
-   "seed": 1339501900,
+   "seed": 1504843650,
+   "draw": 2,
    "hints": {
-    "3,2": "prep",
-    "3,1": "noun",
-    "2,1": "prep",
-    "3,0": "adj",
-    "3,3": "noun"
+    "0,1": "noun",
+    "1,0": "adj",
+    "0,3": "pron"
    },
    "stars": [
-    27,
-    33,
-    39
+    17,
+    20,
+    23
    ]
   },
   {
    "id": "level-13",
-   "name": "The Honey",
+   "name": "Early Napkin",
    "theme": "breakfast",
    "layout": [
-    ".##.",
     "....",
-    ".##.",
-    ".##."
+    "###.",
+    "###.",
+    "...."
    ],
    "anchors": {
-    "2,0": "for"
+    "0,1": "in"
    },
    "swaps": 5,
-   "seed": 69405601,
+   "seed": 1087076449,
+   "draw": 2,
    "hints": {
-    "3,3": "noun",
-    "2,3": "det",
-    "1,2": "noun",
-    "1,1": "det",
-    "1,0": "verb"
+    "0,3": "noun",
+    "0,2": "det",
+    "3,2": "det",
+    "3,0": "noun",
+    "2,3": "det"
    },
    "stars": [
     26,
-    33,
-    39
+    31,
+    36
    ]
   },
   {
@@ -101,15 +102,16 @@
    },
    "swaps": 5,
    "seed": 724006021,
+   "draw": 2,
    "hints": {
-    "1,1": "noun",
-    "2,3": "noun",
-    "2,1": "verb"
+    "1,1": "det",
+    "2,3": "verb",
+    "2,1": "adj"
    },
    "stars": [
+    14,
     17,
-    21,
-    25
+    20
    ]
   },
   {
@@ -127,45 +129,46 @@
    },
    "swaps": 5,
    "seed": 1121408447,
+   "draw": 2,
    "hints": {
     "3,2": "verb",
-    "2,2": "pron",
-    "2,0": "pron",
+    "2,2": "verb",
+    "2,0": "det",
     "0,1": "verb",
     "0,2": "det"
    },
    "stars": [
-    24,
-    29,
-    34
+    23,
+    28,
+    33
    ]
   },
   {
    "id": "level-16",
-   "name": "Hot Cinnamon",
+   "name": "The Plate",
    "theme": "breakfast",
    "layout": [
-    "#.#.",
-    "#.#.",
-    "....",
-    "#.#."
+    "##.#",
+    "##.#",
+    "##.#",
+    "...."
    ],
    "anchors": {
-    "2,0": "my",
-    "1,1": "over"
+    "1,2": "of",
+    "3,0": "my"
    },
    "swaps": 5,
-   "seed": 644604726,
+   "seed": 244177659,
+   "draw": 2,
    "hints": {
-    "2,2": "verb",
-    "2,1": "pron",
-    "3,1": "noun",
-    "0,3": "pron"
+    "3,2": "verb",
+    "0,2": "noun",
+    "2,2": "pron"
    },
    "stars": [
-    24,
-    32,
-    39
+    19,
+    23,
+    27
    ]
   },
   {
@@ -184,123 +187,157 @@
    },
    "swaps": 5,
    "seed": 1639927299,
+   "draw": 2,
    "hints": {
-    "0,3": "adj",
-    "0,2": "conj",
+    "0,3": "verb",
+    "0,2": "noun",
     "0,1": "adj"
    },
    "stars": [
-    15,
-    21,
-    27
+    23,
+    28,
+    33
    ]
   },
   {
    "id": "level-18",
-   "name": "Sticky Cinnamon",
+   "name": "Coffee & Juice",
    "theme": "breakfast",
    "layout": [
-    "....",
-    "##.#",
-    "....",
-    "##.#"
+    "###.",
+    "###.",
+    "###.",
+    "...."
    ],
    "anchors": {
-    "0,0": "every"
+    "3,1": "for"
    },
    "swaps": 5,
-   "seed": 1849971761,
+   "seed": 1254492381,
+   "draw": 2,
    "hints": {
-    "2,2": "det",
-    "2,3": "noun",
-    "3,2": "noun",
-    "0,2": "pron",
-    "2,1": "verb"
+    "0,3": "adj",
+    "1,3": "adj",
+    "2,3": "noun"
    },
    "stars": [
-    28,
-    34,
-    40
+    19,
+    23,
+    27
    ]
   },
   {
    "id": "level-19",
-   "name": "Sleepy Croissant",
+   "name": "Milk & Mug",
    "theme": "breakfast",
    "layout": [
-    ".#.#",
-    ".#.#",
-    "....",
-    ".#.#"
+    "#.##",
+    "#.##",
+    "#.##",
+    "...."
    ],
    "anchors": {
-    "1,2": "and",
-    "0,0": "they"
+    "2,1": "and",
+    "3,2": "of"
    },
    "swaps": 5,
-   "seed": 1806400706,
+   "seed": 1971034372,
+   "draw": 2,
    "hints": {
-    "3,0": "noun",
-    "2,2": "det",
-    "2,1": "verb",
-    "1,0": "verb"
+    "3,1": "pron",
+    "3,0": "prep",
+    "0,1": "prep"
    },
    "stars": [
-    23,
-    30,
-    37
+    13,
+    16,
+    19
    ]
   },
   {
    "id": "level-20",
-   "name": "Buttery Crumb",
+   "name": "Muffin & Tea",
    "theme": "breakfast",
    "layout": [
-    "#.#.",
-    "#.#.",
-    "....",
-    "#.#."
+    "###.",
+    "###.",
+    "###.",
+    "...."
    ],
    "anchors": {
-    "1,3": "under"
+    "2,3": "over",
+    "3,0": "some"
    },
    "swaps": 5,
-   "seed": 2032882538,
+   "seed": 739846591,
+   "draw": 2,
    "hints": {
-    "3,1": "noun",
-    "2,3": "verb",
-    "0,3": "noun",
-    "2,2": "noun",
-    "2,1": "det"
+    "3,2": "verb",
+    "3,3": "pron",
+    "3,1": "noun"
    },
    "stars": [
-    33,
-    40,
-    47
+    13,
+    16,
+    19
    ]
   },
   {
    "id": "level-21",
-   "name": "Infinite Wolf",
+   "name": "The Orbit",
    "theme": "night-sky",
    "layout": [
-    "#.#.",
-    "#.#.",
-    "#.#.",
+    "##.#",
     "....",
-    "#.#."
+    "##.#",
+    "...."
    ],
    "anchors": {
-    "3,0": "the",
-    "1,3": "on"
+    "1,0": "this"
    },
    "swaps": 4,
-   "seed": 273185675,
+   "seed": 1497371115,
+   "draw": 2,
    "hints": {
-    "3,3": "noun",
-    "3,1": "adj",
-    "2,1": "adj",
-    "2,3": "det"
+    "1,2": "verb",
+    "3,2": "adv",
+    "0,2": "pron"
+   },
+   "stars": [
+    21,
+    25,
+    29
+   ],
+   "objectives": [
+    {
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 5
+    }
+   ]
+  },
+  {
+   "id": "level-22",
+   "name": "Universe & Planet",
+   "theme": "night-sky",
+   "layout": [
+    "....",
+    ".#.#",
+    ".#.#",
+    ".#.#",
+    "##.#"
+   ],
+   "anchors": {
+    "2,2": "with"
+   },
+   "swaps": 4,
+   "seed": 1370186826,
+   "draw": 2,
+   "hints": {
+    "0,0": "noun",
+    "0,1": "verb",
+    "0,3": "pron",
+    "0,2": "prep"
    },
    "stars": [
     29,
@@ -309,51 +346,15 @@
    ],
    "objectives": [
     {
-     "kind": "themeWords",
-     "count": 3,
+     "kind": "greatLines",
+     "count": 1,
      "points": 6
     }
    ]
   },
   {
-   "id": "level-22",
-   "name": "Ancient Horizon",
-   "theme": "night-sky",
-   "layout": [
-    ".....",
-    "#.#.#",
-    "#.#.#",
-    "....#",
-    "###.#"
-   ],
-   "anchors": {
-    "0,0": "some"
-   },
-   "swaps": 4,
-   "seed": 1143875726,
-   "hints": {
-    "0,3": "pron",
-    "3,1": "verb",
-    "0,1": "noun",
-    "1,1": "verb",
-    "1,3": "verb"
-   },
-   "stars": [
-    43,
-    52,
-    61
-   ],
-   "objectives": [
-    {
-     "kind": "swapsLeft",
-     "count": 2,
-     "points": 9
-    }
-   ]
-  },
-  {
    "id": "level-23",
-   "name": "Celestial Lantern",
+   "name": "The Horizon",
    "theme": "night-sky",
    "layout": [
     "....",
@@ -362,190 +363,158 @@
     ".###"
    ],
    "anchors": {
-    "0,1": "and",
-    "2,1": "for"
+    "1,0": "through",
+    "0,1": "in"
    },
    "swaps": 4,
-   "seed": 1772693555,
+   "seed": 2098046410,
+   "draw": 2,
    "hints": {
-    "2,0": "verb",
-    "0,0": "noun",
-    "0,3": "noun"
+    "0,0": "verb",
+    "2,0": "det",
+    "0,2": "det"
    },
    "stars": [
-    22,
-    28,
-    33
+    29,
+    35,
+    41
    ],
    "objectives": [
     {
-     "kind": "rareCrossing",
-     "value": 6,
-     "points": 5
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 6
     }
    ]
   },
   {
    "id": "level-24",
-   "name": "Mysterious Orbit",
+   "name": "Cloud & Dream",
    "theme": "night-sky",
    "layout": [
+    "#....",
+    "##.##",
+    "##.##",
     "....#",
-    ".####",
-    "....#",
-    ".####",
-    "....."
+    "##.##"
    ],
    "anchors": {
-    "2,0": "space"
+    "2,2": "on"
    },
    "swaps": 4,
-   "seed": 896207102,
+   "seed": 86909721,
+   "draw": 2,
    "hints": {
-    "3,0": "prep",
-    "4,0": "noun",
-    "0,0": "det",
-    "2,2": "det",
-    "0,2": "noun"
+    "0,1": "pron",
+    "3,1": "verb",
+    "0,3": "det",
+    "3,2": "det"
    },
    "stars": [
-    38,
-    48,
-    57
+    27,
+    32,
+    37
    ],
    "objectives": [
     {
-     "kind": "greatLines",
-     "count": 1,
-     "points": 8
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 5
     }
    ]
   },
   {
    "id": "level-25",
-   "name": "Telescope & Sky",
+   "name": "Silent Dream",
    "theme": "night-sky",
    "layout": [
-    "#....",
-    "#.###",
-    "#.###",
-    "....."
+    ".#.##",
+    ".#.##",
+    ".....",
+    ".#.##"
    ],
    "anchors": {
-    "3,3": "near"
+    "1,0": "over",
+    "2,2": "and"
    },
    "swaps": 4,
-   "seed": 1185054075,
+   "seed": 2105822084,
+   "draw": 2,
    "hints": {
-    "3,0": "pron",
-    "2,1": "noun",
-    "0,2": "adv",
-    "0,4": "verb"
+    "1,2": "pron",
+    "2,0": "det",
+    "2,4": "verb"
    },
    "stars": [
-    24,
-    31,
-    37
+    23,
+    28,
+    33
    ],
    "objectives": [
     {
-     "kind": "longWord",
-     "letters": 7,
+     "kind": "themeWords",
+     "count": 4,
      "points": 5
     }
    ]
   },
   {
    "id": "level-26",
-   "name": "Pale Comet",
+   "name": "Celestial Satellite",
    "theme": "night-sky",
    "layout": [
-    "....#",
-    "#.###",
-    ".....",
-    "#.###"
+    "....",
+    "#.##",
+    "....",
+    "#.##"
    ],
    "anchors": {
-    "2,2": "for",
-    "0,2": "under"
+    "1,1": "over",
+    "2,2": "on"
    },
    "swaps": 4,
-   "seed": 1606592638,
+   "seed": 1425722043,
+   "draw": 2,
    "hints": {
+    "2,0": "verb",
     "0,1": "noun",
-    "2,1": "verb",
-    "0,3": "noun"
+    "0,3": "verb"
    },
    "stars": [
-    25,
-    30,
-    35
+    22,
+    26,
+    30
    ],
    "objectives": [
     {
-     "kind": "rareCrossing",
-     "value": 6,
+     "kind": "greatLines",
+     "count": 1,
      "points": 5
     }
    ]
   },
   {
    "id": "level-27",
-   "name": "Nebula & Planet",
+   "name": "Distant Astronaut",
    "theme": "night-sky",
    "layout": [
-    ".....",
-    ".#.#.",
-    ".#.#.",
-    ".#.#.",
-    ".####"
+    "....",
+    ".#.#",
+    ".#.#",
+    ".#.#",
+    ".###"
    ],
    "anchors": {
-    "1,0": "for",
-    "1,4": "and"
+    "0,1": "over",
+    "4,0": "universe"
    },
    "swaps": 4,
-   "seed": 169941356,
+   "seed": 1997263609,
+   "draw": 2,
    "hints": {
-    "0,4": "noun",
-    "2,2": "det",
     "0,2": "det",
-    "2,4": "det",
-    "3,0": "verb"
-   },
-   "stars": [
-    35,
-    42,
-    49
-   ],
-   "objectives": [
-    {
-     "kind": "rareCrossing",
-     "value": 6,
-     "points": 7
-    }
-   ]
-  },
-  {
-   "id": "level-28",
-   "name": "Silent Orbit",
-   "theme": "night-sky",
-   "layout": [
-    "##.##",
-    ".....",
-    "##.##",
-    "....#"
-   ],
-   "anchors": {
-    "1,2": "for"
-   },
-   "swaps": 4,
-   "seed": 414272949,
-   "hints": {
-    "3,2": "adj",
-    "3,0": "pron",
-    "1,0": "det",
-    "3,1": "adv"
+    "3,2": "verb",
+    "1,0": "prep"
    },
    "stars": [
     30,
@@ -554,80 +523,117 @@
    ],
    "objectives": [
     {
-     "kind": "themeWords",
-     "count": 5,
+     "kind": "rareCrossing",
+     "value": 6,
      "points": 6
     }
    ]
   },
   {
-   "id": "level-29",
-   "name": "Cosmic Meteor",
+   "id": "level-28",
+   "name": "Distant Meteor",
    "theme": "night-sky",
    "layout": [
-    "....#",
-    "#.##.",
-    "#.##.",
-    "#....",
-    "#.##."
+    "....",
+    ".#.#",
+    ".#.#",
+    ".#.#",
+    ".###"
    ],
    "anchors": {
-    "4,1": "planet",
-    "1,4": "i"
+    "2,0": "in",
+    "0,3": "planet"
    },
    "swaps": 4,
-   "seed": 855601022,
+   "seed": 1611905286,
+   "draw": 2,
    "hints": {
-    "0,3": "adv",
-    "0,0": "det",
-    "3,2": "noun",
-    "0,1": "noun"
+    "1,0": "verb",
+    "0,0": "pron",
+    "2,2": "noun"
    },
    "stars": [
-    40,
-    48,
-    56
-   ],
-   "objectives": [
-    {
-     "kind": "themeWords",
-     "count": 6,
-     "points": 8
-    }
-   ]
-  },
-  {
-   "id": "level-30",
-   "name": "Infinite Shadow",
-   "theme": "night-sky",
-   "layout": [
-    ".#.#.",
-    ".....",
-    ".#.#.",
-    ".#.#."
-   ],
-   "anchors": {
-    "1,3": "on"
-   },
-   "swaps": 4,
-   "seed": 1523424724,
-   "hints": {
-    "2,2": "conj",
-    "3,0": "adj",
-    "1,2": "adv",
-    "1,0": "pron",
-    "0,4": "det"
-   },
-   "stars": [
-    43,
-    52,
-    61
+    24,
+    29,
+    34
    ],
    "objectives": [
     {
      "kind": "rareCrossing",
      "value": 6,
-     "points": 9
+     "points": 5
+    }
+   ]
+  },
+  {
+   "id": "level-29",
+   "name": "Firefly & Owl",
+   "theme": "night-sky",
+   "layout": [
+    "....#",
+    "##.##",
+    "##.##",
+    ".....",
+    "##.##"
+   ],
+   "anchors": {
+    "3,4": "star"
+   },
+   "swaps": 4,
+   "seed": 233234531,
+   "draw": 2,
+   "hints": {
+    "3,1": "verb",
+    "3,2": "prep",
+    "0,3": "pron",
+    "0,2": "verb"
+   },
+   "stars": [
+    25,
+    30,
+    35
+   ],
+   "objectives": [
+    {
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 5
+    }
+   ]
+  },
+  {
+   "id": "level-30",
+   "name": "Glowing Star",
+   "theme": "night-sky",
+   "layout": [
+    ".....",
+    "##.##",
+    "##.##",
+    ".....",
+    "##.##"
+   ],
+   "anchors": {
+    "0,4": "wolf"
+   },
+   "swaps": 4,
+   "seed": 1376289266,
+   "draw": 2,
+   "hints": {
+    "0,2": "prep",
+    "3,2": "adj",
+    "0,3": "det",
+    "4,2": "noun"
+   },
+   "stars": [
+    29,
+    35,
+    41
+   ],
+   "objectives": [
+    {
+     "kind": "longWord",
+     "letters": 7,
+     "points": 6
     }
    ]
   },
@@ -647,16 +653,17 @@
    },
    "swaps": 4,
    "seed": 76730108,
+   "draw": 2,
    "hints": {
-    "2,3": "adv",
-    "1,3": "verb",
+    "2,3": "noun",
+    "1,3": "adj",
     "4,1": "noun",
     "3,1": "det"
    },
    "stars": [
-    25,
-    30,
-    35
+    27,
+    32,
+    37
    ],
    "objectives": [
     {
@@ -668,101 +675,173 @@
   },
   {
    "id": "level-32",
-   "name": "The Tomato",
+   "name": "Tree & Blossom",
    "theme": "garden",
    "layout": [
-    "####.",
-    "#....",
-    "##.#.",
-    "##.#.",
-    "....."
+    "###.",
+    ".##.",
+    ".##.",
+    ".##.",
+    "...."
    ],
    "anchors": {
-    "1,1": "this"
+    "3,0": "of"
    },
    "swaps": 4,
-   "seed": 323827169,
+   "seed": 232901834,
+   "draw": 2,
    "hints": {
-    "1,2": "verb",
-    "1,3": "det",
-    "2,2": "adv",
-    "4,2": "adj",
-    "1,4": "noun"
+    "0,3": "adj",
+    "4,3": "pron",
+    "3,3": "prep",
+    "4,0": "pron"
    },
    "stars": [
-    37,
-    47,
-    56
-   ],
-   "objectives": [
-    {
-     "kind": "rareCrossing",
-     "value": 6,
-     "points": 7
-    }
-   ]
-  },
-  {
-   "id": "level-33",
-   "name": "The Nest",
-   "theme": "garden",
-   "layout": [
-    ".....",
-    "#.###",
-    ".....",
-    "#.###",
-    "#...."
-   ],
-   "anchors": {
-    "0,2": "over"
-   },
-   "swaps": 4,
-   "seed": 45092746,
-   "hints": {
-    "2,1": "noun",
-    "2,3": "det",
-    "4,4": "adj",
-    "4,3": "det",
-    "0,4": "noun"
-   },
-   "stars": [
-    42,
-    50,
-    58
+    27,
+    32,
+    37
    ],
    "objectives": [
     {
      "kind": "greatLines",
      "count": 1,
-     "points": 8
+     "points": 5
+    }
+   ]
+  },
+  {
+   "id": "level-33",
+   "name": "Wilted Blossom",
+   "theme": "garden",
+   "layout": [
+    "#.##",
+    "....",
+    "#.##",
+    "...."
+   ],
+   "anchors": {
+    "2,1": "for"
+   },
+   "swaps": 4,
+   "seed": 1047150512,
+   "draw": 2,
+   "hints": {
+    "3,3": "pron",
+    "1,1": "noun",
+    "1,0": "adj"
+   },
+   "stars": [
+    23,
+    28,
+    33
+   ],
+   "objectives": [
+    {
+     "kind": "longWord",
+     "letters": 7,
+     "points": 5
     }
    ]
   },
   {
    "id": "level-34",
-   "name": "Leafy Leaf",
+   "name": "Colorful Rose",
    "theme": "garden",
    "layout": [
-    ".##.#",
-    ".##.#",
-    ".....",
-    ".##.#",
-    ".####"
+    "....",
+    ".#.#",
+    ".#.#",
+    "....",
+    ".#.#"
    ],
    "anchors": {
-    "0,3": "some",
-    "2,1": "and"
+    "1,0": "and",
+    "3,3": "soil"
    },
    "swaps": 4,
-   "seed": 1663119745,
+   "seed": 962304717,
+   "draw": 2,
    "hints": {
-    "2,0": "adj",
-    "1,0": "det",
-    "2,3": "noun",
-    "3,0": "adj"
+    "0,2": "det",
+    "0,1": "verb",
+    "4,0": "verb",
+    "2,2": "verb"
    },
    "stars": [
-    28,
+    36,
+    43,
+    50
+   ],
+   "objectives": [
+    {
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 7
+    }
+   ]
+  },
+  {
+   "id": "level-35",
+   "name": "Muddy Flower",
+   "theme": "garden",
+   "layout": [
+    "####.",
+    ".....",
+    "#.##.",
+    "#.##.",
+    "....#"
+   ],
+   "anchors": {
+    "2,4": "for",
+    "1,2": "under"
+   },
+   "swaps": 4,
+   "seed": 349235304,
+   "draw": 2,
+   "hints": {
+    "4,3": "adv",
+    "4,1": "noun",
+    "1,4": "noun",
+    "0,4": "det"
+   },
+   "stars": [
+    33,
+    40,
+    47
+   ],
+   "objectives": [
+    {
+     "kind": "greatLines",
+     "count": 1,
+     "points": 7
+    }
+   ]
+  },
+  {
+   "id": "level-36",
+   "name": "The Bee",
+   "theme": "garden",
+   "layout": [
+    ".###",
+    ".#.#",
+    ".#.#",
+    "....",
+    ".#.#"
+   ],
+   "anchors": {
+    "2,2": "on"
+   },
+   "swaps": 4,
+   "seed": 1127914889,
+   "draw": 2,
+   "hints": {
+    "3,2": "det",
+    "3,1": "verb",
+    "1,0": "noun",
+    "1,2": "noun"
+   },
+   "stars": [
+    29,
     35,
     41
    ],
@@ -775,282 +854,214 @@
    ]
   },
   {
-   "id": "level-35",
-   "name": "Colorful Worm",
-   "theme": "garden",
-   "layout": [
-    "#.#.#",
-    ".....",
-    "#.#.#",
-    "#....",
-    "#.###"
-   ],
-   "anchors": {
-    "2,3": "for",
-    "1,1": "in"
-   },
-   "swaps": 4,
-   "seed": 1825913788,
-   "hints": {
-    "0,3": "adj",
-    "3,1": "det",
-    "3,2": "adj",
-    "2,1": "prep"
-   },
-   "stars": [
-    36,
-    44,
-    52
-   ],
-   "objectives": [
-    {
-     "kind": "rareCrossing",
-     "value": 6,
-     "points": 7
-    }
-   ]
-  },
-  {
-   "id": "level-36",
-   "name": "Shovel & Weed",
-   "theme": "garden",
-   "layout": [
-    "#.###",
-    "#.#.#",
-    "#....",
-    "#.#.#",
-    "....."
-   ],
-   "anchors": {
-    "4,2": "in",
-    "2,4": "rose"
-   },
-   "swaps": 4,
-   "seed": 1737322484,
-   "hints": {
-    "4,1": "verb",
-    "0,1": "verb",
-    "2,2": "adj",
-    "4,3": "adj"
-   },
-   "stars": [
-    41,
-    49,
-    57
-   ],
-   "objectives": [
-    {
-     "kind": "longWord",
-     "letters": 7,
-     "points": 8
-    }
-   ]
-  },
-  {
    "id": "level-37",
-   "name": "Lush Nest",
+   "name": "Sprout & Tree",
    "theme": "garden",
    "layout": [
-    "#....",
-    "#.#.#",
-    ".....",
-    "#.#.#",
-    "#.###"
+    "###.",
+    "#.#.",
+    "#.#.",
+    "....",
+    "#.##"
    ],
    "anchors": {
-    "2,4": "rain"
+    "3,3": "bird",
+    "2,1": "over"
    },
    "swaps": 4,
-   "seed": 1061741831,
+   "seed": 1623806667,
+   "draw": 2,
    "hints": {
+    "3,1": "det",
     "1,3": "verb",
-    "3,3": "noun",
-    "0,1": "verb",
-    "0,4": "verb",
-    "2,3": "adj"
+    "3,0": "verb"
    },
    "stars": [
-    42,
-    51,
-    59
+    24,
+    29,
+    34
    ],
    "objectives": [
     {
-     "kind": "greatLines",
-     "count": 1,
-     "points": 8
+     "kind": "themeWords",
+     "count": 4,
+     "points": 5
     }
    ]
   },
   {
    "id": "level-38",
-   "name": "Root & Leaf",
+   "name": "Muddy Rain",
    "theme": "garden",
    "layout": [
-    "##.##",
-    "....#",
-    "##.##",
-    "#....",
-    "##.##"
+    ".###.",
+    ".....",
+    ".#.#.",
+    ".#.#.",
+    ".#.#."
    ],
    "anchors": {
-    "1,1": "on",
-    "0,2": "i"
+    "0,4": "your"
    },
    "swaps": 4,
-   "seed": 556449479,
+   "seed": 1158496031,
+   "draw": 2,
    "hints": {
-    "1,2": "pron",
-    "2,2": "verb",
-    "3,2": "adj"
+    "1,0": "pron",
+    "1,4": "noun",
+    "0,0": "verb",
+    "3,0": "det",
+    "4,0": "noun"
    },
    "stars": [
-    30,
-    36,
-    42
+    42,
+    50,
+    58
    ],
    "objectives": [
     {
-     "kind": "longWord",
-     "letters": 7,
-     "points": 6
+     "kind": "themeWords",
+     "count": 5,
+     "points": 8
     }
    ]
   },
   {
    "id": "level-39",
-   "name": "Leafy Fence",
+   "name": "Butterfly & Weed",
    "theme": "garden",
    "layout": [
-    "....#",
-    ".####",
-    ".####",
-    "....."
+    "#....",
+    "#.###",
+    ".....",
+    "#.###"
    ],
    "anchors": {
-    "3,1": "under"
+    "3,1": "soil",
+    "0,4": "sun"
    },
    "swaps": 4,
-   "seed": 1460608188,
+   "seed": 991218602,
+   "draw": 2,
    "hints": {
-    "3,3": "noun",
-    "0,2": "noun",
-    "0,0": "verb",
-    "3,0": "verb"
+    "0,1": "pron",
+    "2,3": "det",
+    "2,4": "noun"
    },
    "stars": [
-    23,
-    30,
-    36
+    24,
+    29,
+    34
    ],
    "objectives": [
     {
-     "kind": "swapsLeft",
-     "count": 2,
+     "kind": "rareCrossing",
+     "value": 6,
      "points": 5
     }
    ]
   },
   {
    "id": "level-40",
-   "name": "Colorful Blossom",
+   "name": "Tangled Fence",
    "theme": "garden",
    "layout": [
-    "#.#.",
-    "....",
-    "#.#.",
-    "...."
+    "#.###",
+    "....#",
+    "#.###",
+    "#...."
    ],
    "anchors": {
-    "1,1": "of"
+    "1,2": "of"
    },
    "swaps": 4,
-   "seed": 1984140475,
+   "seed": 2116529392,
+   "draw": 2,
    "hints": {
-    "3,2": "adj",
-    "1,0": "noun",
-    "3,3": "noun",
-    "1,3": "adv"
+    "3,4": "noun",
+    "3,1": "pron",
+    "1,1": "verb"
    },
    "stars": [
-    36,
-    43,
-    50
-   ],
-   "objectives": [
-    {
-     "kind": "themeWords",
-     "count": 6,
-     "points": 7
-    }
-   ]
-  },
-  {
-   "id": "level-41",
-   "name": "Foamy Whale",
-   "theme": "seaside",
-   "layout": [
-    ".....",
-    "#.#.#",
-    "#.#.#",
-    "#.#.#",
-    "....#"
-   ],
-   "anchors": {
-    "2,3": "with"
-   },
-   "swaps": 4,
-   "seed": 797755210,
-   "hints": {
-    "4,1": "noun",
-    "3,1": "verb",
-    "0,3": "adj",
-    "0,1": "noun"
-   },
-   "stars": [
-    43,
-    52,
-    61
+    26,
+    31,
+    36
    ],
    "objectives": [
     {
      "kind": "rareCrossing",
      "value": 6,
-     "points": 9
+     "points": 5
     }
    ]
   },
   {
-   "id": "level-42",
-   "name": "Bucket & Sunset",
+   "id": "level-41",
+   "name": "Shiny Captain",
    "theme": "seaside",
    "layout": [
     ".#.##",
-    "....#",
-    ".#.##",
-    ".#.##",
-    "#...."
+    ".....",
+    ".#.#.",
+    ".#.#.",
+    "####."
    ],
    "anchors": {
-    "1,2": "under",
-    "0,0": "they"
+    "0,0": "this"
    },
    "swaps": 4,
-   "seed": 37262602,
+   "seed": 1434735754,
+   "draw": 2,
    "hints": {
-    "1,3": "verb",
-    "2,2": "det",
-    "1,0": "verb"
+    "3,2": "noun",
+    "2,4": "prep",
+    "0,2": "verb"
    },
    "stars": [
-    41,
-    49,
-    57
+    40,
+    48,
+    56
    ],
    "objectives": [
     {
      "kind": "swapsLeft",
      "count": 2,
+     "points": 8
+    }
+   ]
+  },
+  {
+   "id": "level-42",
+   "name": "Deep Tide",
+   "theme": "seaside",
+   "layout": [
+    "###.",
+    "....",
+    ".##.",
+    "....",
+    ".###"
+   ],
+   "anchors": {
+    "2,3": "through",
+    "3,2": "for"
+   },
+   "swaps": 4,
+   "seed": 1415997004,
+   "draw": 2,
+   "hints": {
+    "3,0": "adj",
+    "3,3": "pron",
+    "1,0": "verb"
+   },
+   "stars": [
+    42,
+    50,
+    58
+   ],
+   "objectives": [
+    {
+     "kind": "greatLines",
+     "count": 1,
      "points": 8
     }
    ]
@@ -1071,22 +1082,23 @@
    },
    "swaps": 4,
    "seed": 1002042719,
+   "draw": 2,
    "hints": {
-    "2,0": "adj",
-    "3,0": "pron",
-    "2,1": "noun",
-    "1,0": "adj"
+    "2,0": "pron",
+    "3,0": "prep",
+    "2,1": "verb",
+    "1,0": "noun"
    },
    "stars": [
-    50,
-    60,
-    70
+    39,
+    47,
+    55
    ],
    "objectives": [
     {
      "kind": "longWord",
      "letters": 7,
-     "points": 10
+     "points": 8
     }
    ]
   },
@@ -1106,51 +1118,87 @@
    },
    "swaps": 4,
    "seed": 2133277989,
+   "draw": 2,
    "hints": {
-    "4,0": "pron",
+    "4,0": "det",
     "3,4": "prep",
-    "2,4": "noun",
-    "4,2": "adv"
+    "2,4": "verb",
+    "4,2": "verb"
    },
    "stars": [
-    46,
-    55,
-    64
+    42,
+    50,
+    58
    ],
    "objectives": [
     {
      "kind": "rareCrossing",
      "value": 6,
-     "points": 9
+     "points": 8
     }
    ]
   },
   {
    "id": "level-45",
-   "name": "Whale & Boat",
+   "name": "Dolphin & Anchor",
+   "theme": "seaside",
+   "layout": [
+    ".####",
+    ".##.#",
+    ".....",
+    ".##.#",
+    "#...."
+   ],
+   "anchors": {
+    "4,2": "of",
+    "3,0": "sea"
+   },
+   "swaps": 4,
+   "seed": 396648836,
+   "draw": 2,
+   "hints": {
+    "0,0": "det",
+    "2,3": "verb",
+    "4,3": "noun"
+   },
+   "stars": [
+    40,
+    48,
+    56
+   ],
+   "objectives": [
+    {
+     "kind": "rareCrossing",
+     "value": 6,
+     "points": 8
+    }
+   ]
+  },
+  {
+   "id": "level-46",
+   "name": "Foamy Ocean",
    "theme": "seaside",
    "layout": [
     ".....",
-    ".#.#.",
-    ".#.#.",
-    ".....",
-    "##.#."
+    "#.#.#",
+    "#.#.#",
+    "....."
    ],
    "anchors": {
-    "1,2": "near"
+    "0,2": "and"
    },
    "swaps": 4,
-   "seed": 1186181844,
+   "seed": 1444974756,
+   "draw": 2,
    "hints": {
-    "2,2": "det",
-    "3,4": "noun",
-    "2,4": "det",
-    "3,0": "pron"
+    "3,3": "noun",
+    "2,1": "det",
+    "0,4": "verb"
    },
    "stars": [
-    45,
-    54,
-    63
+    43,
+    52,
+    61
    ],
    "objectives": [
     {
@@ -1161,107 +1209,73 @@
    ]
   },
   {
-   "id": "level-46",
-   "name": "Breezy Surf",
-   "theme": "seaside",
-   "layout": [
-    ".....",
-    ".#.#.",
-    ".#.#.",
-    ".....",
-    "##.##"
-   ],
-   "anchors": {
-    "0,4": "treasure"
-   },
-   "swaps": 4,
-   "seed": 1871067511,
-   "hints": {
-    "3,0": "adv",
-    "2,2": "det",
-    "0,0": "verb",
-    "3,2": "adj"
-   },
-   "stars": [
-    61,
-    73,
-    85
-   ],
-   "objectives": [
-    {
-     "kind": "rareCrossing",
-     "value": 6,
-     "points": 12
-    }
-   ]
-  },
-  {
    "id": "level-47",
-   "name": "The Breeze",
+   "name": "The Bucket",
    "theme": "seaside",
    "layout": [
-    "####.",
-    "#.##.",
+    ".#.#.",
     ".....",
-    "#.##.",
-    "#...."
+    ".#.#.",
+    ".#.#.",
+    "####."
    ],
    "anchors": {
-    "2,0": "our"
+    "0,0": "they"
    },
    "swaps": 4,
-   "seed": 678812337,
+   "seed": 1852259563,
+   "draw": 2,
    "hints": {
-    "2,4": "verb",
-    "3,1": "prep",
-    "2,1": "noun"
+    "1,2": "adj",
+    "3,2": "noun",
+    "2,2": "adj",
+    "0,2": "det"
    },
    "stars": [
-    50,
-    60,
-    70
+    47,
+    56,
+    65
    ],
    "objectives": [
     {
-     "kind": "rareCrossing",
-     "value": 6,
-     "points": 10
+     "kind": "greatLines",
+     "count": 1,
+     "points": 9
     }
    ]
   },
   {
    "id": "level-48",
-   "name": "Blue Bucket",
+   "name": "Foamy Starfish",
    "theme": "seaside",
    "layout": [
-    "####.",
-    ".#.#.",
-    ".....",
-    ".#.#.",
-    "....#"
+    "....#",
+    "##.#.",
+    "##.#.",
+    "#....",
+    "##.#."
    ],
    "anchors": {
-    "4,0": "fish",
-    "2,1": "on"
+    "0,3": "boat"
    },
    "swaps": 4,
-   "seed": 1364078924,
+   "seed": 1054730928,
+   "draw": 2,
    "hints": {
-    "1,0": "det",
-    "2,0": "noun",
-    "3,4": "verb",
-    "2,4": "noun"
+    "4,2": "verb",
+    "2,4": "noun",
+    "0,1": "verb"
    },
    "stars": [
-    48,
-    58,
-    68
+    37,
+    44,
+    51
    ],
    "objectives": [
     {
-     "kind": "longWord",
-     "letters": 7,
-     "points": 10
+     "kind": "themeWords",
+     "count": 5,
+     "points": 7
     }
    ]
   },
@@ -1282,48 +1296,51 @@
    },
    "swaps": 4,
    "seed": 1062891889,
+   "draw": 2,
    "hints": {
     "3,1": "adj",
-    "3,3": "verb",
-    "1,3": "conj"
+    "3,3": "noun",
+    "1,3": "prep"
    },
    "stars": [
-    35,
-    44,
-    52
+    46,
+    55,
+    64
    ],
    "objectives": [
     {
      "kind": "swapsLeft",
      "count": 2,
-     "points": 7
+     "points": 9
     }
    ]
   },
   {
    "id": "level-50",
-   "name": "Sandy Shell",
+   "name": "Salty Pirate",
    "theme": "seaside",
    "layout": [
-    ".....",
-    "#.#.#",
-    "#.#.#",
-    "#...."
+    "####.",
+    "#....",
+    "#.##.",
+    "#.##.",
+    "....#"
    ],
    "anchors": {
-    "0,4": "sea"
+    "2,4": "for"
    },
    "swaps": 4,
-   "seed": 223911163,
+   "seed": 847421064,
+   "draw": 2,
    "hints": {
-    "0,3": "adj",
-    "3,2": "det",
-    "3,3": "noun"
+    "1,4": "noun",
+    "1,3": "det",
+    "3,4": "pron"
    },
    "stars": [
-    37,
-    44,
-    51
+    33,
+    40,
+    47
    ],
    "objectives": [
     {
@@ -1350,10 +1367,11 @@
    },
    "swaps": 4,
    "seed": 1378732702,
+   "draw": 2,
    "hints": {
-    "3,1": "adj",
-    "3,3": "verb",
-    "0,2": "verb"
+    "3,1": "prep",
+    "3,3": "noun",
+    "0,2": "noun"
    },
    "stars": [
     37,
@@ -1370,24 +1388,96 @@
   },
   {
    "id": "level-52",
-   "name": "Paper & Poem",
+   "name": "The Map",
+   "theme": "library",
+   "layout": [
+    "###.#",
+    "....#",
+    ".##.#",
+    ".##.#",
+    "....."
+   ],
+   "anchors": {
+    "4,1": "in",
+    "2,3": "in"
+   },
+   "swaps": 4,
+   "seed": 1825736799,
+   "draw": 2,
+   "hints": {
+    "1,0": "noun",
+    "1,3": "pron",
+    "3,3": "det"
+   },
+   "stars": [
+    42,
+    50,
+    58
+   ],
+   "objectives": [
+    {
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 8
+    }
+   ]
+  },
+  {
+   "id": "level-53",
+   "name": "Famous Reader",
    "theme": "library",
    "layout": [
     "....#",
-    "##.#.",
-    "#....",
-    "##.#.",
-    "####."
+    ".#.#.",
+    ".#.#.",
+    ".#.#.",
+    "#...."
    ],
    "anchors": {
-    "2,2": "through"
+    "4,3": "under"
    },
    "swaps": 4,
-   "seed": 206933048,
+   "seed": 164190161,
+   "draw": 2,
    "hints": {
-    "1,4": "pron",
-    "4,4": "verb",
-    "0,2": "noun"
+    "0,2": "adv",
+    "2,2": "prep",
+    "2,0": "prep",
+    "0,0": "det"
+   },
+   "stars": [
+    40,
+    49,
+    58
+   ],
+   "objectives": [
+    {
+     "kind": "rareCrossing",
+     "value": 6,
+     "points": 8
+    }
+   ]
+  },
+  {
+   "id": "level-54",
+   "name": "Magical Dictionary",
+   "theme": "library",
+   "layout": [
+    "##.#.",
+    ".....",
+    "##.#.",
+    "#...."
+   ],
+   "anchors": {
+    "0,4": "this"
+   },
+   "swaps": 4,
+   "seed": 107480441,
+   "draw": 2,
+   "hints": {
+    "1,2": "verb",
+    "3,4": "adj",
+    "3,2": "adv"
    },
    "stars": [
     33,
@@ -1403,107 +1493,38 @@
    ]
   },
   {
-   "id": "level-53",
-   "name": "Desk & Reader",
-   "theme": "library",
-   "layout": [
-    ".#.##",
-    ".....",
-    ".#.#.",
-    ".#.#.",
-    "....."
-   ],
-   "anchors": {
-    "2,0": "with"
-   },
-   "swaps": 4,
-   "seed": 1228395249,
-   "hints": {
-    "1,0": "verb",
-    "4,3": "prep",
-    "2,4": "adj",
-    "1,4": "verb"
-   },
-   "stars": [
-    48,
-    58,
-    68
-   ],
-   "objectives": [
-    {
-     "kind": "rareCrossing",
-     "value": 6,
-     "points": 10
-    }
-   ]
-  },
-  {
-   "id": "level-54",
-   "name": "Overdue Dictionary",
-   "theme": "library",
-   "layout": [
-    "....",
-    ".##.",
-    ".##.",
-    "....",
-    "###."
-   ],
-   "anchors": {
-    "2,3": "for",
-    "0,0": "we"
-   },
-   "swaps": 4,
-   "seed": 1640677069,
-   "hints": {
-    "3,3": "verb",
-    "3,0": "noun",
-    "0,3": "adj"
-   },
-   "stars": [
-    36,
-    43,
-    50
-   ],
-   "objectives": [
-    {
-     "kind": "rareCrossing",
-     "value": 6,
-     "points": 7
-    }
-   ]
-  },
-  {
    "id": "level-55",
-   "name": "Candle & Scroll",
+   "name": "Lamp & Cover",
    "theme": "library",
    "layout": [
+    ".#.#.",
     ".....",
     ".#.#.",
     ".#.#.",
-    "....."
+    "##.##"
    ],
    "anchors": {
-    "0,2": "chapter",
-    "3,1": "with"
+    "2,0": "with",
+    "3,2": "of"
    },
    "swaps": 4,
-   "seed": 1004032401,
+   "seed": 1277946081,
+   "draw": 2,
    "hints": {
-    "2,0": "pron",
-    "0,4": "noun",
-    "3,0": "verb",
-    "1,2": "prep"
+    "1,1": "pron",
+    "4,2": "pron",
+    "1,4": "noun"
    },
    "stars": [
-    47,
-    56,
-    65
+    37,
+    44,
+    51
    ],
    "objectives": [
     {
      "kind": "longWord",
      "letters": 7,
-     "points": 9
+     "points": 7
     }
    ]
   },
@@ -1522,113 +1543,11 @@
    },
    "swaps": 4,
    "seed": 401953677,
+   "draw": 2,
    "hints": {
     "3,2": "pron",
     "1,2": "noun",
     "0,2": "det"
-   },
-   "stars": [
-    31,
-    37,
-    43
-   ],
-   "objectives": [
-    {
-     "kind": "themeWords",
-     "count": 5,
-     "points": 6
-    }
-   ]
-  },
-  {
-   "id": "level-57",
-   "name": "Famous Lamp",
-   "theme": "library",
-   "layout": [
-    ".#.#.",
-    ".#.#.",
-    ".#.#.",
-    ".....",
-    ".#.#."
-   ],
-   "anchors": {
-    "3,1": "over"
-   },
-   "swaps": 4,
-   "seed": 734927101,
-   "hints": {
-    "3,0": "noun",
-    "0,0": "pron",
-    "0,2": "det",
-    "3,4": "noun"
-   },
-   "stars": [
-    49,
-    59,
-    69
-   ],
-   "objectives": [
-    {
-     "kind": "longWord",
-     "letters": 7,
-     "points": 10
-    }
-   ]
-  },
-  {
-   "id": "level-58",
-   "name": "Spine & Word",
-   "theme": "library",
-   "layout": [
-    "....#",
-    ".##.#",
-    ".....",
-    ".##.#",
-    ".####"
-   ],
-   "anchors": {
-    "3,0": "on"
-   },
-   "swaps": 4,
-   "seed": 723107593,
-   "hints": {
-    "2,0": "noun",
-    "2,3": "adj",
-    "3,3": "noun"
-   },
-   "stars": [
-    43,
-    52,
-    61
-   ],
-   "objectives": [
-    {
-     "kind": "themeWords",
-     "count": 8,
-     "points": 9
-    }
-   ]
-  },
-  {
-   "id": "level-59",
-   "name": "The Library",
-   "theme": "library",
-   "layout": [
-    ".....",
-    "#.#.#",
-    "#....",
-    "#.#.#"
-   ],
-   "anchors": {
-    "0,0": "my",
-    "2,3": "in"
-   },
-   "swaps": 4,
-   "seed": 1760250025,
-   "hints": {
-    "0,1": "adj",
-    "0,4": "adv",
-    "2,1": "noun"
    },
    "stars": [
     40,
@@ -1638,215 +1557,325 @@
    "objectives": [
     {
      "kind": "themeWords",
-     "count": 7,
-     "points": 8
-    }
-   ]
-  },
-  {
-   "id": "level-60",
-   "name": "Bookish Pen",
-   "theme": "library",
-   "layout": [
-    "#.#.#",
-    ".....",
-    "#.#.#",
-    "....."
-   ],
-   "anchors": {
-    "0,1": "some",
-    "2,3": "through"
-   },
-   "swaps": 4,
-   "seed": 364730940,
-   "hints": {
-    "3,3": "verb",
-    "2,1": "verb",
-    "1,0": "det"
-   },
-   "stars": [
-    41,
-    49,
-    57
-   ],
-   "objectives": [
-    {
-     "kind": "longWord",
-     "letters": 7,
-     "points": 8
-    }
-   ]
-  },
-  {
-   "id": "level-61",
-   "name": "Mug & Sunrise",
-   "theme": "breakfast",
-   "layout": [
-    "....#",
-    "###.#",
-    "#....",
-    "###.#",
-    "#...."
-   ],
-   "anchors": {
-    "2,3": "and",
-    "0,2": "through"
-   },
-   "swaps": 4,
-   "seed": 1304699643,
-   "hints": {
-    "4,1": "det",
-    "2,1": "det",
-    "0,0": "verb"
-   },
-   "stars": [
-    38,
-    46,
-    54
-   ],
-   "objectives": [
-    {
-     "kind": "swapsLeft",
-     "count": 2,
-     "points": 8
-    }
-   ]
-  },
-  {
-   "id": "level-62",
-   "name": "Kitchen & Croissant",
-   "theme": "breakfast",
-   "layout": [
-    "#.###",
-    "....#",
-    "#.#.#",
-    "#....",
-    "#.#.#"
-   ],
-   "anchors": {
-    "3,2": "and"
-   },
-   "swaps": 4,
-   "seed": 1271573810,
-   "hints": {
-    "3,1": "noun",
-    "2,3": "verb",
-    "1,1": "verb"
-   },
-   "stars": [
-    42,
-    50,
-    58
-   ],
-   "objectives": [
-    {
-     "kind": "themeWords",
      "count": 5,
      "points": 8
     }
    ]
   },
   {
-   "id": "level-63",
-   "name": "Delicious Morning",
-   "theme": "breakfast",
+   "id": "level-57",
+   "name": "Atlas & Owl",
+   "theme": "library",
    "layout": [
-    ".....",
-    ".#.#.",
-    ".....",
-    ".#.#.",
-    ".####"
+    "....",
+    ".##.",
+    ".##.",
+    "...."
    ],
    "anchors": {
-    "1,0": "over",
-    "1,2": "for"
+    "3,0": "paper",
+    "0,1": "in"
    },
    "swaps": 4,
-   "seed": 295541229,
+   "seed": 104156711,
+   "draw": 2,
    "hints": {
-    "2,4": "adj",
-    "2,2": "pron",
+    "0,3": "noun",
     "0,0": "verb",
-    "2,0": "det"
+    "1,3": "prep"
    },
    "stars": [
-    45,
-    54,
-    63
+    37,
+    44,
+    51
    ],
    "objectives": [
     {
      "kind": "longWord",
      "letters": 7,
-     "points": 9
+     "points": 7
+    }
+   ]
+  },
+  {
+   "id": "level-58",
+   "name": "Bookish Spine",
+   "theme": "library",
+   "layout": [
+    "##.##",
+    ".....",
+    "##.#.",
+    "#....",
+    "####."
+   ],
+   "anchors": {
+    "3,1": "a"
+   },
+   "swaps": 4,
+   "seed": 1088720337,
+   "draw": 2,
+   "hints": {
+    "3,3": "verb",
+    "3,2": "noun",
+    "2,2": "det"
+   },
+   "stars": [
+    30,
+    36,
+    42
+   ],
+   "objectives": [
+    {
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 6
+    }
+   ]
+  },
+  {
+   "id": "level-59",
+   "name": "Curious Author",
+   "theme": "library",
+   "layout": [
+    ".####",
+    ".#.#.",
+    ".#.#.",
+    ".....",
+    "##.#."
+   ],
+   "anchors": {
+    "4,2": "page",
+    "1,4": "every"
+   },
+   "swaps": 4,
+   "seed": 1453426216,
+   "draw": 2,
+   "hints": {
+    "3,0": "pron",
+    "3,2": "det",
+    "3,4": "noun"
+   },
+   "stars": [
+    39,
+    47,
+    55
+   ],
+   "objectives": [
+    {
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 8
+    }
+   ]
+  },
+  {
+   "id": "level-60",
+   "name": "The Page",
+   "theme": "library",
+   "layout": [
+    ".#.##",
+    "....#",
+    ".#.##",
+    ".....",
+    "##.##"
+   ],
+   "anchors": {
+    "3,1": "for",
+    "0,0": "we"
+   },
+   "swaps": 4,
+   "seed": 1695583108,
+   "draw": 2,
+   "hints": {
+    "1,0": "verb",
+    "1,2": "det",
+    "3,0": "noun"
+   },
+   "stars": [
+    33,
+    40,
+    47
+   ],
+   "objectives": [
+    {
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 7
+    }
+   ]
+  },
+  {
+   "id": "level-61",
+   "name": "Crispy Muffin",
+   "theme": "breakfast",
+   "layout": [
+    "##.#.",
+    "#....",
+    "##.#.",
+    "....."
+   ],
+   "anchors": {
+    "2,4": "near"
+   },
+   "swaps": 4,
+   "seed": 391059840,
+   "draw": 2,
+   "hints": {
+    "3,2": "verb",
+    "1,2": "prep",
+    "1,4": "noun"
+   },
+   "stars": [
+    36,
+    43,
+    50
+   ],
+   "objectives": [
+    {
+     "kind": "rareCrossing",
+     "value": 6,
+     "points": 7
+    }
+   ]
+  },
+  {
+   "id": "level-62",
+   "name": "Fluffy Croissant",
+   "theme": "breakfast",
+   "layout": [
+    "####.",
+    ".....",
+    "#.##.",
+    "#....",
+    "#.###"
+   ],
+   "anchors": {
+    "1,2": "of",
+    "2,1": "through"
+   },
+   "swaps": 4,
+   "seed": 487800945,
+   "draw": 2,
+   "hints": {
+    "3,2": "noun",
+    "3,4": "pron",
+    "3,3": "verb"
+   },
+   "stars": [
+    39,
+    47,
+    55
+   ],
+   "objectives": [
+    {
+     "kind": "greatLines",
+     "count": 1,
+     "points": 8
+    }
+   ]
+  },
+  {
+   "id": "level-63",
+   "name": "Burnt Mug",
+   "theme": "breakfast",
+   "layout": [
+    "#.#.#",
+    "#....",
+    "#.#.#",
+    "....#",
+    "#.###"
+   ],
+   "anchors": {
+    "1,4": "apple",
+    "3,3": "kitchen"
+   },
+   "swaps": 4,
+   "seed": 1674261263,
+   "draw": 2,
+   "hints": {
+    "3,2": "adj",
+    "0,1": "adj",
+    "0,3": "verb"
+   },
+   "stars": [
+    40,
+    48,
+    56
+   ],
+   "objectives": [
+    {
+     "kind": "longWord",
+     "letters": 7,
+     "points": 8
     }
    ]
   },
   {
    "id": "level-64",
-   "name": "Runny Tea",
+   "name": "Fresh Croissant",
    "theme": "breakfast",
    "layout": [
+    "#.##.",
     ".....",
-    "#.#.#",
-    ".....",
-    "#.#.#"
+    "#.##.",
+    "....."
    ],
    "anchors": {
-    "2,2": "in"
+    "1,3": "and"
    },
    "swaps": 4,
-   "seed": 1890684207,
+   "seed": 1143316417,
+   "draw": 2,
    "hints": {
-    "2,1": "adv",
-    "0,3": "det",
-    "2,3": "noun"
+    "2,1": "prep",
+    "1,4": "verb",
+    "1,1": "verb"
    },
    "stars": [
-    43,
-    52,
-    61
+    37,
+    44,
+    51
    ],
    "objectives": [
     {
-     "kind": "swapsLeft",
-     "count": 2,
-     "points": 9
+     "kind": "longWord",
+     "letters": 7,
+     "points": 7
     }
    ]
   },
   {
    "id": "level-65",
-   "name": "Fresh Bagel",
+   "name": "The Morning",
    "theme": "breakfast",
    "layout": [
+    "###.",
     "....",
-    ".#.#",
-    ".#.#",
+    ".##.",
     "....",
     ".###"
    ],
    "anchors": {
-    "0,0": "a",
-    "2,2": "through"
+    "2,0": "through"
    },
    "swaps": 4,
-   "seed": 1975423874,
+   "seed": 835359053,
+   "draw": 2,
    "hints": {
-    "1,0": "adj",
-    "3,1": "adj",
-    "1,2": "prep"
+    "0,3": "det",
+    "3,2": "noun",
+    "1,3": "noun"
    },
    "stars": [
-    43,
-    52,
-    61
+    39,
+    47,
+    55
    ],
    "objectives": [
     {
      "kind": "swapsLeft",
      "count": 2,
-     "points": 9
+     "points": 8
     }
    ]
   },
@@ -1866,115 +1895,260 @@
    },
    "swaps": 4,
    "seed": 953115395,
+   "draw": 2,
    "hints": {
-    "0,2": "prep",
-    "3,4": "verb",
+    "0,2": "verb",
+    "3,4": "noun",
     "0,4": "noun"
    },
    "stars": [
-    37,
-    47,
-    56
+    46,
+    55,
+    64
    ],
    "objectives": [
     {
      "kind": "swapsLeft",
      "count": 2,
-     "points": 7
-    }
-   ]
-  },
-  {
-   "id": "level-67",
-   "name": "Fork & Mug",
-   "theme": "breakfast",
-   "layout": [
-    "#.###",
-    "#....",
-    "#.#.#",
-    "#.#.#",
-    "....#"
-   ],
-   "anchors": {
-    "4,3": "cup",
-    "0,1": "your"
-   },
-   "swaps": 4,
-   "seed": 1783959311,
-   "hints": {
-    "4,0": "verb",
-    "2,1": "noun",
-    "3,3": "det"
-   },
-   "stars": [
-    47,
-    56,
-    65
-   ],
-   "objectives": [
-    {
-     "kind": "rareCrossing",
-     "value": 6,
      "points": 9
     }
    ]
   },
   {
-   "id": "level-68",
-   "name": "Golden Tea",
+   "id": "level-67",
+   "name": "The Apple",
    "theme": "breakfast",
    "layout": [
+    "....#",
+    "#.###",
     ".....",
-    ".#.#.",
-    ".....",
-    ".#.#.",
-    ".####"
+    "#.###",
+    "#...."
    ],
    "anchors": {
-    "0,1": "through"
+    "2,1": "on",
+    "4,3": "of"
    },
    "swaps": 4,
-   "seed": 806477153,
+   "seed": 319693670,
+   "draw": 2,
    "hints": {
-    "2,2": "prep",
-    "0,4": "verb",
-    "2,1": "adv",
-    "0,0": "noun"
+    "0,1": "adj",
+    "4,2": "verb",
+    "0,0": "det"
    },
    "stars": [
-    62,
-    74,
-    86
+    40,
+    48,
+    56
    ],
    "objectives": [
     {
-     "kind": "themeWords",
-     "count": 8,
-     "points": 12
+     "kind": "greatLines",
+     "count": 1,
+     "points": 8
+    }
+   ]
+  },
+  {
+   "id": "level-68",
+   "name": "Sleepy Plate",
+   "theme": "breakfast",
+   "layout": [
+    "....",
+    ".#.#",
+    "....",
+    ".#.#",
+    ".#.#"
+   ],
+   "anchors": {
+    "2,2": "with",
+    "0,1": "of"
+   },
+   "swaps": 4,
+   "seed": 950880723,
+   "draw": 2,
+   "hints": {
+    "4,2": "noun",
+    "3,0": "adj",
+    "0,0": "noun"
+   },
+   "stars": [
+    37,
+    44,
+    51
+   ],
+   "objectives": [
+    {
+     "kind": "greatLines",
+     "count": 1,
+     "points": 7
     }
    ]
   },
   {
    "id": "level-69",
-   "name": "The Berry",
+   "name": "The Cereal",
    "theme": "breakfast",
    "layout": [
-    ".....",
-    ".####",
-    ".....",
-    ".####",
+    "#....",
+    ".#.##",
+    ".#.##",
+    "....#",
+    ".####"
+   ],
+   "anchors": {
+    "3,1": "of",
+    "2,2": "near"
+   },
+   "swaps": 4,
+   "seed": 486150744,
+   "draw": 2,
+   "hints": {
+    "3,2": "pron",
+    "1,0": "det",
+    "3,0": "noun"
+   },
+   "stars": [
+    32,
+    40,
+    48
+   ],
+   "objectives": [
+    {
+     "kind": "themeWords",
+     "count": 4,
+     "points": 6
+    }
+   ]
+  },
+  {
+   "id": "level-70",
+   "name": "The Fork",
+   "theme": "breakfast",
+   "layout": [
+    "#.###",
+    "#.#.#",
+    "....#",
+    "#.#.#",
     "....."
    ],
    "anchors": {
-    "0,3": "in"
+    "1,3": "this",
+    "2,1": "of"
    },
    "swaps": 4,
-   "seed": 690255969,
+   "seed": 1815229159,
+   "draw": 2,
    "hints": {
-    "2,1": "adj",
-    "3,0": "adj",
-    "4,2": "pron",
-    "2,0": "verb"
+    "4,3": "pron",
+    "3,1": "det",
+    "4,4": "verb"
+   },
+   "stars": [
+    45,
+    54,
+    63
+   ],
+   "objectives": [
+    {
+     "kind": "themeWords",
+     "count": 5,
+     "points": 9
+    }
+   ]
+  },
+  {
+   "id": "level-71",
+   "name": "Cloud & Planet",
+   "theme": "night-sky",
+   "layout": [
+    ".....",
+    ".####",
+    "....#",
+    ".##.#",
+    "###.#",
+    "#...."
+   ],
+   "anchors": {
+    "2,3": "dream"
+   },
+   "swaps": 4,
+   "seed": 1809645622,
+   "draw": 2,
+   "hints": {
+    "0,0": "noun",
+    "5,3": "noun"
+   },
+   "stars": [
+    50,
+    60,
+    70
+   ],
+   "objectives": [
+    {
+     "kind": "rareCrossing",
+     "value": 6,
+     "points": 10
+    }
+   ]
+  },
+  {
+   "id": "level-72",
+   "name": "Cosmic Lantern",
+   "theme": "night-sky",
+   "layout": [
+    "#....",
+    "###.#",
+    "#.#.#",
+    "....#",
+    "#.###",
+    "#...."
+   ],
+   "anchors": {
+    "5,1": "night"
+   },
+   "swaps": 4,
+   "seed": 1741302586,
+   "draw": 2,
+   "hints": {
+    "0,3": "adv",
+    "5,3": "det"
+   },
+   "stars": [
+    48,
+    58,
+    68
+   ],
+   "objectives": [
+    {
+     "kind": "longWord",
+     "letters": 7,
+     "points": 10
+    }
+   ]
+  },
+  {
+   "id": "level-73",
+   "name": "Distant Wish",
+   "theme": "night-sky",
+   "layout": [
+    "....#",
+    ".####",
+    "....#",
+    ".##.#",
+    "###.#",
+    "#...."
+   ],
+   "anchors": {
+    "2,3": "star"
+   },
+   "swaps": 4,
+   "seed": 301989200,
+   "draw": 2,
+   "hints": {
+    "2,2": "det",
+    "5,1": "det"
    },
    "stars": [
     43,
@@ -1984,142 +2158,143 @@
    "objectives": [
     {
      "kind": "themeWords",
-     "count": 7,
+     "count": 5,
      "points": 9
     }
    ]
   },
   {
-   "id": "level-70",
-   "name": "The Grandma",
-   "theme": "breakfast",
-   "layout": [
-    ".#.#.",
-    ".#.#.",
-    ".....",
-    ".#.#.",
-    ".###."
-   ],
-   "anchors": {
-    "2,4": "tea",
-    "1,2": "under"
-   },
-   "swaps": 4,
-   "seed": 554054141,
-   "hints": {
-    "3,4": "conj",
-    "0,4": "verb",
-    "2,0": "adj",
-    "2,1": "noun"
-   },
-   "stars": [
-    54,
-    65,
-    76
-   ],
-   "objectives": [
-    {
-     "kind": "swapsLeft",
-     "count": 2,
-     "points": 11
-    }
-   ]
-  },
-  {
-   "id": "level-71",
-   "name": "Celestial Telescope",
+   "id": "level-74",
+   "name": "The Alien",
    "theme": "night-sky",
    "layout": [
     ".....",
-    ".####",
-    "....#",
-    ".##.#",
-    "###.#",
+    "####.",
+    "##.#.",
+    "#....",
+    "##.##",
     "#...."
    ],
    "anchors": {
-    "0,2": "on",
-    "2,1": "for",
-    "5,2": "near"
+    "3,3": "through"
    },
    "swaps": 4,
-   "seed": 1259818724,
+   "seed": 1975615898,
+   "draw": 2,
    "hints": {
-    "1,0": "adv",
-    "0,0": "verb"
+    "3,4": "pron",
+    "5,2": "pron"
    },
    "stars": [
-    49,
-    59,
-    69
+    46,
+    55,
+    64
    ],
    "objectives": [
     {
      "kind": "themeWords",
-     "count": 6,
-     "points": 10
+     "count": 5,
+     "points": 9
     }
    ]
   },
   {
-   "id": "level-72",
-   "name": "Pale Wish",
+   "id": "level-75",
+   "name": "Firefly & Planet",
    "theme": "night-sky",
    "layout": [
-    ".###.",
-    ".....",
-    ".#.#.",
-    ".#.#.",
-    "#...."
+    "....",
+    "###.",
+    "....",
+    ".##.",
+    ".###",
+    "...."
    ],
    "anchors": {
-    "4,1": "the"
+    "5,1": "under",
+    "1,3": "with"
    },
    "swaps": 4,
-   "seed": 41067103,
+   "seed": 1551534829,
+   "draw": 2,
    "hints": {
-    "1,4": "adv",
-    "1,0": "verb"
+    "5,2": "det",
+    "2,1": "pron"
    },
    "stars": [
+    42,
     50,
-    60,
-    70
+    58
    ],
    "objectives": [
     {
      "kind": "swapsLeft",
      "count": 2,
-     "points": 10
+     "points": 8
     }
    ]
   },
   {
-   "id": "level-73",
-   "name": "Universe & Alien",
+   "id": "level-76",
+   "name": "Ancient Space",
    "theme": "night-sky",
    "layout": [
-    ".....",
+    "....#",
     "###.#",
     "#....",
     "#.#.#",
-    "#.###",
+    "....#",
+    "#.###"
+   ],
+   "anchors": {
+    "4,3": "moon"
+   },
+   "swaps": 4,
+   "seed": 2135837512,
+   "draw": 2,
+   "hints": {
+    "3,1": "det",
+    "2,4": "pron"
+   },
+   "stars": [
+    45,
+    54,
+    63
+   ],
+   "objectives": [
+    {
+     "kind": "rareCrossing",
+     "value": 6,
+     "points": 9
+    }
+   ]
+  },
+  {
+   "id": "level-77",
+   "name": "Planet & Sky",
+   "theme": "night-sky",
+   "layout": [
+    "#....",
+    "##.##",
+    "....#",
+    ".#.##",
+    ".####",
     "....."
    ],
    "anchors": {
-    "3,1": "in"
+    "2,2": "in"
    },
    "swaps": 4,
-   "seed": 1076336583,
+   "seed": 1423071691,
+   "draw": 2,
    "hints": {
-    "2,3": "noun",
-    "2,1": "noun",
-    "0,3": "verb"
+    "1,2": "verb",
+    "0,3": "prep"
    },
    "stars": [
-    50,
-    60,
-    70
+    48,
+    58,
+    68
    ],
    "objectives": [
     {
@@ -2130,128 +2305,27 @@
    ]
   },
   {
-   "id": "level-74",
-   "name": "Celestial Night",
+   "id": "level-78",
+   "name": "Silent Midnight",
    "theme": "night-sky",
    "layout": [
-    ".###",
-    "....",
-    ".##.",
-    "....",
-    "###.",
-    "...."
-   ],
-   "anchors": {
-    "3,2": "for"
-   },
-   "swaps": 4,
-   "seed": 23716440,
-   "hints": {
-    "1,3": "verb",
-    "5,3": "noun"
-   },
-   "stars": [
-    47,
-    56,
-    65
-   ],
-   "objectives": [
-    {
-     "kind": "swapsLeft",
-     "count": 2,
-     "points": 9
-    }
-   ]
-  },
-  {
-   "id": "level-75",
-   "name": "Darkness & Nebula",
-   "theme": "night-sky",
-   "layout": [
-    ".....",
-    ".##.#",
-    "....#",
-    ".##.#",
-    "....#"
-   ],
-   "anchors": {
-    "4,2": "near"
-   },
-   "swaps": 4,
-   "seed": 1059748775,
-   "hints": {
-    "1,0": "adj",
-    "0,0": "det"
-   },
-   "stars": [
-    63,
-    76,
-    89
-   ],
-   "objectives": [
-    {
-     "kind": "themeWords",
-     "count": 7,
-     "points": 13
-    }
-   ]
-  },
-  {
-   "id": "level-76",
-   "name": "Lunar Horizon",
-   "theme": "night-sky",
-   "layout": [
-    ".....",
-    "####.",
-    "##.#.",
-    ".....",
     "##.##",
-    "#...."
-   ],
-   "anchors": {
-    "2,2": "my"
-   },
-   "swaps": 4,
-   "seed": 1811626749,
-   "hints": {
-    "2,4": "det",
-    "3,4": "adj",
-    "5,2": "verb"
-   },
-   "stars": [
-    49,
-    59,
-    69
-   ],
-   "objectives": [
-    {
-     "kind": "themeWords",
-     "count": 7,
-     "points": 10
-    }
-   ]
-  },
-  {
-   "id": "level-77",
-   "name": "The Satellite",
-   "theme": "night-sky",
-   "layout": [
-    ".####",
-    ".###.",
+    ".#.#.",
     ".....",
     ".#.#.",
-    "#....",
-    "##.#."
+    ".###.",
+    "....."
    ],
    "anchors": {
-    "3,2": "of",
-    "1,4": "our"
+    "3,4": "of"
    },
    "swaps": 4,
-   "seed": 2086919087,
+   "seed": 1614984589,
+   "draw": 2,
    "hints": {
-    "2,4": "noun",
-    "2,2": "det"
+    "2,2": "adj",
+    "4,0": "noun",
+    "1,2": "det"
    },
    "stars": [
     54,
@@ -2261,65 +2335,213 @@
    "objectives": [
     {
      "kind": "themeWords",
-     "count": 8,
+     "count": 9,
      "points": 11
     }
    ]
   },
   {
-   "id": "level-78",
-   "name": "The Moon",
+   "id": "level-79",
+   "name": "Galaxy & Shadow",
    "theme": "night-sky",
    "layout": [
-    "....#",
-    "#.##.",
     ".....",
-    "#.##.",
-    ".....",
-    "####."
+    "####.",
+    "#....",
+    "##.#.",
+    "#....",
+    "##.##"
    ],
    "anchors": {
-    "0,2": "near"
+    "0,2": "for"
    },
    "swaps": 4,
-   "seed": 265937863,
+   "seed": 1394549896,
+   "draw": 2,
    "hints": {
-    "1,1": "prep",
-    "2,4": "verb",
-    "4,4": "pron"
+    "4,4": "noun",
+    "4,2": "prep"
    },
    "stars": [
-    61,
-    73,
-    85
+    50,
+    60,
+    70
    ],
    "objectives": [
     {
      "kind": "themeWords",
-     "count": 6,
+     "count": 8,
+     "points": 10
+    }
+   ]
+  },
+  {
+   "id": "level-80",
+   "name": "Starry Crater",
+   "theme": "night-sky",
+   "layout": [
+    "#....",
+    "###.#",
+    "#....",
+    "#.#.#",
+    "....#",
+    "#.###"
+   ],
+   "anchors": {
+    "2,3": "with",
+    "0,1": "a"
+   },
+   "swaps": 4,
+   "seed": 1014174548,
+   "draw": 2,
+   "hints": {
+    "1,3": "verb",
+    "4,1": "verb"
+   },
+   "stars": [
+    49,
+    59,
+    69
+   ],
+   "objectives": [
+    {
+     "kind": "greatLines",
+     "count": 1,
+     "points": 10
+    }
+   ]
+  },
+  {
+   "id": "level-81",
+   "name": "The Garden",
+   "theme": "garden",
+   "layout": [
+    "#....",
+    "###.#",
+    ".....",
+    ".##.#",
+    ".####",
+    "....#"
+   ],
+   "anchors": {
+    "1,3": "over",
+    "2,4": "soil"
+   },
+   "swaps": 4,
+   "seed": 12393452,
+   "draw": 2,
+   "hints": {
+    "0,1": "noun",
+    "2,3": "det"
+   },
+   "stars": [
+    54,
+    65,
+    76
+   ],
+   "objectives": [
+    {
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 11
+    }
+   ]
+  },
+  {
+   "id": "level-82",
+   "name": "Worm & Tomato",
+   "theme": "garden",
+   "layout": [
+    ".#.#.",
+    ".....",
+    ".#.#.",
+    ".#.#.",
+    "#...."
+   ],
+   "anchors": {
+    "3,4": "over"
+   },
+   "swaps": 4,
+   "seed": 1578734999,
+   "draw": 2,
+   "hints": {
+    "1,4": "noun",
+    "4,4": "pron",
+    "1,2": "det"
+   },
+   "stars": [
+    46,
+    55,
+    64
+   ],
+   "objectives": [
+    {
+     "kind": "greatLines",
+     "count": 1,
+     "points": 9
+    }
+   ]
+  },
+  {
+   "id": "level-83",
+   "name": "Busy Snail",
+   "theme": "garden",
+   "layout": [
+    "#....",
+    ".##.#",
+    "....#",
+    ".##.#",
+    ".####",
+    "....#"
+   ],
+   "anchors": {
+    "0,4": "weed",
+    "2,0": "weed",
+    "5,1": "under"
+   },
+   "swaps": 4,
+   "seed": 834871823,
+   "draw": 2,
+   "hints": {
+    "0,1": "noun",
+    "0,3": "det"
+   },
+   "stars": [
+    59,
+    71,
+    83
+   ],
+   "objectives": [
+    {
+     "kind": "rareCrossing",
+     "value": 6,
      "points": 12
     }
    ]
   },
   {
-   "id": "level-79",
-   "name": "The Cloud",
-   "theme": "night-sky",
+   "id": "level-84",
+   "name": "Fence & Soil",
+   "theme": "garden",
    "layout": [
-    ".....",
-    ".##.#",
-    "....#",
-    ".##.#",
-    "#...."
+    "....",
+    ".###",
+    "....",
+    ".##.",
+    "###.",
+    "...."
    ],
    "anchors": {
-    "4,4": "planet"
+    "0,3": "flower",
+    "3,3": "with",
+    "3,0": "soil"
    },
    "swaps": 4,
-   "seed": 1976247401,
+   "seed": 465246108,
+   "draw": 2,
    "hints": {
-    "4,2": "verb",
-    "2,1": "det"
+    "5,1": "prep",
+    "2,3": "noun"
    },
    "stars": [
     52,
@@ -2328,211 +2550,146 @@
    ],
    "objectives": [
     {
-     "kind": "swapsLeft",
-     "count": 2,
-     "points": 10
-    }
-   ]
-  },
-  {
-   "id": "level-80",
-   "name": "Endless Universe",
-   "theme": "night-sky",
-   "layout": [
-    "....",
-    "#.#.",
-    "....",
-    "#.#.",
-    "...."
-   ],
-   "anchors": {
-    "2,1": "through",
-    "4,3": "cloud"
-   },
-   "swaps": 4,
-   "seed": 1002501801,
-   "hints": {
-    "4,1": "noun",
-    "2,0": "verb"
-   },
-   "stars": [
-    56,
-    67,
-    78
-   ],
-   "objectives": [
-    {
-     "kind": "themeWords",
-     "count": 6,
-     "points": 11
-    }
-   ]
-  },
-  {
-   "id": "level-81",
-   "name": "Snail & Frog",
-   "theme": "garden",
-   "layout": [
-    "#....",
-    "##.#.",
-    "#....",
-    "##.#.",
-    "....#"
-   ],
-   "anchors": {
-    "0,2": "sun"
-   },
-   "swaps": 4,
-   "seed": 1705884705,
-   "hints": {
-    "1,2": "verb",
-    "2,2": "prep"
-   },
-   "stars": [
-    51,
-    61,
-    71
-   ],
-   "objectives": [
-    {
      "kind": "longWord",
      "letters": 7,
      "points": 10
-    }
-   ]
-  },
-  {
-   "id": "level-82",
-   "name": "Wilted Seed",
-   "theme": "garden",
-   "layout": [
-    "####.",
-    ".....",
-    ".#.#.",
-    ".#.#.",
-    "....#",
-    ".####"
-   ],
-   "anchors": {
-    "1,2": "rose",
-    "4,1": "near"
-   },
-   "swaps": 4,
-   "seed": 201673637,
-   "hints": {
-    "1,4": "noun",
-    "1,0": "pron"
-   },
-   "stars": [
-    56,
-    67,
-    78
-   ],
-   "objectives": [
-    {
-     "kind": "themeWords",
-     "count": 5,
-     "points": 11
-    }
-   ]
-  },
-  {
-   "id": "level-83",
-   "name": "Leafy Hose",
-   "theme": "garden",
-   "layout": [
-    ".#.##",
-    "....#",
-    ".#.#.",
-    ".....",
-    "####.",
-    "....."
-   ],
-   "anchors": {
-    "5,2": "over",
-    "4,4": "and",
-    "2,0": "of"
-   },
-   "swaps": 4,
-   "seed": 117091262,
-   "hints": {
-    "2,2": "verb",
-    "5,0": "det",
-    "5,4": "noun"
-   },
-   "stars": [
-    70,
-    84,
-    98
-   ],
-   "objectives": [
-    {
-     "kind": "rareCrossing",
-     "value": 6,
-     "points": 14
-    }
-   ]
-  },
-  {
-   "id": "level-84",
-   "name": "Green Sun",
-   "theme": "garden",
-   "layout": [
-    "##.##",
-    ".....",
-    ".#.#.",
-    ".#.#.",
-    ".....",
-    ".###."
-   ],
-   "anchors": {
-    "2,4": "in"
-   },
-   "swaps": 4,
-   "seed": 1409140220,
-   "hints": {
-    "4,0": "noun",
-    "4,4": "adj",
-    "1,2": "det"
-   },
-   "stars": [
-    66,
-    79,
-    92
-   ],
-   "objectives": [
-    {
-     "kind": "longWord",
-     "letters": 7,
-     "points": 13
     }
    ]
   },
   {
    "id": "level-85",
-   "name": "The Hose",
+   "name": "Sun & Gnome",
    "theme": "garden",
    "layout": [
+    "##.#.",
     ".....",
-    "#.##.",
-    "#....",
-    "#.##.",
+    ".#.#.",
+    ".#.#.",
+    ".####",
     "....."
    ],
    "anchors": {
-    "4,2": "of"
+    "3,0": "in"
    },
    "swaps": 4,
-   "seed": 239384665,
+   "seed": 1406267831,
+   "draw": 2,
    "hints": {
-    "4,1": "noun",
-    "4,4": "verb",
-    "0,4": "adv"
+    "2,0": "verb",
+    "1,4": "adv",
+    "1,0": "noun"
    },
    "stars": [
+    54,
     65,
-    78,
-    91
+    76
+   ],
+   "objectives": [
+    {
+     "kind": "themeWords",
+     "count": 7,
+     "points": 11
+    }
+   ]
+  },
+  {
+   "id": "level-86",
+   "name": "Colorful Pond",
+   "theme": "garden",
+   "layout": [
+    "###.#",
+    "#....",
+    "#.#.#",
+    "....#",
+    "#.###",
+    "#...."
+   ],
+   "anchors": {
+    "5,2": "through",
+    "3,1": "of"
+   },
+   "swaps": 4,
+   "seed": 589626048,
+   "draw": 2,
+   "hints": {
+    "3,2": "pron",
+    "3,3": "verb"
+   },
+   "stars": [
+    55,
+    66,
+    77
+   ],
+   "objectives": [
+    {
+     "kind": "longWord",
+     "letters": 7,
+     "points": 11
+    }
+   ]
+  },
+  {
+   "id": "level-87",
+   "name": "Carrot & Fence",
+   "theme": "garden",
+   "layout": [
+    "#....",
+    "###.#",
+    "#.#.#",
+    "....#",
+    "#.###",
+    "....#"
+   ],
+   "anchors": {
+    "5,1": "gate"
+   },
+   "swaps": 4,
+   "seed": 139143839,
+   "draw": 2,
+   "hints": {
+    "3,3": "verb",
+    "0,2": "verb"
+   },
+   "stars": [
+    47,
+    56,
+    65
+   ],
+   "objectives": [
+    {
+     "kind": "longWord",
+     "letters": 7,
+     "points": 9
+    }
+   ]
+  },
+  {
+   "id": "level-88",
+   "name": "Leafy Petal",
+   "theme": "garden",
+   "layout": [
+    "....#",
+    "##.##",
+    "....#",
+    ".#.##",
+    ".####",
+    "....."
+   ],
+   "anchors": {
+    "3,0": "under",
+    "5,1": "over"
+   },
+   "swaps": 4,
+   "seed": 1671615013,
+   "draw": 2,
+   "hints": {
+    "5,0": "noun",
+    "0,1": "det"
+   },
+   "stars": [
+    64,
+    77,
+    90
    ],
    "objectives": [
     {
@@ -2543,25 +2700,26 @@
    ]
   },
   {
-   "id": "level-86",
-   "name": "Fragrant Blossom",
+   "id": "level-89",
+   "name": "Fence & Pond",
    "theme": "garden",
    "layout": [
-    "#....",
+    "....#",
     "##.#.",
     "#....",
     "##.#.",
-    "....."
+    "####.",
+    "#...."
    ],
    "anchors": {
-    "4,0": "we",
-    "3,2": "over"
+    "0,3": "garden"
    },
    "swaps": 4,
-   "seed": 332449946,
+   "seed": 2034950157,
+   "draw": 2,
    "hints": {
-    "2,2": "adv",
-    "4,4": "noun"
+    "2,4": "noun",
+    "1,2": "noun"
    },
    "stars": [
     54,
@@ -2570,32 +2728,69 @@
    ],
    "objectives": [
     {
-     "kind": "rareCrossing",
-     "value": 6,
+     "kind": "swapsLeft",
+     "count": 2,
      "points": 11
     }
    ]
   },
   {
-   "id": "level-87",
-   "name": "Damp Butterfly",
+   "id": "level-90",
+   "name": "Bee & Frog",
    "theme": "garden",
    "layout": [
+    "#....",
+    ".#.##",
     ".....",
-    ".#.##",
-    "....#",
-    ".#.##",
-    "#...."
+    ".#.#.",
+    ".#.#.",
+    "####."
    ],
    "anchors": {
-    "2,2": "in",
-    "0,1": "with"
+    "0,3": "in",
+    "4,0": "garden"
    },
    "swaps": 4,
-   "seed": 187108702,
+   "seed": 1811156512,
+   "draw": 2,
    "hints": {
-    "0,0": "pron",
-    "0,4": "noun"
+    "2,0": "verb",
+    "2,4": "noun"
+   },
+   "stars": [
+    48,
+    58,
+    68
+   ],
+   "objectives": [
+    {
+     "kind": "themeWords",
+     "count": 5,
+     "points": 10
+    }
+   ]
+  },
+  {
+   "id": "level-91",
+   "name": "Anchor & Wave",
+   "theme": "seaside",
+   "layout": [
+    ".....",
+    "####.",
+    "#.##.",
+    "#....",
+    "#.###",
+    "....#"
+   ],
+   "anchors": {
+    "0,0": "we"
+   },
+   "swaps": 4,
+   "seed": 528409992,
+   "draw": 2,
+   "hints": {
+    "0,4": "noun",
+    "3,4": "noun"
    },
    "stars": [
     53,
@@ -2611,31 +2806,209 @@
    ]
   },
   {
-   "id": "level-88",
-   "name": "Sunny Snail",
-   "theme": "garden",
+   "id": "level-92",
+   "name": "Salty Seaweed",
+   "theme": "seaside",
    "layout": [
-    "#....",
+    "##.##",
+    "....#",
     ".#.#.",
     ".....",
     ".#.#.",
-    ".###."
+    "####."
    ],
    "anchors": {
-    "2,3": "with",
-    "1,0": "this",
-    "0,4": "rose"
+    "2,4": "every",
+    "4,0": "ocean"
    },
    "swaps": 4,
-   "seed": 22193375,
+   "seed": 166508272,
+   "draw": 2,
    "hints": {
-    "1,2": "verb",
-    "2,0": "pron"
+    "4,4": "verb",
+    "1,0": "pron"
    },
    "stars": [
-    56,
-    67,
-    78
+    53,
+    64,
+    75
+   ],
+   "objectives": [
+    {
+     "kind": "longWord",
+     "letters": 7,
+     "points": 11
+    }
+   ]
+  },
+  {
+   "id": "level-93",
+   "name": "The Harbor",
+   "theme": "seaside",
+   "layout": [
+    "#....",
+    "###.#",
+    ".....",
+    ".##.#",
+    ".####",
+    "....."
+   ],
+   "anchors": {
+    "5,1": "and"
+   },
+   "swaps": 4,
+   "seed": 1654630384,
+   "draw": 2,
+   "hints": {
+    "5,4": "verb",
+    "2,2": "prep",
+    "5,2": "det"
+   },
+   "stars": [
+    66,
+    79,
+    92
+   ],
+   "objectives": [
+    {
+     "kind": "greatLines",
+     "count": 1,
+     "points": 13
+    }
+   ]
+  },
+  {
+   "id": "level-94",
+   "name": "Breezy Starfish",
+   "theme": "seaside",
+   "layout": [
+    ".....",
+    "##.##",
+    "##.#.",
+    "#....",
+    "####.",
+    "#...."
+   ],
+   "anchors": {
+    "1,2": "of"
+   },
+   "swaps": 4,
+   "seed": 579106814,
+   "draw": 2,
+   "hints": {
+    "0,1": "adj",
+    "0,3": "adv"
+   },
+   "stars": [
+    42,
+    50,
+    58
+   ],
+   "objectives": [
+    {
+     "kind": "longWord",
+     "letters": 7,
+     "points": 8
+    }
+   ]
+  },
+  {
+   "id": "level-95",
+   "name": "Wave & Jellyfish",
+   "theme": "seaside",
+   "layout": [
+    ".....",
+    "####.",
+    "#....",
+    "#.##.",
+    "....#",
+    "#.###"
+   ],
+   "anchors": {
+    "1,4": "of"
+   },
+   "swaps": 4,
+   "seed": 665723882,
+   "draw": 2,
+   "hints": {
+    "0,4": "noun",
+    "0,0": "noun"
+   },
+   "stars": [
+    48,
+    58,
+    68
+   ],
+   "objectives": [
+    {
+     "kind": "themeWords",
+     "count": 6,
+     "points": 10
+    }
+   ]
+  },
+  {
+   "id": "level-96",
+   "name": "Calm Anchor",
+   "theme": "seaside",
+   "layout": [
+    "....#",
+    ".####",
+    "....#",
+    ".#.##",
+    "##.##",
+    "#...."
+   ],
+   "anchors": {
+    "3,2": "with"
+   },
+   "swaps": 4,
+   "seed": 322505210,
+   "draw": 2,
+   "hints": {
+    "0,1": "prep",
+    "2,0": "det"
+   },
+   "stars": [
+    49,
+    59,
+    69
+   ],
+   "objectives": [
+    {
+     "kind": "themeWords",
+     "count": 6,
+     "points": 10
+    }
+   ]
+  },
+  {
+   "id": "level-97",
+   "name": "Blue Towel",
+   "theme": "seaside",
+   "layout": [
+    "....#",
+    "#.###",
+    "....#",
+    "#.#.#",
+    "#....",
+    "###.#"
+   ],
+   "anchors": {
+    "2,1": "near",
+    "3,3": "for"
+   },
+   "swaps": 4,
+   "seed": 144355489,
+   "draw": 2,
+   "hints": {
+    "4,4": "noun",
+    "3,1": "det"
+   },
+   "stars": [
+    54,
+    65,
+    76
    ],
    "objectives": [
     {
@@ -2646,58 +3019,168 @@
    ]
   },
   {
-   "id": "level-89",
-   "name": "Green Weed",
-   "theme": "garden",
+   "id": "level-98",
+   "name": "Breezy Shell",
+   "theme": "seaside",
    "layout": [
-    "#....",
-    "##.##",
-    "#....",
-    "##.#.",
-    "####.",
-    "....."
+    ".####",
+    ".#.#.",
+    ".....",
+    ".#.#.",
+    "#...."
    ],
    "anchors": {
-    "4,4": "in"
+    "2,2": "over",
+    "1,4": "this"
    },
    "swaps": 4,
-   "seed": 1396060488,
+   "seed": 861678182,
+   "draw": 2,
    "hints": {
-    "5,4": "noun"
+    "2,4": "noun",
+    "2,0": "adj"
    },
    "stars": [
-    56,
-    67,
-    78
+    51,
+    61,
+    71
    ],
    "objectives": [
     {
-     "kind": "themeWords",
-     "count": 5,
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 10
+    }
+   ]
+  },
+  {
+   "id": "level-99",
+   "name": "Deep Shell",
+   "theme": "seaside",
+   "layout": [
+    "#....",
+    "##.##",
+    ".....",
+    "##.#.",
+    "####.",
+    "#...."
+   ],
+   "anchors": {
+    "5,1": "they",
+    "1,2": "through",
+    "3,4": "and"
+   },
+   "swaps": 4,
+   "seed": 1632077780,
+   "draw": 2,
+   "hints": {
+    "2,3": "adj",
+    "2,0": "noun"
+   },
+   "stars": [
+    48,
+    58,
+    68
+   ],
+   "objectives": [
+    {
+     "kind": "greatLines",
+     "count": 1,
+     "points": 10
+    }
+   ]
+  },
+  {
+   "id": "level-100",
+   "name": "Ocean & Bucket",
+   "theme": "seaside",
+   "layout": [
+    "#....",
+    "#.###",
+    "#....",
+    "#.#.#",
+    "###.#",
+    "....."
+   ],
+   "anchors": {
+    "1,1": "over"
+   },
+   "swaps": 4,
+   "seed": 1216553412,
+   "draw": 2,
+   "hints": {
+    "0,3": "adj",
+    "2,1": "det"
+   },
+   "stars": [
+    57,
+    68,
+    79
+   ],
+   "objectives": [
+    {
+     "kind": "longWord",
+     "letters": 7,
      "points": 11
     }
    ]
   },
   {
-   "id": "level-90",
-   "name": "The Leaf",
-   "theme": "garden",
+   "id": "level-101",
+   "name": "The Legend",
+   "theme": "library",
    "layout": [
-    "#....",
-    "#.#.#",
-    "....#",
-    "#.#.#",
-    "....."
+    "....##",
+    ".#####",
+    ".#.##.",
+    "....#.",
+    "##.##.",
+    "#....."
    ],
    "anchors": {
-    "0,1": "my",
-    "2,0": "we"
+    "5,1": "your"
    },
    "swaps": 4,
-   "seed": 1758384924,
+   "seed": 357420581,
+   "draw": 2,
    "hints": {
-    "2,1": "noun",
-    "0,3": "pron"
+    "0,2": "det",
+    "3,3": "noun"
+   },
+   "stars": [
+    65,
+    78,
+    91
+   ],
+   "objectives": [
+    {
+     "kind": "rareCrossing",
+     "value": 7,
+     "points": 13
+    }
+   ]
+  },
+  {
+   "id": "level-102",
+   "name": "Hushed Riddle",
+   "theme": "library",
+   "layout": [
+    "....#.",
+    "###.#.",
+    "#.....",
+    "#.#.#.",
+    "#.####",
+    "#....#"
+   ],
+   "anchors": {
+    "2,1": "our"
+   },
+   "swaps": 4,
+   "seed": 142537104,
+   "draw": 2,
+   "hints": {
+    "0,3": "noun",
+    "5,1": "adj"
    },
    "stars": [
     60,
@@ -2706,33 +3189,576 @@
    ],
    "objectives": [
     {
+     "kind": "longWord",
+     "letters": 8,
+     "points": 12
+    },
+    {
      "kind": "rareCrossing",
-     "value": 6,
+     "value": 7,
      "points": 12
     }
    ]
   },
   {
-   "id": "level-91",
-   "name": "Whale & Sandcastle",
-   "theme": "seaside",
+   "id": "level-103",
+   "name": "Desk & Mystery",
+   "theme": "library",
    "layout": [
-    "....#",
-    ".#.##",
-    ".#.#.",
-    ".....",
-    ".###.",
-    "#...."
+    "....##",
+    ".#.###",
+    ".#....",
+    ".#.##.",
+    ".####.",
+    "##...."
    ],
    "anchors": {
-    "1,0": "through"
+    "5,3": "through"
    },
    "swaps": 4,
-   "seed": 774215613,
+   "seed": 1976291235,
+   "draw": 2,
    "hints": {
-    "3,0": "verb",
-    "0,1": "adj",
-    "5,4": "verb"
+    "0,0": "pron",
+    "1,2": "noun"
+   },
+   "stars": [
+    61,
+    73,
+    85
+   ],
+   "objectives": [
+    {
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 12
+    }
+   ]
+  },
+  {
+   "id": "level-104",
+   "name": "Librarian & Letter",
+   "theme": "library",
+   "layout": [
+    "#....#",
+    "##.##.",
+    "....#.",
+    ".#.##.",
+    ".#....",
+    ".#####"
+   ],
+   "anchors": {
+    "1,2": "on"
+   },
+   "swaps": 4,
+   "seed": 1370268940,
+   "draw": 2,
+   "hints": {
+    "2,3": "noun",
+    "4,5": "noun"
+   },
+   "stars": [
+    59,
+    71,
+    83
+   ],
+   "objectives": [
+    {
+     "kind": "themeWords",
+     "count": 9,
+     "points": 12
+    },
+    {
+     "kind": "rareCrossing",
+     "value": 7,
+     "points": 12
+    }
+   ]
+  },
+  {
+   "id": "level-105",
+   "name": "The Letter",
+   "theme": "library",
+   "layout": [
+    ".....#",
+    ".##.##",
+    ".##.#.",
+    ".#....",
+    "#####.",
+    "#....."
+   ],
+   "anchors": {
+    "2,5": "the"
+   },
+   "swaps": 4,
+   "seed": 1857955774,
+   "draw": 2,
+   "hints": {
+    "0,3": "adv",
+    "5,3": "det"
+   },
+   "stars": [
+    57,
+    68,
+    79
+   ],
+   "objectives": [
+    {
+     "kind": "themeWords",
+     "count": 7,
+     "points": 11
+    }
+   ]
+  },
+  {
+   "id": "level-106",
+   "name": "Thick Pencil",
+   "theme": "library",
+   "layout": [
+    "##....",
+    ".###.#",
+    ".....#",
+    ".#.#.#",
+    "....##",
+    ".#.###"
+   ],
+   "anchors": {
+    "0,3": "for",
+    "4,2": "with"
+   },
+   "swaps": 4,
+   "seed": 1180164882,
+   "draw": 2,
+   "hints": {
+    "2,4": "verb",
+    "2,1": "prep"
+   },
+   "stars": [
+    52,
+    62,
+    72
+   ],
+   "objectives": [
+    {
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 10
+    },
+    {
+     "kind": "longWord",
+     "letters": 8,
+     "points": 10
+    }
+   ]
+  },
+  {
+   "id": "level-107",
+   "name": "Dusty Owl",
+   "theme": "library",
+   "layout": [
+    "###.##",
+    "##....",
+    "#.#.#.",
+    "....#.",
+    "#.###.",
+    "#....."
+   ],
+   "anchors": {
+    "4,1": "of",
+    "3,3": "story"
+   },
+   "swaps": 4,
+   "seed": 286094139,
+   "draw": 2,
+   "hints": {
+    "2,5": "verb",
+    "0,3": "pron"
+   },
+   "stars": [
+    50,
+    60,
+    70
+   ],
+   "objectives": [
+    {
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 10
+    },
+    {
+     "kind": "greatLines",
+     "count": 1,
+     "points": 10
+    }
+   ]
+  },
+  {
+   "id": "level-108",
+   "name": "Ink & Atlas",
+   "theme": "library",
+   "layout": [
+    "##....",
+    ".##.#.",
+    "....#.",
+    ".##.#.",
+    ".#####",
+    "....##"
+   ],
+   "anchors": {
+    "2,1": "of"
+   },
+   "swaps": 4,
+   "seed": 1187126609,
+   "draw": 2,
+   "hints": {
+    "2,2": "det",
+    "5,1": "verb"
+   },
+   "stars": [
+    58,
+    70,
+    82
+   ],
+   "objectives": [
+    {
+     "kind": "greatLines",
+     "count": 1,
+     "points": 12
+    }
+   ]
+  },
+  {
+   "id": "level-109",
+   "name": "Bookish Lamp",
+   "theme": "library",
+   "layout": [
+    "##....",
+    "#.#.#.",
+    "....#.",
+    "#.#.#.",
+    "#....#"
+   ],
+   "anchors": {
+    "2,0": "i"
+   },
+   "swaps": 4,
+   "seed": 1171134947,
+   "draw": 2,
+   "hints": {
+    "4,1": "noun",
+    "2,1": "verb"
+   },
+   "stars": [
+    55,
+    66,
+    77
+   ],
+   "objectives": [
+    {
+     "kind": "greatLines",
+     "count": 1,
+     "points": 11
+    }
+   ]
+  },
+  {
+   "id": "level-110",
+   "name": "Bookish Dictionary",
+   "theme": "library",
+   "layout": [
+    "##....",
+    "###.#.",
+    "#.#.#.",
+    "....#.",
+    "#.####",
+    "....##"
+   ],
+   "anchors": {
+    "5,2": "of",
+    "3,0": "this"
+   },
+   "swaps": 4,
+   "seed": 148941981,
+   "draw": 2,
+   "hints": {
+    "0,5": "pron",
+    "3,3": "verb"
+   },
+   "stars": [
+    58,
+    70,
+    82
+   ],
+   "objectives": [
+    {
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 12
+    },
+    {
+     "kind": "longWord",
+     "letters": 8,
+     "points": 12
+    }
+   ]
+  },
+  {
+   "id": "level-111",
+   "name": "Sticky Waffle",
+   "theme": "breakfast",
+   "layout": [
+    "....##",
+    ".#.###",
+    ".....#",
+    ".#.#.#",
+    "####.#",
+    "#....."
+   ],
+   "anchors": {
+    "2,2": "of"
+   },
+   "swaps": 4,
+   "seed": 1529715397,
+   "draw": 2,
+   "hints": {
+    "0,2": "det",
+    "0,0": "noun"
+   },
+   "stars": [
+    69,
+    83,
+    97
+   ],
+   "objectives": [
+    {
+     "kind": "longWord",
+     "letters": 8,
+     "points": 14
+    }
+   ]
+  },
+  {
+   "id": "level-112",
+   "name": "The Milk",
+   "theme": "breakfast",
+   "layout": [
+    "##....",
+    ".####.",
+    ".##.#.",
+    ".#....",
+    ".##.##",
+    "....##"
+   ],
+   "anchors": {
+    "5,1": "of",
+    "3,0": "of"
+   },
+   "swaps": 4,
+   "seed": 1622445516,
+   "draw": 2,
+   "hints": {
+    "5,2": "pron",
+    "0,5": "pron"
+   },
+   "stars": [
+    63,
+    76,
+    89
+   ],
+   "objectives": [
+    {
+     "kind": "longWord",
+     "letters": 8,
+     "points": 13
+    },
+    {
+     "kind": "themeWords",
+     "count": 8,
+     "points": 13
+    }
+   ]
+  },
+  {
+   "id": "level-113",
+   "name": "Kettle & Syrup",
+   "theme": "breakfast",
+   "layout": [
+    "....#.",
+    ".#.##.",
+    ".#....",
+    ".#.##.",
+    "#....#"
+   ],
+   "anchors": {
+    "0,5": "the",
+    "1,2": "over"
+   },
+   "swaps": 4,
+   "seed": 78777351,
+   "draw": 2,
+   "hints": {
+    "0,2": "noun",
+    "1,0": "noun"
+   },
+   "stars": [
+    69,
+    83,
+    97
+   ],
+   "objectives": [
+    {
+     "kind": "rareCrossing",
+     "value": 7,
+     "points": 14
+    },
+    {
+     "kind": "themeWords",
+     "count": 6,
+     "points": 14
+    }
+   ]
+  },
+  {
+   "id": "level-114",
+   "name": "The Butter",
+   "theme": "breakfast",
+   "layout": [
+    ".....#",
+    "#.###.",
+    "#.#.#.",
+    "....#.",
+    "###.#.",
+    "##...."
+   ],
+   "anchors": {
+    "3,0": "a"
+   },
+   "swaps": 4,
+   "seed": 447899185,
+   "draw": 2,
+   "hints": {
+    "0,1": "noun",
+    "5,3": "noun"
+   },
+   "stars": [
+    83,
+    100,
+    117
+   ],
+   "objectives": [
+    {
+     "kind": "greatLines",
+     "count": 1,
+     "points": 17
+    },
+    {
+     "kind": "rareCrossing",
+     "value": 7,
+     "points": 17
+    }
+   ]
+  },
+  {
+   "id": "level-115",
+   "name": "Kettle & Bacon",
+   "theme": "breakfast",
+   "layout": [
+    "....##",
+    ".##.#.",
+    ".#....",
+    ".##.#.",
+    ".#....",
+    "#####."
+   ],
+   "anchors": {
+    "2,0": "over"
+   },
+   "swaps": 4,
+   "seed": 1614688420,
+   "draw": 2,
+   "hints": {
+    "4,5": "pron",
+    "0,3": "noun"
+   },
+   "stars": [
+    66,
+    79,
+    92
+   ],
+   "objectives": [
+    {
+     "kind": "longWord",
+     "letters": 8,
+     "points": 13
+    },
+    {
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 13
+    }
+   ]
+  },
+  {
+   "id": "level-116",
+   "name": "The Toaster",
+   "theme": "breakfast",
+   "layout": [
+    "##.###",
+    "##....",
+    ".#.#.#",
+    ".....#",
+    ".###.#",
+    ".#...."
+   ],
+   "anchors": {
+    "5,4": "butter"
+   },
+   "swaps": 4,
+   "seed": 97644097,
+   "draw": 2,
+   "hints": {
+    "3,4": "verb",
+    "1,2": "noun"
+   },
+   "stars": [
+    72,
+    86,
+    100
+   ],
+   "objectives": [
+    {
+     "kind": "longWord",
+     "letters": 8,
+     "points": 14
+    },
+    {
+     "kind": "swapsLeft",
+     "count": 2,
+     "points": 14
+    }
+   ]
+  },
+  {
+   "id": "level-117",
+   "name": "Buttery Table",
+   "theme": "breakfast",
+   "layout": [
+    "##....",
+    "##.##.",
+    "....#.",
+    ".#.##.",
+    ".#####",
+    ".....#"
+   ],
+   "anchors": {
+    "0,5": "kitchen"
+   },
+   "swaps": 4,
+   "seed": 1845087848,
+   "draw": 2,
+   "hints": {
+    "4,0": "det",
+    "5,4": "noun"
    },
    "stars": [
     66,
@@ -2748,376 +3774,26 @@
    ]
   },
   {
-   "id": "level-92",
-   "name": "Stormy Harbor",
-   "theme": "seaside",
+   "id": "level-118",
+   "name": "Kettle & Morning",
+   "theme": "breakfast",
    "layout": [
-    "....#",
-    "#.##.",
-    ".....",
-    "#.##.",
-    "....."
-   ],
-   "anchors": {
-    "2,0": "every",
-    "1,1": "under",
-    "4,0": "they"
-   },
-   "swaps": 4,
-   "seed": 929414390,
-   "hints": {
-    "1,4": "verb",
-    "4,4": "verb"
-   },
-   "stars": [
-    50,
-    60,
-    70
-   ],
-   "objectives": [
-    {
-     "kind": "themeWords",
-     "count": 6,
-     "points": 10
-    }
-   ]
-  },
-  {
-   "id": "level-93",
-   "name": "Pebble & Harbor",
-   "theme": "seaside",
-   "layout": [
-    "#....",
-    "##.#.",
-    "#....",
-    "##.#.",
-    "....#"
-   ],
-   "anchors": {
-    "1,2": "for",
-    "0,4": "shell",
-    "4,1": "with"
-   },
-   "swaps": 4,
-   "seed": 848178909,
-   "hints": {
-    "2,2": "noun",
-    "1,4": "verb"
-   },
-   "stars": [
-    58,
-    70,
-    82
-   ],
-   "objectives": [
-    {
-     "kind": "swapsLeft",
-     "count": 2,
-     "points": 12
-    }
-   ]
-  },
-  {
-   "id": "level-94",
-   "name": "Blue Sail",
-   "theme": "seaside",
-   "layout": [
-    "###.",
-    "....",
-    ".##.",
-    "....",
-    ".###",
-    "...."
-   ],
-   "anchors": {
-    "1,2": "and"
-   },
-   "swaps": 4,
-   "seed": 35669003,
-   "hints": {
-    "1,0": "det",
-    "3,3": "adj"
-   },
-   "stars": [
-    46,
-    55,
-    64
-   ],
-   "objectives": [
-    {
-     "kind": "longWord",
-     "letters": 7,
-     "points": 9
-    }
-   ]
-  },
-  {
-   "id": "level-95",
-   "name": "The Fish",
-   "theme": "seaside",
-   "layout": [
-    ".....",
-    "##.#.",
-    ".....",
-    ".#.#.",
-    ".#.##",
-    ".####"
-   ],
-   "anchors": {
-    "0,0": "i",
-    "2,3": "for",
-    "3,0": "on"
-   },
-   "swaps": 4,
-   "seed": 2093352251,
-   "hints": {
-    "4,2": "noun",
-    "0,4": "noun"
-   },
-   "stars": [
-    57,
-    68,
-    79
-   ],
-   "objectives": [
-    {
-     "kind": "swapsLeft",
-     "count": 2,
-     "points": 11
-    }
-   ]
-  },
-  {
-   "id": "level-96",
-   "name": "Sunburnt Ocean",
-   "theme": "seaside",
-   "layout": [
-    ".#.#.",
-    ".#.#.",
-    ".....",
-    ".#.#.",
-    "#...."
-   ],
-   "anchors": {
-    "1,2": "of",
-    "1,0": "under",
-    "4,1": "our"
-   },
-   "swaps": 4,
-   "seed": 317858618,
-   "hints": {
-    "4,4": "adv",
-    "3,4": "verb"
-   },
-   "stars": [
-    68,
-    82,
-    96
-   ],
-   "objectives": [
-    {
-     "kind": "longWord",
-     "letters": 7,
-     "points": 14
-    }
-   ]
-  },
-  {
-   "id": "level-97",
-   "name": "Shiny Ocean",
-   "theme": "seaside",
-   "layout": [
-    "#.###",
-    ".....",
-    "#.#.#",
-    "....#",
-    "###.#",
-    "....."
-   ],
-   "anchors": {
-    "0,1": "our"
-   },
-   "swaps": 4,
-   "seed": 67866726,
-   "hints": {
-    "5,1": "det",
-    "5,0": "verb",
-    "1,1": "conj"
-   },
-   "stars": [
-    54,
-    65,
-    76
-   ],
-   "objectives": [
-    {
-     "kind": "rareCrossing",
-     "value": 6,
-     "points": 11
-    }
-   ]
-  },
-  {
-   "id": "level-98",
-   "name": "Sandy Ocean",
-   "theme": "seaside",
-   "layout": [
-    "#....",
-    "#.#.#",
-    ".....",
-    "#.#.#",
-    "....."
-   ],
-   "anchors": {
-    "3,1": "with"
-   },
-   "swaps": 4,
-   "seed": 1143255075,
-   "hints": {
-    "4,1": "noun",
-    "0,3": "pron",
-    "0,1": "pron"
-   },
-   "stars": [
-    61,
-    73,
-    85
-   ],
-   "objectives": [
-    {
-     "kind": "rareCrossing",
-     "value": 6,
-     "points": 12
-    }
-   ]
-  },
-  {
-   "id": "level-99",
-   "name": "The Pebble",
-   "theme": "seaside",
-   "layout": [
-    ".#.#.",
-    ".#.#.",
-    ".....",
-    ".#.#.",
-    "....#"
-   ],
-   "anchors": {
-    "1,4": "near",
-    "0,2": "some",
-    "2,1": "through"
-   },
-   "swaps": 4,
-   "seed": 42591703,
-   "hints": {
-    "4,2": "verb",
-    "3,2": "pron"
-   },
-   "stars": [
-    57,
-    68,
-    79
-   ],
-   "objectives": [
-    {
-     "kind": "themeWords",
-     "count": 7,
-     "points": 11
-    }
-   ]
-  },
-  {
-   "id": "level-100",
-   "name": "Pier & Ocean",
-   "theme": "seaside",
-   "layout": [
-    "....#",
-    ".#.##",
-    ".....",
-    ".#.#.",
-    "####.",
-    "#...."
-   ],
-   "anchors": {
-    "0,1": "on",
-    "3,4": "through"
-   },
-   "swaps": 4,
-   "seed": 1257132700,
-   "hints": {
-    "1,2": "verb",
-    "4,4": "det",
-    "3,2": "verb"
-   },
-   "stars": [
-    63,
-    76,
-    89
-   ],
-   "objectives": [
-    {
-     "kind": "themeWords",
-     "count": 6,
-     "points": 13
-    }
-   ]
-  },
-  {
-   "id": "level-101",
-   "name": "Curious Owl",
-   "theme": "library",
-   "layout": [
-    ".##.##",
     "....##",
+    ".#####",
     ".##.#.",
-    "......",
-    "#####.",
+    "....#.",
+    ".##.#.",
     "#....."
    ],
    "anchors": {
-    "0,0": "a",
-    "4,5": "and"
+    "3,5": "on"
    },
-   "swaps": 3,
-   "seed": 560497143,
+   "swaps": 4,
+   "seed": 428827839,
+   "draw": 2,
    "hints": {
-    "3,3": "pron",
-    "3,5": "noun"
-   },
-   "stars": [
-    68,
-    82,
-    96
-   ],
-   "objectives": [
-    {
-     "kind": "longWord",
-     "letters": 8,
-     "points": 14
-    }
-   ]
-  },
-  {
-   "id": "level-102",
-   "name": "Tale & Pen",
-   "theme": "library",
-   "layout": [
-    "....##",
-    ".#.#.#",
-    ".....#",
-    ".#.#.#",
-    ".#....",
-    "##.###"
-   ],
-   "anchors": {
-    "4,4": "map",
-    "2,2": "and"
-   },
-   "swaps": 3,
-   "seed": 1293847298,
-   "hints": {
-    "5,2": "verb",
-    "4,3": "verb"
+    "3,2": "verb",
+    "5,5": "noun"
    },
    "stars": [
     65,
@@ -3126,6 +3802,11 @@
    ],
    "objectives": [
     {
+     "kind": "greatLines",
+     "count": 1,
+     "points": 13
+    },
+    {
      "kind": "swapsLeft",
      "count": 2,
      "points": 13
@@ -3133,320 +3814,26 @@
    ]
   },
   {
-   "id": "level-103",
-   "name": "Thick Scroll",
-   "theme": "library",
-   "layout": [
-    "....#",
-    ".#.#.",
-    ".....",
-    ".#.#.",
-    ".#.#.",
-    "....#"
-   ],
-   "anchors": {
-    "5,1": "over"
-   },
-   "swaps": 3,
-   "seed": 1374882987,
-   "hints": {
-    "2,4": "noun",
-    "1,4": "det"
-   },
-   "stars": [
-    72,
-    86,
-    100
-   ],
-   "objectives": [
-    {
-     "kind": "rareCrossing",
-     "value": 7,
-     "points": 14
-    }
-   ]
-  },
-  {
-   "id": "level-104",
-   "name": "Curious Candle",
-   "theme": "library",
-   "layout": [
-    "#.....",
-    "#.###.",
-    "#.#.#.",
-    "......",
-    "###.##",
-    "#....#"
-   ],
-   "anchors": {
-    "3,5": "paper"
-   },
-   "swaps": 3,
-   "seed": 16841080,
-   "hints": {
-    "5,3": "noun",
-    "3,3": "prep"
-   },
-   "stars": [
-    63,
-    76,
-    89
-   ],
-   "objectives": [
-    {
-     "kind": "themeWords",
-     "count": 6,
-     "points": 13
-    }
-   ]
-  },
-  {
-   "id": "level-105",
-   "name": "Wise Librarian",
-   "theme": "library",
-   "layout": [
-    "......",
-    ".#.##.",
-    ".#.##.",
-    ".#....",
-    ".#####",
-    "....##"
-   ],
-   "anchors": {
-    "3,4": "over",
-    "5,3": "library"
-   },
-   "swaps": 3,
-   "seed": 264019732,
-   "hints": {
-    "2,0": "adv",
-    "1,2": "det"
-   },
-   "stars": [
-    72,
-    86,
-    100
-   ],
-   "objectives": [
-    {
-     "kind": "rareCrossing",
-     "value": 7,
-     "points": 14
-    },
-    {
-     "kind": "greatLines",
-     "count": 1,
-     "points": 14
-    }
-   ]
-  },
-  {
-   "id": "level-106",
-   "name": "Thick Atlas",
-   "theme": "library",
-   "layout": [
-    "....#",
-    ".#.#.",
-    ".....",
-    ".#.#.",
-    ".....",
-    "####."
-   ],
-   "anchors": {
-    "1,4": "this"
-   },
-   "swaps": 3,
-   "seed": 1990719865,
-   "hints": {
-    "3,2": "verb",
-    "0,3": "verb"
-   },
-   "stars": [
-    68,
-    82,
-    96
-   ],
-   "objectives": [
-    {
-     "kind": "greatLines",
-     "count": 1,
-     "points": 14
-    },
-    {
-     "kind": "themeWords",
-     "count": 7,
-     "points": 14
-    }
-   ]
-  },
-  {
-   "id": "level-107",
-   "name": "Wise Owl",
-   "theme": "library",
-   "layout": [
-    ".#####",
-    ".#....",
-    ".##.#.",
-    "......",
-    "###.#.",
-    "......"
-   ],
-   "anchors": {
-    "3,1": "over",
-    "4,5": "for"
-   },
-   "swaps": 3,
-   "seed": 2048581308,
-   "hints": {
-    "2,5": "verb",
-    "1,5": "noun"
-   },
-   "stars": [
-    75,
-    90,
-    105
-   ],
-   "objectives": [
-    {
-     "kind": "rareCrossing",
-     "value": 7,
-     "points": 15
-    },
-    {
-     "kind": "longWord",
-     "letters": 8,
-     "points": 15
-    }
-   ]
-  },
-  {
-   "id": "level-108",
-   "name": "Famous Desk",
-   "theme": "library",
-   "layout": [
-    "......",
-    ".#.##.",
-    ".#.##.",
-    "....#.",
-    ".#.###",
-    "##...."
-   ],
-   "anchors": {
-    "1,2": "in"
-   },
-   "swaps": 3,
-   "seed": 1662512001,
-   "hints": {
-    "5,2": "verb",
-    "3,5": "verb"
-   },
-   "stars": [
-    72,
-    86,
-    100
-   ],
-   "objectives": [
-    {
-     "kind": "rareCrossing",
-     "value": 7,
-     "points": 14
-    },
-    {
-     "kind": "longWord",
-     "letters": 8,
-     "points": 14
-    }
-   ]
-  },
-  {
-   "id": "level-109",
-   "name": "Famous Author",
-   "theme": "library",
-   "layout": [
-    ".....#",
-    ".#.#.#",
-    ".....#",
-    ".#.#.#",
-    "......",
-    "##.#.#"
-   ],
-   "anchors": {
-    "2,2": "with"
-   },
-   "swaps": 3,
-   "seed": 2127615921,
-   "hints": {
-    "1,0": "conj",
-    "2,4": "adv"
-   },
-   "stars": [
-    78,
-    94,
-    110
-   ],
-   "objectives": [
-    {
-     "kind": "greatLines",
-     "count": 1,
-     "points": 16
-    }
-   ]
-  },
-  {
-   "id": "level-110",
-   "name": "Thick Owl",
-   "theme": "library",
-   "layout": [
-    ".....#",
-    "##.#.#",
-    ".....#",
-    ".#.#.#",
-    ".#####",
-    "......"
-   ],
-   "anchors": {
-    "5,1": "over",
-    "0,3": "with"
-   },
-   "swaps": 3,
-   "seed": 1091941283,
-   "hints": {
-    "0,2": "prep",
-    "1,2": "prep"
-   },
-   "stars": [
-    73,
-    88,
-    103
-   ],
-   "objectives": [
-    {
-     "kind": "swapsLeft",
-     "count": 2,
-     "points": 15
-    }
-   ]
-  },
-  {
-   "id": "level-111",
-   "name": "Waffle & Crumb",
+   "id": "level-119",
+   "name": "Burnt Juice",
    "theme": "breakfast",
    "layout": [
-    "#....",
-    "##.#.",
-    ".#.#.",
-    ".....",
-    ".###.",
-    "....."
+    ".....#",
+    ".####.",
+    "....#.",
+    ".#.##.",
+    "#.....",
+    "##.###"
    ],
    "anchors": {
-    "0,1": "the"
+    "1,5": "the"
    },
-   "swaps": 3,
-   "seed": 1706480374,
+   "swaps": 4,
+   "seed": 999500925,
+   "draw": 2,
    "hints": {
-    "3,4": "adj",
-    "5,4": "verb"
+    "0,0": "noun",
+    "4,2": "adj"
    },
    "stars": [
     67,
@@ -3455,6 +3842,11 @@
    ],
    "objectives": [
     {
+     "kind": "longWord",
+     "letters": 8,
+     "points": 13
+    },
+    {
      "kind": "swapsLeft",
      "count": 2,
      "points": 13
@@ -3462,180 +3854,26 @@
    ]
   },
   {
-   "id": "level-112",
-   "name": "The Croissant",
+   "id": "level-120",
+   "name": "Table & Syrup",
    "theme": "breakfast",
    "layout": [
-    "#.....",
+    ".#####",
+    ".#....",
     ".#.##.",
     "....#.",
-    ".#.##.",
-    ".#....",
-    "#####."
+    "##.##.",
+    "....#."
    ],
    "anchors": {
-    "4,5": "coffee",
-    "3,0": "through"
+    "3,5": "in"
    },
-   "swaps": 3,
-   "seed": 490424131,
+   "swaps": 4,
+   "seed": 784136022,
+   "draw": 2,
    "hints": {
-    "4,0": "verb",
-    "2,0": "noun"
-   },
-   "stars": [
-    72,
-    86,
-    100
-   ],
-   "objectives": [
-    {
-     "kind": "greatLines",
-     "count": 1,
-     "points": 14
-    }
-   ]
-  },
-  {
-   "id": "level-113",
-   "name": "Mug & Spoon",
-   "theme": "breakfast",
-   "layout": [
-    "#.....",
-    "##.#.#",
-    ".#.#.#",
-    ".....#",
-    ".###.#",
-    ".....#"
-   ],
-   "anchors": {
-    "0,5": "butter",
-    "3,3": "of"
-   },
-   "swaps": 3,
-   "seed": 1444176687,
-   "hints": {
-    "0,4": "prep",
-    "0,2": "verb"
-   },
-   "stars": [
-    68,
-    82,
-    96
-   ],
-   "objectives": [
-    {
-     "kind": "swapsLeft",
-     "count": 2,
-     "points": 14
-    },
-    {
-     "kind": "greatLines",
-     "count": 1,
-     "points": 14
-    }
-   ]
-  },
-  {
-   "id": "level-114",
-   "name": "The Cereal",
-   "theme": "breakfast",
-   "layout": [
-    "##....",
-    ".###.#",
-    ".....#",
-    ".#.#.#",
-    ".#.#.#",
-    ".....#"
-   ],
-   "anchors": {
-    "2,0": "coffee",
-    "5,4": "coffee"
-   },
-   "swaps": 3,
-   "seed": 214259394,
-   "hints": {
-    "2,2": "noun",
-    "4,0": "adv"
-   },
-   "stars": [
-    79,
-    95,
-    111
-   ],
-   "objectives": [
-    {
-     "kind": "longWord",
-     "letters": 8,
-     "points": 16
-    },
-    {
-     "kind": "themeWords",
-     "count": 10,
-     "points": 16
-    }
-   ]
-  },
-  {
-   "id": "level-115",
-   "name": "Sticky Orange",
-   "theme": "breakfast",
-   "layout": [
-    "##....",
-    "##.#.#",
-    ".#.#.#",
-    ".#....",
-    ".#.#.#",
-    "......"
-   ],
-   "anchors": {
-    "3,2": "cup"
-   },
-   "swaps": 3,
-   "seed": 1217111528,
-   "hints": {
-    "1,2": "adj",
-    "4,4": "verb"
-   },
-   "stars": [
-    89,
-    107,
-    125
-   ],
-   "objectives": [
-    {
-     "kind": "themeWords",
-     "count": 11,
-     "points": 18
-    },
-    {
-     "kind": "longWord",
-     "letters": 8,
-     "points": 18
-    }
-   ]
-  },
-  {
-   "id": "level-116",
-   "name": "Cinnamon & Kettle",
-   "theme": "breakfast",
-   "layout": [
-    "....#.",
-    ".##.#.",
-    "......",
-    ".##.#.",
-    "....##",
-    "###.##"
-   ],
-   "anchors": {
-    "2,4": "in",
-    "5,3": "egg"
-   },
-   "swaps": 3,
-   "seed": 1111913453,
-   "hints": {
-    "0,3": "pron",
-    "1,0": "verb"
+    "5,3": "verb",
+    "4,2": "adj"
    },
    "stars": [
     75,
@@ -3644,155 +3882,14 @@
    ],
    "objectives": [
     {
-     "kind": "swapsLeft",
-     "count": 2,
-     "points": 15
-    }
-   ]
-  },
-  {
-   "id": "level-117",
-   "name": "Napkin & Cereal",
-   "theme": "breakfast",
-   "layout": [
-    "......",
-    ".#.##.",
-    "....#.",
-    ".#.##.",
-    "##....",
-    "#####."
-   ],
-   "anchors": {
-    "1,5": "under"
-   },
-   "swaps": 3,
-   "seed": 4985372,
-   "hints": {
-    "0,3": "adj",
-    "2,1": "noun"
-   },
-   "stars": [
-    79,
-    95,
-    111
-   ],
-   "objectives": [
-    {
-     "kind": "longWord",
-     "letters": 8,
-     "points": 16
-    },
-    {
-     "kind": "swapsLeft",
-     "count": 2,
-     "points": 16
-    }
-   ]
-  },
-  {
-   "id": "level-118",
-   "name": "The Sunrise",
-   "theme": "breakfast",
-   "layout": [
-    "#....#",
-    ".#.###",
-    ".#....",
-    ".#.##.",
-    "....#.",
-    ".#.##."
-   ],
-   "anchors": {
-    "3,2": "over"
-   },
-   "swaps": 3,
-   "seed": 1764276078,
-   "hints": {
-    "0,3": "verb",
-    "1,0": "det"
-   },
-   "stars": [
-    69,
-    83,
-    97
-   ],
-   "objectives": [
-    {
-     "kind": "longWord",
-     "letters": 8,
-     "points": 14
-    },
-    {
-     "kind": "themeWords",
-     "count": 8,
-     "points": 14
-    }
-   ]
-  },
-  {
-   "id": "level-119",
-   "name": "Muffin & Porridge",
-   "theme": "breakfast",
-   "layout": [
-    "###.##",
-    "......",
-    ".##.#.",
-    ".#....",
-    ".##.#.",
-    "....##"
-   ],
-   "anchors": {
-    "5,1": "of",
-    "3,0": "for"
-   },
-   "swaps": 3,
-   "seed": 747139117,
-   "hints": {
-    "1,0": "det",
-    "5,3": "verb"
-   },
-   "stars": [
-    76,
-    91,
-    106
-   ],
-   "objectives": [
-    {
      "kind": "longWord",
      "letters": 8,
      "points": 15
-    }
-   ]
-  },
-  {
-   "id": "level-120",
-   "name": "Milk & Banana",
-   "theme": "breakfast",
-   "layout": [
-    "......",
-    ".#.##.",
-    "......",
-    ".#.##.",
-    "#....#"
-   ],
-   "anchors": {
-    "1,2": "with"
-   },
-   "swaps": 3,
-   "seed": 435502301,
-   "hints": {
-    "4,2": "adv",
-    "2,2": "pron"
-   },
-   "stars": [
-    68,
-    82,
-    96
-   ],
-   "objectives": [
+    },
     {
      "kind": "themeWords",
-     "count": 9,
-     "points": 14
+     "count": 7,
+     "points": 15
     }
    ]
   }

@@ -1,5 +1,6 @@
 import { TIER_MULTIPLIER } from './config';
 import { createGame, entryTiles, gameReducer, type GameAction, type GameState } from './game';
+import { isGrammatical } from './grammar';
 import { BUNDLED_MODEL, ruleProblem } from './localJudge';
 import { scoreSubmission, tileValue } from './scoring';
 import type { RunAction } from './run';
@@ -8,7 +9,8 @@ import type { CellKey, Entry, LevelDef, Pos, Tier, Tile, Verdict } from './types
 import { wordInfo } from './words';
 
 // A simulated player, used by the level generator to check that a level can be
-// solved with the hand it deals and to set its star thresholds. It plays by the
+// solved with the hand it deals and to set its star thresholds. It only plays
+// grammatical English (see makeJudge), so "solvable" means solvable by people. It plays by the
 // real rules (the game reducer: same deals, refills and swaps) and is judged by
 // the built-in judge. It fills one entry at a time, trying every way to put
 // hand words into the entry's empty cells, and swaps when it's stuck. If it
@@ -61,15 +63,25 @@ interface Judged {
   pValid: number;
 }
 
+/**
+ * How the bot judges a line: only real English counts (src/core/grammar.ts),
+ * so a board it solves can be solved by people writing sentences, not just by
+ * word salad the built-in judge happens to let through. Among those, the
+ * built-in judge's tier and confidence rank the choices.
+ */
 function makeJudge(model: TinyModel) {
   const memo = new Map<string, Judged>();
   return (words: string[]): Judged => {
     const key = words.join(' ');
     let judged = memo.get(key);
     if (!judged) {
-      judged = ruleProblem(words)
-        ? { tier: 'invalid', pValid: 0 }
-        : (({ tier, pValid }) => ({ tier, pValid }))(predict(model, words));
+      if (ruleProblem(words) || !isGrammatical(words, { strict: true })) {
+        judged = { tier: 'invalid', pValid: 0 };
+      } else {
+        const { tier, pValid } = predict(model, words);
+        // The built-in judge passes every grammatical line (as at least OK).
+        judged = { tier: tier === 'invalid' ? 'ok' : tier, pValid };
+      }
       memo.set(key, judged);
     }
     return judged;
@@ -85,9 +97,18 @@ interface Choice {
 }
 
 /** How many alternatives to keep per entry when backing up. */
-const BRANCHING = 4;
-/** Entries the bot may try filling per playthrough, so a hopeless level fails fast. */
-const SEARCH_BUDGET = 150;
+const BRANCHING = 6;
+/**
+ * The bot searches twice. First it swaps only when nothing fits, always the
+ * likeliest word to be useless (quick, and enough for most boards); if that
+ * fails, it searches again trying a few different swaps, also after lines
+ * that fit but lead nowhere. Each pass may try filling this many entries (and
+ * the second pass this many swaps), so a hopeless level fails fast.
+ */
+const PASSES = [
+  { budget: 400, swapWidth: 1 },
+  { budget: 1000, swapWidth: 3 },
+];
 
 /** The best few ways to fill an entry's empty cells from the hand, best first. */
 function bestChoices(state: GameState, entry: Entry, style: BotStyle, judge: Judge): Choice[] {
@@ -176,15 +197,19 @@ function functionWord(word: string): boolean {
 }
 
 /**
- * When stuck: swap out an unusable wildcard, then a surplus function word, then
- * the rarest word (the hardest to fit).
+ * The words worth swapping when stuck, best first: an unusable wildcard, a
+ * surplus function word, then the rarest words (the hardest to fit). One per
+ * word, since swapping either copy of a word is the same.
  */
-function tileToSwap(hand: Tile[]): Tile {
-  const wildcard = hand.find((t) => t.wildcard);
-  if (wildcard) return wildcard;
-  const fillers = hand.filter((t) => functionWord(t.word));
-  if (fillers.length > 3) return fillers[fillers.length - 1];
-  return hand.reduce((a, b) => (wordInfo(b.word).zipf < wordInfo(a.word).zipf ? b : a));
+function tilesToSwap(hand: Tile[], width: number): Tile[] {
+  const fillers = hand.filter((t) => !t.wildcard && functionWord(t.word));
+  const rarest = hand.filter((t) => !t.wildcard).sort((a, b) => wordInfo(a.word).zipf - wordInfo(b.word).zipf);
+  const ordered = [
+    ...hand.filter((t) => t.wildcard),
+    ...(fillers.length > 3 ? [fillers[fillers.length - 1]] : []),
+    ...rarest,
+  ];
+  return ordered.filter((t, i) => ordered.findIndex((o) => o.word === t.word) === i).slice(0, width);
 }
 
 export function playLevel(
@@ -202,29 +227,41 @@ export function playLevel(
     if (tiles && judge(tiles.map((t) => t.word)).tier === 'invalid') return failed();
   }
 
-  let budget = SEARCH_BUDGET;
   type Path = { state: GameState; moves: RunAction[] };
-  const solve = (current: GameState, moves: RunAction[]): Path | null => {
-    const entry = nextEntry(current);
-    if (!entry) return { state: current, moves };
-    if (budget-- <= 0) return null;
-    let choices = bestChoices(current, entry, style, judge);
-    while (choices.length === 0 && current.swapsLeft > 0) {
-      const swap: RunAction = { type: 'swap', tileId: tileToSwap(current.hand).id };
-      current = gameReducer(current, swap);
-      moves = [...moves, swap];
-      choices = bestChoices(current, entry, style, judge);
-    }
-    const empty = entry.cells.filter((cell) => !current.board[cell]);
-    for (const choice of choices) {
-      const places: RunAction[] = choice.tileIds.map((tileId, i) => ({ type: 'place', tileId, cell: empty[i] }));
-      const placed = places.reduce((s, move) => gameReducer(s, move as GameAction), current);
-      const solved = solve(placed, [...moves, ...places]);
-      if (solved) return solved;
-    }
-    return null;
+  const search = (budget: number, swapWidth: number): Path | null => {
+    const solve = (current: GameState, moves: RunAction[]): Path | null => {
+      const entry = nextEntry(current);
+      if (!entry) return { state: current, moves };
+      if (budget-- <= 0) return null;
+      return fill(current, moves, entry);
+    };
+    const fill = (current: GameState, moves: RunAction[], entry: Entry): Path | null => {
+      const empty = entry.cells.filter((cell) => !current.board[cell]);
+      const choices = bestChoices(current, entry, style, judge);
+      for (const choice of choices) {
+        const places: RunAction[] = choice.tileIds.map((tileId, i) => ({ type: 'place', tileId, cell: empty[i] }));
+        const placed = places.reduce((s, move) => gameReducer(s, move as GameAction), current);
+        const solved = solve(placed, [...moves, ...places]);
+        if (solved) return solved;
+      }
+      // Nothing fits (or, in the wider pass, nothing that fits works out): swap a word and try this entry again.
+      if (current.swapsLeft > 0 && (choices.length === 0 || swapWidth > 1)) {
+        for (const tile of tilesToSwap(current.hand, swapWidth)) {
+          if (swapWidth > 1 && budget-- <= 0) return null;
+          const swap: RunAction = { type: 'swap', tileId: tile.id };
+          const solved = fill(gameReducer(current, swap), [...moves, swap], entry);
+          if (solved) return solved;
+        }
+      }
+      return null;
+    };
+    return solve(state, []);
   };
-  const solved = solve(state, []);
+  let solved: Path | null = null;
+  for (const pass of PASSES) {
+    solved = search(pass.budget, pass.swapWidth);
+    if (solved) break;
+  }
   if (!solved) return failed();
   state = solved.state;
 
