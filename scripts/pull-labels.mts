@@ -9,77 +9,12 @@
 // and publishable key from .env.local: no secret key needed. Labels already
 // in the file are skipped, so running it twice adds nothing.
 
-import { createClient } from '@supabase/supabase-js';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 
-import { accountEmail } from '../supabase/functions/_shared/accountRules';
+import { adminSession } from './adminSession.mts';
 
-const ROOT = new URL('../', import.meta.url);
-const LABELS = new URL('training/labels.jsonl', ROOT);
-
-function envFile(name: string): Record<string, string> {
-  const file = new URL(name, ROOT);
-  if (!existsSync(file)) return {};
-  const out: Record<string, string> = {};
-  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
-    if (match) out[match[1]] = match[2].replace(/^["']|["']$/g, '');
-  }
-  return out;
-}
-
-const env = { ...envFile('.env'), ...envFile('.env.local'), ...process.env };
-const url = env.EXPO_PUBLIC_SUPABASE_URL;
-const key = env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-if (!url || !key) {
-  console.error('Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY in .env.local first.');
-  process.exit(1);
-}
-const userFlag = process.argv.indexOf('--user');
-const username = userFlag > 0 ? process.argv[userFlag + 1] : 'James';
-
-/** Reads a line without showing it (falls back to plain input when not in a terminal). */
-function askHidden(question: string): Promise<string> {
-  process.stdout.write(question);
-  const stdin = process.stdin;
-  if (!stdin.isTTY) {
-    return new Promise((resolve) => {
-      let text = '';
-      stdin.setEncoding('utf8');
-      stdin.on('data', (chunk) => (text += chunk));
-      stdin.on('end', () => resolve(text.split(/\r?\n/)[0]));
-    });
-  }
-  stdin.setRawMode(true);
-  stdin.resume();
-  stdin.setEncoding('utf8');
-  return new Promise((resolve) => {
-    let text = '';
-    const onData = (chunk: string) => {
-      for (const ch of chunk) {
-        if (ch === '\r' || ch === '\n') {
-          stdin.setRawMode(false);
-          stdin.pause();
-          stdin.off('data', onData);
-          process.stdout.write('\n');
-          resolve(text);
-          return;
-        }
-        if (ch === '\u0003') process.exit(130); // Ctrl+C
-        text = ch === '\u007f' || ch === '\b' ? text.slice(0, -1) : text + ch;
-      }
-    };
-    stdin.on('data', onData);
-  });
-}
-
-const password = env.CROSSPHRASE_PASSWORD || (await askHidden(`Password for ${username}: `));
-const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-const { error: loginError } = await supabase.auth.signInWithPassword({ email: accountEmail(username), password });
-if (loginError) {
-  console.error(`Couldn't log in as ${username}: ${loginError.message}`);
-  process.exit(1);
-}
+const LABELS = new URL('../training/labels.jsonl', import.meta.url);
+const { supabase, username } = await adminSession();
 
 const { data, error } = await supabase.rpc('admin_training_labels');
 if (error) {

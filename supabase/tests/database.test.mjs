@@ -482,3 +482,38 @@ describe('admin', () => {
     await assert.rejects(asJames(() => q(`select admin_set_config('economy', '[1]')`)), /JSON object/);
   });
 });
+
+describe('unsolved daily puzzles', () => {
+  const KIM = '88888888-8888-8888-8888-888888888888';
+  const LEE = '99999999-9999-9999-9999-999999999999';
+  const ADMIN = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const save = (user, won, score, stars) =>
+    q(`select save_daily_score($1, '2026-10-30', $2, $3, $4::smallint, 3::smallint, '[{"type":"submit"}]'::jsonb, 'v1')`, [user, won, score, stars]);
+
+  before(async () => {
+    await q('insert into auth.users values ($1), ($2), ($3)', [KIM, LEE, ADMIN]);
+    await q(`insert into accounts (user_id, username) values ($1, 'Kim'), ($2, 'Lee'), ($3, 'Boss')`, [KIM, LEE, ADMIN]);
+    await q('insert into admins (user_id) values ($1)', [ADMIN]);
+  });
+
+  test('rank below every solve, by their points', async () => {
+    await save(KIM, false, 60, 0); // more points than the solve, but unsolved
+    await save(LEE, true, 30, 1);
+    await save(ALICE, false, 0, 0); // saved before unsolved runs kept points
+    const rows = (await asPlayer(KIM, () => q(`select name, score, stars from daily_leaderboard('2026-10-30')`))).rows;
+    assert.deepEqual(rows.map((r) => `${r.name}:${r.score}`), ['Lee:30', 'Kim:60', 'Alice:0']);
+  });
+
+  test('the admin can fill in the points of old unsolved runs, and nothing else', async () => {
+    await assert.rejects(asPlayer(KIM, () => q('select * from admin_unscored_dailies()')), /Admins only/);
+    const rows = (await asPlayer(ADMIN, () => q('select user_id, day from admin_unscored_dailies()'))).rows;
+    assert.ok(rows.some((r) => r.user_id === ALICE));
+    const set = (user, score) =>
+      asPlayer(ADMIN, () => one(`select admin_set_unsolved_score($1, '2026-10-30', $2) as ok`, [user, score]));
+    assert.equal((await set(ALICE, 13)).ok, true);
+    assert.equal((await set(ALICE, 99)).ok, false); // already filled in
+    assert.equal((await set(LEE, 99)).ok, false); // a solve
+    assert.equal((await set(KIM, 99)).ok, false); // already has points
+    assert.deepEqual((await one(`select score from daily_scores where user_id = $1 and day = '2026-10-30'`, [ALICE])).score, 13);
+  });
+});

@@ -16,7 +16,10 @@ export const JUDGE_VERSION = BUNDLED_MODEL.trainedAt;
 
 export interface ScoredRun {
   won: boolean;
-  /** The final score; 0 for a level that was lost. */
+  /**
+   * The final score. A lost daily puzzle keeps its points (it ranks below
+   * every solve); level boards only take wins.
+   */
   score: number;
   stars: 0 | 1 | 2 | 3;
   submits: number;
@@ -31,7 +34,7 @@ export function scoreRun(level: LevelDef, actions: unknown): ScoredRun | string 
   const won = state.phase === 'won';
   return {
     won,
-    score: won ? state.lastResult!.total : 0,
+    score: state.lastResult?.total ?? 0,
     stars: won ? state.lastResult!.stars : 0,
     submits: state.submitsUsed,
   };

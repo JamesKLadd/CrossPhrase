@@ -83,8 +83,8 @@ function DailyGame({ level, day }: { level: LevelDef; day: string }) {
       heading={(state) => (state.phase === 'won' ? 'Daily puzzle solved!' : 'Out of submits')}
       note={(state) => {
         if (state.phase === 'lost') {
-          // The points shown above don't reach the leaderboard: only a solve (one star or more) does.
-          return scoresEnabled ? 'Not enough for a star, so this counts as unsolved on the leaderboard.' : null;
+          // Unsolved runs keep their points on the leaderboard, below every solve.
+          return scoresEnabled ? 'Not enough for a star: on the leaderboard you’re below every solve, ranked by these points.' : null;
         }
         const streak = dailyStreak(progress.snapshot(), day, previousDay);
         return [streak > 1 ? `🔥 ${streak}-day streak` : '', earned > 0 ? `+${earned} 🪶` : ''].filter(Boolean).join(' · ') || null;

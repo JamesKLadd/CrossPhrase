@@ -1,4 +1,6 @@
-import { createGame, gameReducer } from '../../core/game';
+import { canSubmit, createGame, gameReducer, pendingJudgeEntries, type GameState } from '../../core/game';
+import { builtinJudge } from '../../core/run';
+import type { CellKey } from '../../core/types';
 import type { RunAction } from '../../core/run';
 import { addDays, dailyLevel, dayKey } from '../../data/dailies';
 import { levelById } from '../../data/levels';
@@ -57,6 +59,38 @@ describe('server scoring', () => {
     const eased = scoreLevel('level-41', run, { bands: { mid: { stars: 0.5 } } }) as { stars: number };
     expect(eased.stars).toBe(3);
     expect(eased.stars).toBeGreaterThanOrEqual(plain.stars);
+  });
+
+  it('keeps the points of a daily puzzle that ran out of submits', () => {
+    const level = dailyLevel('2026-10-20')!;
+    // Fill the board with whatever is dealt and submit until out of submits.
+    let state: GameState = createGame(level);
+    const actions: RunAction[] = [];
+    const act = (action: RunAction) => {
+      actions.push(action);
+      state = gameReducer(state, action as never);
+    };
+    for (let guard = 0; state.phase === 'playing' && guard < 300; guard++) {
+      const cells = Object.keys(state.board) as CellKey[];
+      const empty = cells.find((c) => state.board[c] === null);
+      if (empty) {
+        act({ type: 'place', tileId: state.hand.find((t) => !t.wildcard)!.id, cell: empty });
+      } else if (canSubmit(state)) {
+        actions.push({ type: 'submit' });
+        state = gameReducer(state, { type: 'submitStart' });
+        state = gameReducer(state, { type: 'submitResult', verdicts: builtinJudge(pendingJudgeEntries(state)) });
+      } else {
+        // Nothing new to judge: change a word, a different square and word each time.
+        const open = cells.filter((c) => !state.board[c]?.anchor);
+        const words = state.hand.filter((t) => !t.wildcard);
+        act({ type: 'place', tileId: words[guard % words.length].id, cell: open[guard % open.length] });
+      }
+    }
+    expect(state.phase).toBe('lost');
+    const scored = scoreDaily('2026-10-20', actions, NOW) as { won: boolean; score: number; stars: number };
+    expect(scored).toMatchObject({ won: false, stars: 0, score: state.lastResult!.total });
+    // Level boards still only take wins.
+    expect(scoreLevel('level-11', [])).toBe("the game isn't finished");
   });
 
   it('agrees with the app on what day it is', () => {

@@ -56,6 +56,7 @@
     "test:functions": "deno test --no-lock supabase/functions",
     "train:judge": "tsx scripts/train-judge.ts",
     "pull:labels": "tsx scripts/pull-labels.mts",
+    "rescore:dailies": "tsx scripts/rescore-dailies.mts",
     "generate:levels": "tsx scripts/generate-levels.ts",
     "generate:dailies": "tsx scripts/generate-dailies.ts",
     "make:sounds": "node scripts/make-sounds.mjs",

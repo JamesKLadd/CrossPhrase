@@ -164,7 +164,9 @@ Then commit and push (the website rebuilds) and `npx supabase functions deploy s
 - **Zen** (🧘): endless boards made on the spot. No star targets, no penalty,
   no limit on submits or swaps; a board clears when every line reads.
 - **Leaderboards** (🏆): today's daily puzzle and each level. Players with an
-  account show by their username, everyone else as "Anonymous owl". They need
+  account show by their username, everyone else as "Anonymous owl". On the
+  daily board, every solve ranks first; a daily that ran out of submits before
+  its first star keeps its points but ranks below all of them ("unsolved"). They need
   the backend below; until then the screen says how to switch them on.
 
 ### Switch on the leaderboards (free)
@@ -361,6 +363,7 @@ applies the tuning) and `npx supabase functions deploy account` (new).
 | `npm run test:pc-judge` | PC judge server tests |
 | `npm run test:functions` | Edge Function tests: the judge and scores (needs [Deno](https://deno.com)) |
 | `npm run train:judge` | Retrains the built-in judge from `training/` |
+| `npm run rescore:dailies` | One-off: fills in the points of unsolved daily runs saved as 0 before they kept their points (logs in as James) |
 | `npm run pull:labels` | Downloads approved training labels (yours and reviewed corrections) into `training/labels.jsonl` |
 | `npm run generate:levels` | Regenerates levels 11–120 (see Levels above) |
 | `npm run generate:dailies` | Regenerates a year of daily puzzles |

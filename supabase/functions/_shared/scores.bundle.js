@@ -5530,7 +5530,7 @@ function scoreRun(level, actions) {
   const won = state.phase === "won";
   return {
     won,
-    score: won ? state.lastResult.total : 0,
+    score: state.lastResult?.total ?? 0,
     stars: won ? state.lastResult.stars : 0,
     submits: state.submitsUsed
   };
