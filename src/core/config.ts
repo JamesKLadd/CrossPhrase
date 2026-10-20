@@ -99,6 +99,11 @@ export const LEVEL_BANDS: LevelBand[] = [
   { name: 'late', from: 101, maxRows: 6, maxCols: 6, entries: [6, 8], length: [4, 6], loops: 0.5, anchors: [1, 2], hints: 0.1, swaps: 3, objectives: [1, 2], oneStar: 0.95 },
 ];
 
+/** The difficulty band of a generated level, by its number on the map. */
+export function bandFor(levelNumber: number): LevelBand {
+  return [...LEVEL_BANDS].reverse().find((b) => levelNumber >= b.from) ?? LEVEL_BANDS[0];
+}
+
 /** The daily puzzle: the same mid-sized board for everyone, generated ahead of time like the levels. */
 export const DAILY_BAND: LevelBand = { name: 'daily', from: 0, maxRows: 5, maxCols: 5, entries: [3, 5], length: [4, 5], loops: 0.2, anchors: [1, 2], hints: 0.2, swaps: 4, objectives: [1, 1], oneStar: 0.85 };
 

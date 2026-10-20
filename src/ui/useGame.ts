@@ -9,6 +9,7 @@ import {
   type GameAction,
   type GameState,
 } from '../core/game';
+import { track } from '../analytics';
 import { builtinJudge, replayRun, runActionFor, type RunAction } from '../core/run';
 import type { LevelDef, Tier } from '../core/types';
 import { judgeService, type JudgeMode } from '../judge';
@@ -142,6 +143,8 @@ export function useGame(level: LevelDef, options: GameOptions = {}) {
   const correct = useCallback((phrase: string, judged: Tier, tier: Tier) => {
     setCorrections((prev) => new Map(prev).set(phrase, tier));
     judgeService.label({ phrase, tier, judged, source: 'play' });
+    // With play stats on, corrections reach the developer too (see npm run import:labels).
+    track('label', { phrase, tier, judged });
     setNotice(
       tier === judged
         ? 'So we agree after all. How novel.'
@@ -160,5 +163,7 @@ export function useGame(level: LevelDef, options: GameOptions = {}) {
     notice,
     corrections,
     correct,
+    /** Puts a one-off line in the owl's speech bubble. */
+    say: setNotice,
   };
 }

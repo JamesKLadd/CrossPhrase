@@ -20,6 +20,11 @@ is what the owl had said). If the PC judge wasn't running, labels wait on the
 phone; use **Export labels** on the labelling screen and paste the text at the
 end of `labels.jsonl`.
 
+Testers playing the website send their "Wrong?" taps with their play stats.
+Export them from Supabase (`select at, phrase, tier, judged from player_labels;`
+in the SQL Editor, as CSV) and add them with
+`npm run import:labels -- path/to/the.csv`. See docs/PLAYTESTING.md.
+
 ## Train the built-in judge
 
 ```sh

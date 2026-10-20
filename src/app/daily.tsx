@@ -3,12 +3,15 @@ import { useState } from 'react';
 import { Pressable, Share, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { track } from '../analytics';
 import type { GameState } from '../core/game';
 import type { RunAction } from '../core/run';
 import { shareText } from '../core/share';
 import type { LevelDef } from '../core/types';
 import { addDays, dailyLevel, dayKey, dayLabel } from '../data/dailies';
+import { wallet } from '../economy';
 import { dailyStreak, progress } from '../progress';
+import { remoteConfig } from '../remote';
 import { scoresEnabled, submitDailyScore } from '../scores';
 import { GameView } from '../ui/GameView';
 import { colors } from '../ui/theme';
@@ -40,6 +43,8 @@ export default function DailyScreen() {
 
 function DailyGame({ level, day }: { level: LevelDef; day: string }) {
   const [resume] = useState(() => progress.snapshot().daily[day]?.log ?? []);
+  /** Feathers earned by solving it just now (not when reopening a solved puzzle). */
+  const [earned, setEarned] = useState(0);
   const title = `Daily · ${dayLabel(day)}`;
 
   const save = (state: GameState, log: readonly RunAction[]) => {
@@ -54,10 +59,16 @@ function DailyGame({ level, day }: { level: LevelDef; day: string }) {
       total: state.lastResult?.total ?? 0,
       submitted: false,
     });
+    if (finished && state.phase === 'won') {
+      const reward = remoteConfig.snapshot().economy.rewards.dailyWin;
+      wallet.earn(reward);
+      setEarned(reward);
+    }
     if (finished && scoresEnabled) void submitDailyScore(day, log);
   };
 
   const share = (state: GameState) => {
+    track('share', { mode: 'daily', day });
     Share.share({ message: shareText(state, `daily · ${dayLabel(day)}`) }).catch(() => {});
   };
 
@@ -67,11 +78,12 @@ function DailyGame({ level, day }: { level: LevelDef; day: string }) {
       title={title}
       backLabel="Home"
       options={{ judge: 'builtin', resume }}
+      stats={{ mode: 'daily', day }}
       onChange={save}
       heading={(state) => (state.phase === 'won' ? 'Daily puzzle solved!' : 'Out of submits')}
       note={() => {
         const streak = dailyStreak(progress.snapshot(), day, previousDay);
-        return streak > 1 ? `🔥 ${streak}-day streak` : null;
+        return [streak > 1 ? `🔥 ${streak}-day streak` : '', earned > 0 ? `+${earned} 🪶` : ''].filter(Boolean).join(' · ') || null;
       }}
       actions={(state) => [
         { label: 'Share', primary: true, onPress: () => share(state) },

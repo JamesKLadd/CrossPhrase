@@ -1,0 +1,57 @@
+# Builds the game as a website and publishes it on GitHub Pages at
+# https://<owner>.github.io/<repo>/ on every push to main (README: "Play it
+# as a website"). One-time setup: Settings → Pages → Source: GitHub Actions.
+# For leaderboards and play stats, add the repository variables
+# EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+# (Settings → Secrets and variables → Actions → Variables). They're public
+# values that end up in the website anyway; never add the secret key.
+
+name: Website
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Don't publish a build that fails its checks.
+      - run: npm run typecheck
+      - run: npm test -- --ci
+      - name: Build the website
+        run: npm run build:web
+        env:
+          EXPO_BASE_URL: /${{ github.event.repository.name }}
+          EXPO_PUBLIC_BUILD: ${{ github.sha }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

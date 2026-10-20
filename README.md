@@ -6,11 +6,15 @@ AI judge) grades each phrase. Rare words and great phrasing score the points
 needed to clear the level.
 
 The full game design and phase plan are in [docs/DESIGN.md](docs/DESIGN.md).
-This repo is at **Phase 5: modes and social**: a daily puzzle you can share,
-an endless zen mode, and leaderboards (on a free backend, switched off until
-you set it up). Underneath: 120 levels on a level map, stars, bonus objectives
-and wildcards, an owl with moods and quips, sound and music, judged by free
-judges you can train.
+This repo is at **Phase 6: website and live ops**: the game is published as a
+website anyone can play on their phone (no Expo Go, no app store), with
+hearts, feathers and boosters, settings you can retune from the backend
+without a new build, and anonymous play stats to see which levels are too
+hard. Before that: a daily puzzle you can share, an endless zen mode,
+leaderboards, 120 levels on a level map, stars, bonus objectives and
+wildcards, an owl with moods and quips, sound and music, judged by free judges
+you can train. Playtesting with friends is described in
+[docs/PLAYTESTING.md](docs/PLAYTESTING.md).
 
 ## Run it
 
@@ -114,7 +118,9 @@ Study App's training kit) on the NVIDIA desktop.
 
 With `EXPO_PUBLIC_DEV_PIN` set in `.env.local`, **long-press the owl** on the
 home screen and enter the PIN for: the labelling screen, a gallery of **the
-owl's moods**, **Unlock all levels** (to try any level) and **Reset progress**.
+owl's moods**, **Unlock all levels** (to try any level), **Add 100 feathers**,
+**Lose a heart** (to try the economy) and **Reset progress**. The website is
+built without a PIN, so these don't exist there.
 
 ## Modes
 
@@ -164,6 +170,102 @@ redeploy the function; `npm test` fails while the bundle is out of date.
 Score submissions are rate limited (60 per 15 minutes per player;
 `SCORES_LIMIT_PER_15_MIN` secret).
 
+## Play it as a website
+
+The game also builds as a website, which is how friends play it: they open a
+link on their phone, no Expo Go or app store needed. It's published free on
+GitHub Pages at **https://jameskladd.github.io/CrossPhrase/** by
+[`.github/workflows/website.yml`](.github/workflows/website.yml) on every push
+to `main` (after the type check and tests pass).
+
+One-time setup on GitHub:
+
+1. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
+2. For leaderboards and play stats: **Settings → Secrets and variables →
+   Actions → Variables** → add `EXPO_PUBLIC_SUPABASE_URL` and
+   `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (the same values as `.env.local`).
+   They're variables, not secrets, because they're public anyway: they end up
+   inside the website. Never add the secret key.
+3. Push to `main` (or **Actions → Website → Run workflow**). The Actions tab
+   shows the build; the link appears on the deploy step when it's done.
+
+On the phone, open the link in Safari, then **Share → Add to Home Screen**: it
+opens full screen like an app, and Safari won't clear its saved progress (it
+can clear a website's after a week without a visit). Progress lives in that
+browser on that phone. The website uses the built-in judge: the PC judge can't
+be reached from a public https site. To play the website with the PC judge,
+run it from your computer instead (`npm run web`, then open
+`http://<your-computer's-IP>:8081` on the phone, on the same Wi-Fi).
+
+To build it yourself: `npm run build:web` writes the site to `dist/`
+(`EXPO_BASE_URL=/CrossPhrase` builds it for that path, as Pages serves it).
+Any static host works.
+
+## Hearts, feathers and boosters
+
+From level 11 (after the tutorial) the levels use a small economy, all in
+[`src/core/economy.ts`](src/core/economy.ts):
+
+- **Hearts** ❤️: 5, and losing a level costs one. They come back one every 30
+  minutes, or all at once for feathers. The daily puzzle and zen mode never
+  cost hearts.
+- **Feathers** 🪶: earned by new stars (5 each), daily puzzles (10) and zen
+  boards (1). New players start with 30.
+- **Boosters**, bought with feathers during a level (🪶 button): a **hint**
+  (the owl fills one line from your hand), **+2 swaps**, turning a hand word
+  into a **wildcard**, and, on the "out of submits" card, **one more
+  submit** (which gives the heart back). Boosted clears don't go on the
+  leaderboards (the server refuses runs with boosters).
+- **Ads**: none. If they come, they'll only ever be optional ones a player
+  chooses to watch for a reward.
+
+The wallet is kept on the device. Feathers can't be bought yet; when they can,
+the wallet moves to the server so purchases can be checked.
+
+## Tune it without an update (remote config)
+
+The `remote_config` table (Supabase → Table Editor → `remote_config`) holds
+settings the game reads when it starts; edit a row's `value` and players get
+it next time they open the game. Anything the game doesn't understand is
+ignored, so a typo can't break it.
+
+- **`economy`**: overrides for the defaults in `src/core/economy.ts`, e.g.
+  `{"lives": {"refillMinutes": 20}, "boosters": {"hint": {"cost": 15}}}`, or
+  `{"lives": {"enabled": false}}` to switch hearts off.
+- **`tuning`**: level difficulty (`src/core/tuning.ts`), by band (`warm-up`,
+  `early`, `mid`, `hard`, `late`) or by level id: `swaps` adds swaps and
+  `stars` scales the star targets, e.g.
+  `{"bands": {"mid": {"stars": 0.9}}, "levels": {"level-37": {"swaps": 1, "stars": 0.8}}}`.
+  The leaderboard server applies the same tuning (it re-reads it every minute).
+  The tutorial and the daily puzzles are never tuned. Draw weighting isn't
+  tunable this way: it changes every deal, so it needs a regenerate.
+
+## Play stats (analytics)
+
+With the backend set up, the game sends small anonymous events (a level
+started, each submit, won or lost, boosters used, the 😴/🙂/😤 rating on the
+result card, feedback typed in Settings) to the `events` table, a batch at a
+time. Players can switch this off in Settings. Read them in the Supabase
+Table Editor (or SQL Editor) through these views:
+
+| View | Shows |
+|---|---|
+| `level_stats` | Per level: players, starts, wins, losses, quits, **fail rate**, submits to win, stars, boosted clears and ratings |
+| `level_funnel` | How many players reached each level |
+| `daily_stats` | Each daily puzzle: players, wins, average score, shares, ratings |
+| `active_players` | Players, sessions and games per day |
+| `economy_stats` | Boosters bought, hearts refilled, players running out of hearts |
+| `feedback` | What players wrote in Settings → Send feedback |
+| `player_labels` | "Wrong?" corrections from play, for training (see `npm run import:labels`) |
+
+Judge cost is in `judge_cost_daily` (from Phase 2). Events stay until you
+delete them; on the free tier, `delete from events where created_at < now() - interval '90 days';`
+in the SQL Editor keeps the table small.
+
+**After pulling this change**, update the backend: `npx supabase db push`
+(the new tables and views) and `npx supabase functions deploy scores` (it
+now applies the tuning).
+
 ## The owl, sound and settings
 
 - **The owl** ([`src/ui/Owl.tsx`](src/ui/Owl.tsx)) is drawn in vector shapes:
@@ -181,8 +283,9 @@ Score submissions are rate limited (60 per 15 minutes per player;
   script, not the WAVs. They respect the phone's silent switch and let your
   own music keep playing.
 - **Settings** (⚙️ on the home screen): sound effects, music, vibration,
-  reduce motion (also follows the phone's setting) and colour-blind-friendly
-  verdict colours. Verdicts always carry an icon (✗ ✓ ★ ✦) as well as a
+  reduce motion (also follows the phone's setting), colour-blind-friendly
+  verdict colours, play stats on or off, and **Send feedback**. The build
+  number at the bottom says which website version a tester is on. Verdicts always carry an icon (✗ ✓ ★ ✦) as well as a
   colour, tiles and buttons have screen-reader labels, and text follows the
   phone's text size (word tiles stay fixed so they fit the board).
 - The app icon is the owl, rendered from the same component.
@@ -196,9 +299,11 @@ Score submissions are rate limited (60 per 15 minutes per player;
 | `npm run test:pc-judge` | PC judge server tests |
 | `npm run test:functions` | Edge Function tests: the judge and scores (needs [Deno](https://deno.com)) |
 | `npm run train:judge` | Retrains the built-in judge from `training/` |
+| `npm run import:labels -- <file.csv>` | Adds testers' "Wrong?" corrections (exported from `player_labels`) to `training/labels.jsonl` |
 | `npm run generate:levels` | Regenerates levels 11–120 (see Levels above) |
 | `npm run generate:dailies` | Regenerates a year of daily puzzles |
 | `npm run bundle:server` | Rebuilds the leaderboard server's copy of the game core |
+| `npm run build:web` | Builds the website into `dist/` (see Play it as a website) |
 | `npm run make:sounds` | Regenerates the sound effects and music in `assets/sounds/` |
 | `npm run pc-judge:setup` / `npm run pc-judge` | Sets up / starts the PC judge |
 | `npm run typecheck` | TypeScript |
@@ -243,10 +348,13 @@ src/
                   labels, offline grading and re-checks
   app/daily.tsx, zen.tsx, leaderboards.tsx   The other modes
   progress/       Saved stars and scores, daily attempts, zen totals, unlocks
+  economy/        The wallet: hearts and feathers on this device
+  remote/         Remote config: economy and level tuning read from the backend
+  analytics/      Play stats: queued anonymous events sent in batches
   scores/         Leaderboard client: sends runs, queues them offline, reads boards
   server/         What the leaderboard server runs (scoring by replay), bundled for Supabase
   settings/       Sound, music, vibration, motion and colour settings
-  lib/            Supabase client
+  lib/            Supabase client, anonymous sign-in, build info
   ui/             The owl, board, hand tray, drag-and-drop, owl panel, star
                   bar and goals, wildcard picker, result overlay, confetti,
                   sounds and haptics (feedback.ts)
@@ -259,17 +367,22 @@ supabase/
                   testable request core, shared with the PC judge);
                   scores/ checks and saves leaderboard runs
   migrations/     Verdict cache, appeals, rate limits, usage log, cost view,
-                  leaderboards
+                  leaderboards, remote config, play stats and their views
   tests/          Database tests
 scripts/          Word list builder, word sources, judge eval, train-judge.ts,
                   generate-levels.ts, generate-dailies.ts, make-sounds.mjs,
                   bundle-server.mjs
+public/           The website's page template, web app manifest and icons
+.github/workflows/website.yml   Builds and publishes the website
 docs/DESIGN.md    Game design and phase plan
+docs/PLAYTESTING.md   How to run a playtest with friends
 ```
 
 Tuning knobs (hand size, submits, penalties, tier multipliers, rarity curve,
 draw weighting, wildcards, bonus points, star thresholds and the generator's
-difficulty bands) are all in `src/core/config.ts`.
+difficulty bands) are all in `src/core/config.ts`; the economy's are in
+`src/core/economy.ts`. Swaps, star targets and the economy can also be
+changed live through the remote config (above).
 
 ## Optional: the Claude judge (paid, off by default)
 

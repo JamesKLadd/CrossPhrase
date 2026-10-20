@@ -1,4 +1,4 @@
-import { LEVEL_BANDS, STAR_BASELINE, ZEN_BAND, ZEN_SWAPS, type LevelBand } from './config';
+import { bandFor, STAR_BASELINE, ZEN_BAND, ZEN_SWAPS, type LevelBand } from './config';
 import { cellKey, extractEntries, openCells, parseCellKey } from './grid';
 import { playLevel, type BotRun } from './levelBot';
 import { crossingCells, evaluateObjectives } from './objectives';
@@ -16,9 +16,7 @@ import { poolWords, wordInfo } from './words';
 // inputs always give the same level. scripts/generate-levels.ts runs this and
 // saves the results, so the game itself never runs the generator.
 
-export function bandFor(levelNumber: number): LevelBand {
-  return [...LEVEL_BANDS].reverse().find((b) => levelNumber >= b.from) ?? LEVEL_BANDS[0];
-}
+export { bandFor };
 
 const randInt = (rng: Rng, min: number, max: number) => min + Math.floor(rng.next() * (max - min + 1));
 

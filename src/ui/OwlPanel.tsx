@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { MAX_SUBMITS, TIER_MULTIPLIER } from '../core/config';
-import { entryTiles, hasNewPhrases, phraseKey, verdictFor, type GameState } from '../core/game';
+import { entryTiles, hasNewPhrases, phraseKey, submitLimit, verdictFor, type GameState } from '../core/game';
 import { owlLine } from '../core/quips';
 import { starThresholds, tileValue } from '../core/scoring';
 import type { Tier } from '../core/types';
@@ -59,7 +59,7 @@ function speech(
   }
   if (state.phase === 'won') return zen ? owlLine('zenWin', seed) : owlLine(`win${result.stars as 1 | 2 | 3}`, seed);
   if (state.phase === 'lost') return owlLine('lose', seed);
-  const remaining = MAX_SUBMITS - state.submitsUsed;
+  const remaining = submitLimit(state) - state.submitsUsed;
   const left = `${remaining} submit${remaining === 1 ? '' : 's'}`;
   if (state.entries.some((e) => verdictFor(state, e)?.tier === 'invalid')) {
     return zen ? owlLine('zenFix', seed) : owlLine('fixLines', seed, { left });

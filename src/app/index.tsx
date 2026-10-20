@@ -31,6 +31,8 @@ import { haptic, playSound } from '../ui/feedback';
 import { Owl } from '../ui/Owl';
 import { colors } from '../ui/theme';
 import { useJudgeStatus } from '../ui/useJudgeStatus';
+import { InstallTip } from '../ui/InstallTip';
+import { WalletBar } from '../ui/WalletBar';
 
 const ROW_HEIGHT = 100;
 const NODE = 60;
@@ -132,7 +134,10 @@ export default function LevelMap() {
           <Text style={styles.totalStars} testID="total-stars">
             ★ {totalStars(saved)} of {LEVELS.length * 3}
           </Text>
-          <Text style={styles.devNote}>{judgeStatus}</Text>
+          <WalletBar />
+          {/* Which judge is grading: for development, not for players on the website. */}
+          {(__DEV__ || devToolsEnabled) && <Text style={styles.devNote}>{judgeStatus}</Text>}
+          <InstallTip />
           <Modes saved={saved} />
         </View>
 

@@ -2,7 +2,7 @@
 
 > A crossword where every cell holds a **word**, and every across/down run must read as an acceptable phrase. An AI judge grades the phrases, and rare words plus great phrasing earn the score needed to clear a level.
 
-Status: pre-production · Target: mobile (iOS + Android) · Team: solo · First milestone: playable prototype
+Status: pre-production · Target: phones, first as a website, then iOS + Android apps · Team: solo · First milestone: playable prototype
 
 ---
 
@@ -21,8 +21,8 @@ Status: pre-production · Target: mobile (iOS + Android) · Team: solo · First 
 | Scoring | Word rarity (corpus frequency) × the phrase's AI quality multiplier |
 | Draw | Pure random from the dictionary, weighted by word frequency (nouns and theme words a little more likely). Glue words (the, a, of, is) arrive through the normal draw. **Wildcard** tiles are rare draws (1.5%) that become any dictionary word, at half its value |
 | Win condition | 1–3 stars from score thresholds, plus **bonus objectives** |
-| Stack | React Native + Expo (TypeScript) |
-| Monetization | Lives/energy, IAP boosters, rewarded ads (all deferred to a late phase) |
+| Stack | React Native + Expo (TypeScript). **Ships first as a website** (Expo's web build on GitHub Pages), so testers need no Expo Go, app store or Apple Developer account; native app builds come later (decided after Phase 5) |
+| Monetization | Hearts (lives) that refill over time, feathers earned by play that buy boosters, and later feather purchases. **Ads are rare and only ever optional, watched for a reward; never forced** (decided after Phase 5) |
 | Modes | Level map, Daily puzzle (shareable, one attempt), Zen (endless) and Leaderboards (server-checked by replaying each run) |
 | Art | Cozy mascot: **a smart-looking owl in reading glasses**, and it's allowed to be snarky |
 | Offline | Offline fallback (cached verdicts + lenient local check, re-verified later) |
@@ -33,7 +33,7 @@ Status: pre-production · Target: mobile (iOS + Android) · Team: solo · First 
 | Repeats | The same word can appear more than once on a board |
 | Word forms | A noun can be read as singular or plural in each phrase. Every other word must be used exactly as drawn |
 | Language | English only at launch |
-| AI provider | **Free judges for development** (§5.0): a PC judge (Gemma 4 E2B via llama.cpp, like the Study App) and a tiny built-in model trained on our own labels. Claude Haiku 5.5 is built but switched off until launch |
+| AI provider | **Free judges for development** (§5.0): a PC judge (Gemma 4 E2B via llama.cpp, like the Study App) and a tiny built-in model trained on our own labels. **At launch: our own fine-tuned small model on a server** (decided after Phase 5). Claude Haiku 5.5 is built but switched off |
 
 ---
 
@@ -127,7 +127,7 @@ Each level gets 0–2 objectives (none in the first generated band). Each one me
 
 - **Keep the game core free of React.** Grid logic, scoring and generation live in `packages/core` (or `src/core`) as pure functions with Jest tests. That keeps the hardest logic testable, and it could later run server-side to validate leaderboard scores.
 - **Seeded RNG everywhere** (level layout, draw order). Level N = seed N, and the daily puzzle uses the date as its seed. Everyone sees the same puzzle, and replays can be reproduced for debugging.
-- Ads and IAP need native modules, so plan on **Expo dev builds** (EAS) rather than Expo Go once Phase 6 starts.
+- **Web first** (decided after Phase 5): the same Expo app builds as a static website, published on GitHub Pages by a GitHub Actions workflow. Testers play it in their phone's browser or add it to the home screen. Native app builds (EAS, then the stores) come back in Phase 7; ads and in-app purchases on the web use web providers.
 
 ---
 
@@ -138,7 +138,9 @@ No API spending during development. The game picks the best judge it can reach:
 
 1. **PC judge:** Gemma 4 E2B (Apache-2.0) on the developer's computer through llama.cpp (Vulkan + MTP), the same stack as the Study App, reusing its downloads. Same `/judge` contract and shared prompt as the Claude judge, with hard grammar rules applied first and a compact-JSON grammar to cut output tokens. Measured on the eval set: 27/30 agreement (prompt v2); about 33 output tokens per phrase.
 2. **Built-in judge:** hard rules plus a tiny logistic-regression model (POS patterns + word pairs; ~90 KB) inside the app. Offline, instant, trained by `npm run train:judge` from human labels, the PC judge's verdicts (distillation) and a generated starter set. Starter model: 28/30 on the eval set.
-3. **Claude judge:** the Phase 2 Supabase function, kept for launch and off unless configured.
+3. **Claude judge:** the Phase 2 Supabase function, kept but off unless configured.
+
+**Launch judge (decided after Phase 5):** our own fine-tuned small model on a server. The plan: collect labels (play corrections, the labelling screen, playtests), retrain the built-in judge, LoRA fine-tune Gemma on the desktop GPU, then serve it behind the same `/judge` contract on a server, with the verdict cache in front so repeated phrases cost nothing. Hosting is picked once the model exists: a small CPU server running llama.cpp, or a pay-per-second GPU host, whichever measures cheapest per verdict.
 
 Training data comes from **Wrong?** corrections during play and a PIN-locked labelling screen, saved to `training/` on the PC. Next step once there are a few hundred human labels: a LoRA fine-tune of Gemma on the NVIDIA desktop, adapted from the Study App's training kit.
 
@@ -338,17 +340,32 @@ Each phase ends in a **playable build** with a clear exit test.
 - [ ] Set up the Supabase project and run the daily with friends for two weeks (the exit test)
 - [ ] Later: account linking so a player keeps their scores across devices (anonymous sign-in is per device)
 
-### Phase 6: Monetization & live ops (≈3 weeks)
-- Switch to EAS dev builds.
-- Lives/energy (refill timer), boosters (+swaps, wildcard, hint), IAP via RevenueCat.
-- Rewarded ads (AdMob via `react-native-google-mobile-ads`).
-- Analytics (PostHog/Amplitude): funnel, level fail rates, submit counts, judge cost.
-- Remote config for difficulty knobs, draw weighting, swap counts.
-- **Exit:** the economy is tunable without app updates, and revenue per user exceeds API cost per user.
+### Phase 6: Website & live ops (≈3 weeks)
+*Revised after Phase 5:* web first instead of EAS dev builds (no Apple Developer account needed to test on iPhones), ads only as optional rewards, and the launch judge is our own model on a server.
+- Publish the game as a website (Expo web build on GitHub Pages, home-screen web app).
+- Hearts (refill timer), feathers, boosters (hint, +swaps, wildcard, one more submit).
+- Analytics: funnel, level fail rates, submit counts, ratings, feedback (on the Supabase backend; judge cost was already tracked).
+- Remote config for difficulty knobs (swaps, star targets) and the economy.
+- Rewarded ads (optional, capped) and feather purchases, with web providers.
+- **Exit:** the economy and difficulty are tunable without a new build, and friends playtest the website for two weeks.
 
-### Phase 7: Beta & soft launch (≈2–3 weeks)
-- TestFlight / Play internal testing, crash reporting (Sentry).
-- Privacy policy (ads + analytics + AI processing disclosure), age rating, store listing.
+**Status (Phase 6):**
+- [x] Website: `npm run build:web` (Expo web export with a base path, home-screen manifest and icons, a 404 page so deep links work, phone touch fixes: no text selection, callouts or double-tap zoom while playing), published by `.github/workflows/website.yml` after the type check and tests pass; an "Add to Home Screen" tip on phones; build number in Settings
+- [x] Hearts: 5, one lost per lost level after the tutorial, one back every 30 minutes, refill all for feathers; the daily and zen never cost hearts; an out-of-hearts screen with the wait, the refill and the free modes
+- [x] Feathers: from new stars, daily wins and zen boards
+- [x] Boosters (levels after the tutorial): hint (the bot finds a line the built-in judge passes, from the player's own hand), +2 swaps, wildcard from a hand word, one more submit on a lost level (gives the heart back). Boosters are run actions, so boosted runs replay exactly; the leaderboard server refuses them
+- [x] Remote config (`remote_config` table, read at start-up, cached, validated): the economy, and swaps / star targets by band or level; the leaderboard server applies the same tuning
+- [x] Play stats: anonymous events queued on the device and sent in batches (`log_events`, rate limited), switchable in Settings; dashboard views for level stats and fail rates, the funnel, dailies, active players, the economy and feedback; a too easy / just right / too hard rating on result cards; Send feedback in Settings
+- [x] Playtesting guide: [PLAYTESTING.md](PLAYTESTING.md)
+- [ ] Switch on GitHub Pages and the Supabase variables, then the two-week playtest (the exit test)
+- [ ] Rewarded ads: optional only ("watch a short ad for a heart / one more submit"), capped per day; pick a web ad network once the site has players
+- [ ] Feather purchases: a server-side wallet first (so purchases can be checked), then a web payment provider; app-store purchases with the native apps
+- [ ] Check revenue per player against judge cost per player once the launch judge is running
+
+### Phase 7: Beta & launch (≈3–4 weeks)
+- The launch judge: fine-tune on the collected labels, host it, point `/judge` at it, measure cost per verdict.
+- A wider web beta: crash reporting (Sentry), privacy policy (analytics + AI processing disclosure), terms.
+- Native apps: EAS builds, TestFlight (needs the $99/year Apple Developer account) and Play internal testing, app-store purchases, age rating, store listings.
 - Soft launch in one or two smaller markets; tune with real data.
 
 ---

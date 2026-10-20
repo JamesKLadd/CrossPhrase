@@ -3,7 +3,9 @@ import { useMemo, useRef, useState } from 'react';
 
 import { zenLevel } from '../core/levelGen';
 import { THEME_ORDER } from '../data/themes';
+import { wallet } from '../economy';
 import { progress, useProgress } from '../progress';
+import { remoteConfig } from '../remote';
 import { GameView } from '../ui/GameView';
 
 /** Seeds for zen boards: different every session, then one after another. */
@@ -30,10 +32,12 @@ export default function ZenScreen() {
       level={level}
       title={`Zen · ${level.name}`}
       backLabel="Home"
+      stats={{ mode: 'zen' }}
       onChange={(state) => {
         if (state.phase !== 'won' || !state.lastResult || counted.current.has(level.id)) return;
         counted.current.add(level.id);
         progress.recordZenBoard(state.lastResult.total);
+        wallet.earn(remoteConfig.snapshot().economy.rewards.zenBoard);
       }}
       heading={() => 'Board cleared!'}
       note={() => `${zen.boards} ${zen.boards === 1 ? 'board' : 'boards'} in zen · ${zen.points} points`}

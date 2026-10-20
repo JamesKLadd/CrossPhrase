@@ -44,6 +44,10 @@ export interface GameState {
   verdictCache: Record<string, CachedVerdict>;
   phase: GamePhase;
   lastResult: SubmitResult | null;
+  /** Extra submits bought after running out (the "one more submit" booster). */
+  bonusSubmits: number;
+  /** Boosters used this game. Boosted games don't go on the leaderboards. */
+  boosts: number;
 }
 
 export type GameAction =
@@ -56,7 +60,19 @@ export type GameAction =
   | { type: 'submitResult'; verdicts: Verdict[] }
   | { type: 'submitError' }
   | { type: 'reconcile'; verdicts: PhraseVerdict[] }
-  | { type: 'restart' };
+  | { type: 'restart' }
+  | BoostAction;
+
+/** Boosters, bought with feathers (see src/core/economy.ts). Levels only. */
+export type BoostAction =
+  /** More swaps. */
+  | { type: 'addSwaps'; count: number }
+  /** Turns a hand word into a wildcard. */
+  | { type: 'makeWildcard'; tileId: number }
+  /** The owl fills a line: hand tiles into empty cells (found by `hintLine` in levelBot). */
+  | { type: 'hint'; places: { tileId: number; cell: CellKey }[] }
+  /** One more submit after a lost level, which carries on where it stopped. */
+  | { type: 'extraSubmit' };
 
 const pools = new Map<string, DrawPool>();
 function poolFor(theme: string): DrawPool {
@@ -92,6 +108,8 @@ export function createGame(level: LevelDef): GameState {
     verdictCache: {},
     phase: 'playing',
     lastResult: null,
+    bonusSubmits: 0,
+    boosts: 0,
   };
   return refillHand(state);
 }
@@ -229,10 +247,15 @@ export function maxSubmits(level: LevelDef): number {
   return level.zen ? Infinity : MAX_SUBMITS;
 }
 
+/** Submits allowed in this game, counting any bought with the "one more submit" booster. */
+export function submitLimit(state: GameState): number {
+  return maxSubmits(state.level) + state.bonusSubmits;
+}
+
 export function canSubmit(state: GameState): boolean {
   return (
     state.phase === 'playing' &&
-    state.submitsUsed < maxSubmits(state.level) &&
+    state.submitsUsed < submitLimit(state) &&
     isBoardFull(state) &&
     hasNewPhrases(state)
   );
@@ -241,6 +264,10 @@ export function canSubmit(state: GameState): boolean {
 export function gameReducer(state: GameState, action: GameAction): GameState {
   if (action.type === 'restart') return createGame(state.level);
   if (action.type === 'reconcile') return reconcile(state, action.verdicts);
+  if (action.type === 'extraSubmit') {
+    if (state.phase !== 'lost') return state;
+    return { ...state, phase: 'playing', bonusSubmits: state.bonusSubmits + 1, boosts: state.boosts + 1 };
+  }
 
   if (state.phase === 'judging') {
     if (action.type === 'submitResult') return applyVerdicts(state, action.verdicts);
@@ -298,6 +325,30 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'submitStart':
       return canSubmit(state) ? { ...state, phase: 'judging' } : state;
 
+    case 'addSwaps':
+      if (!Number.isInteger(action.count) || action.count < 1) return state;
+      return { ...state, swapsLeft: state.swapsLeft + action.count, boosts: state.boosts + 1 };
+
+    case 'makeWildcard': {
+      const index = state.hand.findIndex((t) => t.id === action.tileId);
+      if (index === -1 || state.hand[index].wildcard) return state;
+      const hand = [...state.hand];
+      hand[index] = { id: action.tileId, word: WILDCARD, wildcard: true };
+      return { ...state, hand, boosts: state.boosts + 1 };
+    }
+
+    case 'hint': {
+      if (action.places.length === 0) return state;
+      let next = state;
+      for (const { tileId, cell } of action.places) {
+        const tile = next.hand.find((t) => t.id === tileId);
+        // Hints only put plain hand words into empty cells.
+        if (!tile || tile.wildcard || next.board[cell] !== null) return state;
+        next = gameReducer(next, { type: 'place', tileId, cell });
+      }
+      return { ...next, boosts: state.boosts + 1 };
+    }
+
     default:
       return state;
   }
@@ -327,7 +378,7 @@ function applyVerdicts(state: GameState, verdicts: Verdict[]): GameState {
     submitsUsed,
     failedSubmits: state.failedSubmits + 1,
     lastResult: result,
-    phase: submitsUsed >= maxSubmits(state.level) ? 'lost' : 'playing',
+    phase: submitsUsed >= submitLimit(state) ? 'lost' : 'playing',
   };
 }
 

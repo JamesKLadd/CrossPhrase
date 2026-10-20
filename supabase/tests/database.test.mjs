@@ -44,6 +44,16 @@ async function asPlayer(id, fn) {
   }
 }
 
+/** Runs `fn` as someone who hasn't signed in. */
+async function asAnon(fn) {
+  await db.exec(`set role anon;`);
+  try {
+    return await fn();
+  } finally {
+    await db.exec(`reset role;`);
+  }
+}
+
 before(async () => {
   db = new PGlite();
   await db.exec(SUPABASE_STANDINS);
@@ -227,5 +237,90 @@ describe('leaderboards', () => {
   test('names must be 1-20 characters', async () => {
     await assert.rejects(asPlayer(BOB, () => q(`select set_player_name('   ')`)), /check/);
     await assert.rejects(asPlayer(BOB, () => q(`select set_player_name(repeat('x', 21))`)), /check/);
+  });
+});
+
+describe('remote config', () => {
+  test('anyone can read it, including before signing in', async () => {
+    const rows = await asAnon(() => q('select key from remote_config order by key'));
+    assert.deepEqual(rows.rows.map((r) => r.key), ['economy', 'tuning']);
+  });
+
+  test('only the dashboard can change it, and changes are timestamped', async () => {
+    await assert.rejects(asPlayer(ALICE, () => q(`update remote_config set value = '{"x": 1}'`)), /permission denied/);
+    await assert.rejects(asAnon(() => q(`insert into remote_config (key, value) values ('evil', '{}')`)), /permission denied/);
+    const before = await one(`select updated_at from remote_config where key = 'economy'`);
+    await q(`update remote_config set value = '{"lives": {"max": 6}}' where key = 'economy'`);
+    const after = await one(`select value, updated_at from remote_config where key = 'economy'`);
+    assert.deepEqual(after.value, { lives: { max: 6 } });
+    assert.ok(after.updated_at >= before.updated_at);
+  });
+});
+
+describe('analytics events', () => {
+  const SESSION = 'session-abc123';
+  const log = (user, events, session = SESSION) =>
+    asPlayer(user, () => one(`select log_events($1, $2::jsonb) as saved`, [session, JSON.stringify(events)]));
+
+  test('a player logs a batch, saved under their own id, skipping malformed events', async () => {
+    const saved = await log(ALICE, [
+      { name: 'game_start', at: '2026-10-21T10:00:00.000Z', props: { mode: 'level', level: 'level-11', number: 11 } },
+      { name: 'game_end', props: { mode: 'level', level: 'level-11', number: 11, won: false, submits: 3 } },
+      { name: 'Bad Name!', props: {} },
+      { name: 'feedback', props: 'not an object' },
+      { name: 'feedback', props: { text: 'x'.repeat(5000) } },
+      'not even an event',
+    ]);
+    assert.equal(saved.saved, 2);
+    const rows = (await q(`select user_id, name, session from events order by id`)).rows;
+    assert.deepEqual(rows.map((r) => [r.user_id, r.name, r.session]), [
+      [ALICE, 'game_start', SESSION],
+      [ALICE, 'game_end', SESSION],
+    ]);
+  });
+
+  test('needs a signed-in player, a sane batch and a session id', async () => {
+    await assert.rejects(asAnon(() => q(`select log_events('session-abc123', '[{"name": "x"}]')`)), /permission denied/);
+    await assert.rejects(log(ALICE, []), /1 to 50 events/);
+    await assert.rejects(log(ALICE, Array.from({ length: 51 }, () => ({ name: 'x' }))), /1 to 50 events/);
+    await assert.rejects(log(ALICE, [{ name: 'x' }], 'no spaces allowed'), /session/);
+  });
+
+  test('ignores a player who sends too often', async () => {
+    let saved = 0;
+    for (let i = 0; i < 35; i++) saved += (await log(BOB, [{ name: 'game_quit', props: {} }])).saved;
+    assert.equal(saved, 30); // 30 batches per 5-minute window
+  });
+
+  test('players cannot read events or the dashboard views', async () => {
+    await assert.rejects(asPlayer(ALICE, () => q('select * from events')), /permission denied/);
+    for (const view of ['level_stats', 'level_funnel', 'daily_stats', 'active_players', 'economy_stats', 'feedback', 'player_labels']) {
+      await assert.rejects(asPlayer(ALICE, () => q(`select * from ${view}`)), /permission denied/, view);
+    }
+  });
+
+  test('player_labels lists corrections made in play', async () => {
+    await log(ALICE, [
+      { name: 'label', props: { phrase: 'the moon glows', tier: 'poetic', judged: 'ok' } },
+      { name: 'label', props: { phrase: 'x', tier: 'amazing' } },
+    ]);
+    const rows = (await q('select phrase, tier, judged from player_labels')).rows;
+    assert.deepEqual(rows, [{ phrase: 'the moon glows', tier: 'poetic', judged: 'ok' }]);
+  });
+
+  test('level_stats sums up wins, losses, fail rate and ratings', async () => {
+    await log(ALICE, [
+      { name: 'game_start', props: { mode: 'level', level: 'level-11', number: 11 } },
+      { name: 'game_end', props: { mode: 'level', level: 'level-11', number: 11, won: true, submits: 2, stars: 3 } },
+      { name: 'rating', props: { mode: 'level', level: 'level-11', number: 11, rating: 'hard' } },
+    ]);
+    const row = await one(`select * from level_stats where number = 11`);
+    assert.equal(Number(row.players), 1);
+    assert.equal(Number(row.starts), 2);
+    assert.equal(Number(row.wins), 1);
+    assert.equal(Number(row.losses), 1);
+    assert.equal(Number(row.fail_rate), 0.5);
+    assert.equal(Number(row.submits_to_win), 2);
+    assert.equal(Number(row.rated_hard), 1);
   });
 });

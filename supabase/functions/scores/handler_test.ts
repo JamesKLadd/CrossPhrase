@@ -4,10 +4,11 @@ import { handleScore, type ScoreStore } from "./handler.ts";
 
 const NOW = new Date("2026-10-20T12:00:00Z");
 
-function fakeStore() {
+function fakeStore(tuning: unknown = {}) {
   const daily = new Map<string, number>();
   const levels = new Map<string, number>();
   const store: ScoreStore = {
+    tuning: () => Promise.resolve(tuning),
     saveDaily(row) {
       const key = `${row.userId}:${row.day}`;
       if (daily.has(key)) return Promise.resolve(false);
@@ -52,6 +53,31 @@ Deno.test("level clears keep each player's best", async () => {
   assertEquals(outcome.status, 200);
   assertEquals(outcome.body.saved, true);
   assertEquals(levels.size, 1);
+});
+
+Deno.test("level clears are scored with the remote tuning", async () => {
+  const actions = sampleRun(levelById("level-41"));
+  const plain = await handleScore({ kind: "level", levelId: "level-41", actions }, "alice", fakeStore().store, NOW);
+  const eased = await handleScore(
+    { kind: "level", levelId: "level-41", actions },
+    "alice",
+    fakeStore({ bands: { mid: { stars: 0.5 } } }).store,
+    NOW,
+  );
+  assertEquals(plain.status, 200);
+  assertEquals(eased.body.stars, 3);
+  assertEquals(eased.body.score, plain.body.score);
+});
+
+Deno.test("boosted runs are turned away", async () => {
+  const outcome = await handleScore(
+    { kind: "level", levelId: "level-41", actions: [{ type: "addSwaps", count: 2 }] },
+    "alice",
+    fakeStore().store,
+    NOW,
+  );
+  assertEquals(outcome.status, 422);
+  assertEquals(outcome.body.error, "boosted games don't count on leaderboards");
 });
 
 Deno.test("malformed requests", async () => {

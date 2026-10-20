@@ -24,8 +24,22 @@ type AdminClient = SupabaseContext["supabaseAdmin"];
  */
 const LIMIT_PER_15_MIN = Number(Deno.env.get("SCORES_LIMIT_PER_15_MIN") ?? 60);
 
+/** How long the remote config's tuning is kept before reading it again. */
+const TUNING_TTL_MS = 60_000;
+let tuningCache: { value: unknown; at: number } | null = null;
+
+async function readTuning(admin: AdminClient): Promise<unknown> {
+  if (tuningCache && Date.now() - tuningCache.at < TUNING_TTL_MS) return tuningCache.value;
+  const { data, error } = await admin.from("remote_config").select("value").eq("key", "tuning").maybeSingle();
+  // Without the table (or the row), levels play untuned, as in the game.
+  if (error) console.error("Reading the level tuning failed:", error);
+  tuningCache = { value: data?.value ?? {}, at: Date.now() };
+  return tuningCache.value;
+}
+
 function store(admin: AdminClient): ScoreStore {
   return {
+    tuning: () => readTuning(admin),
     async saveDaily(row) {
       const { data, error } = await admin.rpc("save_daily_score", {
         p_user: row.userId,

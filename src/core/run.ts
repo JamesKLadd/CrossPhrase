@@ -1,4 +1,12 @@
-import { canSubmit, createGame, gameReducer, pendingJudgeEntries, type GameAction, type GameState } from './game';
+import {
+  canSubmit,
+  createGame,
+  gameReducer,
+  pendingJudgeEntries,
+  type BoostAction,
+  type GameAction,
+  type GameState,
+} from './game';
 import { localVerdict } from './localJudge';
 import type { CellKey, JudgeEntry, LevelDef, Verdict } from './types';
 
@@ -13,7 +21,8 @@ export type RunAction =
   | { type: 'remove'; cell: CellKey }
   | { type: 'swap'; tileId: number }
   /** A submit that was judged and counted. */
-  | { type: 'submit' };
+  | { type: 'submit' }
+  | BoostAction;
 
 export type RunJudge = (entries: JudgeEntry[]) => Verdict[];
 
@@ -32,10 +41,11 @@ export interface Replay {
 export function replayRun(level: LevelDef, actions: readonly RunAction[], judge: RunJudge): Replay {
   let state = createGame(level);
   for (let i = 0; i < actions.length; i++) {
-    if (state.phase === 'won' || state.phase === 'lost') {
+    const action = actions[i];
+    const carriesOn = state.phase === 'lost' && action.type === 'extraSubmit';
+    if ((state.phase === 'won' || state.phase === 'lost') && !carriesOn) {
       return { state, error: null, extraMoves: actions.length - i };
     }
-    const action = actions[i];
     if (action.type === 'submit') {
       if (!canSubmit(state)) return { state, error: `move ${i + 1}: that board can't be submitted`, extraMoves: 0 };
       state = gameReducer(state, { type: 'submitStart' });
@@ -63,6 +73,10 @@ export function runActionFor(action: GameAction, before: GameState, after: GameS
     case 'move':
     case 'remove':
     case 'swap':
+    case 'addSwaps':
+    case 'makeWildcard':
+    case 'hint':
+    case 'extraSubmit':
       return action;
     case 'submitResult':
       return after.submitsUsed > before.submitsUsed ? { type: 'submit' } : null;
@@ -74,7 +88,11 @@ export function runActionFor(action: GameAction, before: GameState, after: GameS
 const CELL = /^\d{1,2},\d{1,2}$/;
 const MAX_ACTIONS = 600;
 
-/** Checks an untrusted run log (e.g. from a request body). Returns the moves, or what's wrong. */
+/**
+ * Checks an untrusted run log (e.g. from a request body). Returns the moves,
+ * or what's wrong. Boosters are refused: boosted games don't count on
+ * leaderboards.
+ */
 export function parseRun(value: unknown): RunAction[] | string {
   if (!Array.isArray(value)) return 'actions must be a list';
   if (value.length > MAX_ACTIONS) return 'too many actions';
@@ -110,6 +128,11 @@ export function parseRun(value: unknown): RunAction[] | string {
       case 'submit':
         actions.push({ type: 'submit' });
         break;
+      case 'addSwaps':
+      case 'makeWildcard':
+      case 'hint':
+      case 'extraSubmit':
+        return "boosted games don't count on leaderboards";
       default:
         return bad;
     }

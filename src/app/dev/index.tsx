@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LEVELS } from '../../data/levels';
+import { useLives, useWallet, wallet } from '../../economy';
 import { progress, totalStars, useProgress } from '../../progress';
 import { devToolsEnabled, isUnlocked } from '../../ui/devAccess';
 import { DevToolsOff, PinGate } from '../../ui/PinGate';
@@ -34,6 +35,8 @@ function Tools() {
   const judgeStatus = useJudgeStatus();
   const [confirmReset, setConfirmReset] = useState(false);
   const cleared = Object.values(saved.levels).filter((l) => l.stars > 0).length;
+  const { feathers } = useWallet();
+  const lives = useLives();
 
   return (
     <View style={styles.tools}>
@@ -49,11 +52,23 @@ function Tools() {
         onPress={() => progress.setUnlockAll(!saved.unlockAll)}
         testID="dev-unlock-all"
       />
+      <Text style={styles.note}>
+        🪶 {feathers} · ❤️ {lives.lives}/{lives.max}
+      </Text>
+      <Button label="Add 100 feathers" onPress={() => wallet.earn(100)} testID="dev-feathers" />
+      <Button
+        label="Lose a heart"
+        onPress={() => wallet.loseLife()}
+        testID="dev-lose-heart"
+      />
       <Button
         label={confirmReset ? 'Tap again to erase every star' : 'Reset progress'}
         danger={confirmReset}
         onPress={() => {
-          if (confirmReset) progress.reset();
+          if (confirmReset) {
+            progress.reset();
+            wallet.reset();
+          }
           setConfirmReset(!confirmReset);
         }}
       />

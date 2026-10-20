@@ -19,6 +19,13 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
+      "name": "CrossPhrase",
+      "shortName": "CrossPhrase",
+      "description": "A crossword where every square is a word.",
+      "lang": "en",
+      "themeColor": "#F5EEDC",
+      "backgroundColor": "#F5EEDC",
+      "output": "single",
       "favicon": "./assets/favicon.png"
     },
     "plugins": [

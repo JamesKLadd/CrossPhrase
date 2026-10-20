@@ -1,3 +1,5 @@
+import { createGame, gameReducer } from '../../core/game';
+import type { RunAction } from '../../core/run';
 import { addDays, dailyLevel, dayKey } from '../../data/dailies';
 import { levelById } from '../../data/levels';
 import { sampleRun, scoreDaily, scoreLevel, scoreRun } from '../scores';
@@ -35,6 +37,26 @@ describe('server scoring', () => {
     // Three submits of a board the judge rejects.
     const placements = sampleRun(level).filter((a) => a.type === 'place');
     expect(placements.length).toBeGreaterThan(0);
+  });
+
+  it('plays levels with the same remote tuning as the game', () => {
+    const level = levelById('level-41')!;
+    // One swap more than the level allows: only legal with an extra swap tuned in.
+    let state = createGame(level);
+    const swaps: RunAction[] = [];
+    for (let i = 0; i <= level.swaps; i++) {
+      const swap: RunAction = { type: 'swap', tileId: state.hand[0].id };
+      swaps.push(swap);
+      state = gameReducer(state, swap);
+    }
+    expect(scoreLevel('level-41', swaps)).toBe(`move ${level.swaps + 1} isn't allowed`);
+    expect(scoreLevel('level-41', swaps, { levels: { 'level-41': { swaps: 1 } } })).toBe("the game isn't finished");
+    // Easier star targets give at least as many stars for the same run.
+    const run = sampleRun(level);
+    const plain = scoreLevel('level-41', run) as { stars: number };
+    const eased = scoreLevel('level-41', run, { bands: { mid: { stars: 0.5 } } }) as { stars: number };
+    expect(eased.stars).toBe(3);
+    expect(eased.stars).toBeGreaterThanOrEqual(plain.stars);
   });
 
   it('agrees with the app on what day it is', () => {

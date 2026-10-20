@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -37,8 +37,18 @@ function Star({ index, earned, still }: { index: number; earned: boolean; still:
 export interface ResultAction {
   label: string;
   primary?: boolean;
+  disabled?: boolean;
   onPress: () => void;
+  testID?: string;
 }
+
+export type Rating = 'easy' | 'right' | 'hard';
+
+const RATINGS: { rating: Rating; label: string }[] = [
+  { rating: 'easy', label: '😴 Too easy' },
+  { rating: 'right', label: '🙂 Just right' },
+  { rating: 'hard', label: '😤 Too hard' },
+];
 
 export function ResultOverlay({
   state,
@@ -48,6 +58,7 @@ export function ResultOverlay({
   still,
   actions,
   onReview,
+  onRate,
 }: {
   state: GameState;
   heading: string;
@@ -60,7 +71,10 @@ export function ResultOverlay({
   actions: ResultAction[];
   /** Hides this card so the player can read (and correct) the owl's verdicts. */
   onReview: () => void;
+  /** Asks how the level felt (for playtesting), when play stats are on. */
+  onRate?: (rating: Rating) => void;
 }) {
+  const [rated, setRated] = useState(false);
   const result = state.lastResult;
   const won = state.phase === 'won';
   const zen = state.level.zen === true;
@@ -135,9 +149,39 @@ export function ResultOverlay({
         <Text style={styles.remark}>
           {zen ? owlLine('zenWin', seed) : won ? owlLine(`win${stars as 1 | 2 | 3}`, seed) : owlLine('lose', seed)}
         </Text>
+        {onRate &&
+          (rated ? (
+            <Text style={styles.thanks}>Thanks! That helps tune the levels.</Text>
+          ) : (
+            <View style={styles.ratings} accessibilityLabel="How did that feel?">
+              {RATINGS.map(({ rating, label }) => (
+                <Pressable
+                  key={rating}
+                  onPress={() => {
+                    setRated(true);
+                    onRate(rating);
+                  }}
+                  accessibilityRole="button"
+                  style={styles.rating}
+                  testID={`rate-${rating}`}
+                >
+                  <Text style={styles.ratingText} maxFontSizeMultiplier={1.3}>
+                    {label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ))}
         <View style={styles.buttons}>
           {actions.map((action, i) => (
-            <Button key={i} label={action.label} primary={action.primary} onPress={action.onPress} />
+            <Button
+              key={i}
+              label={action.label}
+              primary={action.primary}
+              disabled={action.disabled}
+              onPress={action.onPress}
+              testID={action.testID}
+            />
           ))}
           <Button label="See the owl's verdicts" onPress={onReview} />
         </View>
@@ -146,15 +190,30 @@ export function ResultOverlay({
   );
 }
 
-function Button({ label, primary, onPress }: { label: string; primary?: boolean; onPress: () => void }) {
+function Button({
+  label,
+  primary,
+  disabled,
+  onPress,
+  testID,
+}: {
+  label: string;
+  primary?: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+  testID?: string;
+}) {
   return (
     <Pressable
       onPress={() => {
         playSound('tap');
         onPress();
       }}
+      disabled={disabled}
       accessibilityRole="button"
-      style={[styles.button, primary && styles.buttonPrimary]}
+      accessibilityState={{ disabled }}
+      testID={testID}
+      style={[styles.button, primary && styles.buttonPrimary, disabled && styles.buttonDisabled]}
     >
       <Text style={[styles.buttonText, primary && styles.buttonTextPrimary]} maxFontSizeMultiplier={1.4}>
         {label}
@@ -215,6 +274,17 @@ const styles = StyleSheet.create({
     borderColor: colors.wood,
   },
   buttonPrimary: { backgroundColor: colors.wood },
+  buttonDisabled: { opacity: 0.45 },
+  ratings: { flexDirection: 'row', gap: 6, alignSelf: 'stretch', marginTop: 4 },
+  rating: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: colors.paperDeep,
+  },
+  ratingText: { fontSize: 13, fontWeight: '700', color: colors.ink },
+  thanks: { fontSize: 13, color: colors.inkSoft, marginTop: 4 },
   buttonText: { fontSize: 16, fontWeight: '700', color: colors.wood },
   buttonTextPrimary: { color: colors.white },
 });

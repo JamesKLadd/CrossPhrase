@@ -242,3 +242,28 @@ export function playLevel(
   const { raw } = scoreSubmission(level, state.entries, tilesByEntry, verdicts, 0);
   return { solved: true, score: raw, swapsUsed: level.swaps - state.swapsLeft, state, moves: solved.moves, tiers };
 }
+
+/**
+ * The hint booster: one line the owl would fill from the player's hand, as
+ * placements into its empty cells. It tries the most-filled line first, like
+ * the bot, and only suggests phrases the built-in judge passes, along with
+ * any crossing lines they complete. Null when no line can be filled from
+ * this hand (a swap might help).
+ */
+export function hintLine(
+  state: GameState,
+  model: TinyModel = BUNDLED_MODEL,
+): { entry: Entry; places: { tileId: number; cell: CellKey }[] } | null {
+  const judge = makeJudge(model);
+  const filled = (entry: Entry) => entry.cells.filter((cell) => state.board[cell]).length;
+  const open = state.entries
+    .filter((entry) => filled(entry) < entry.cells.length)
+    .sort((a, b) => filled(b) * 10 + b.cells.length - (filled(a) * 10 + a.cells.length));
+  for (const entry of open) {
+    const [best] = bestChoices(state, entry, 'careful', judge);
+    if (!best) continue;
+    const empty = entry.cells.filter((cell) => !state.board[cell]);
+    return { entry, places: best.tileIds.map((tileId, i) => ({ tileId, cell: empty[i] })) };
+  }
+  return null;
+}

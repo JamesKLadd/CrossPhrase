@@ -21,6 +21,16 @@ var DRAW_WEIGHTING = {
 var DEFAULT_STAR_POINTS_PER_SLOT = [3, 4.5, 6];
 var WILDCARD_CHANCE = 0.015;
 var WILDCARD_VALUE_FACTOR = 0.5;
+var LEVEL_BANDS = [
+  { name: "warm-up", from: 11, maxRows: 4, maxCols: 4, entries: [2, 3], length: [4, 4], loops: 0, anchors: [1, 2], hints: 0.5, swaps: 5, objectives: [0, 0], oneStar: 0.75 },
+  { name: "early", from: 21, maxRows: 5, maxCols: 5, entries: [3, 4], length: [4, 5], loops: 0.15, anchors: [1, 2], hints: 0.35, swaps: 4, objectives: [1, 1], oneStar: 0.8 },
+  { name: "mid", from: 41, maxRows: 5, maxCols: 5, entries: [4, 6], length: [4, 5], loops: 0.3, anchors: [1, 2], hints: 0.25, swaps: 4, objectives: [1, 1], oneStar: 0.85 },
+  { name: "hard", from: 71, maxRows: 6, maxCols: 5, entries: [5, 7], length: [4, 5], loops: 0.4, anchors: [1, 3], hints: 0.15, swaps: 4, objectives: [1, 1], oneStar: 0.9 },
+  { name: "late", from: 101, maxRows: 6, maxCols: 6, entries: [6, 8], length: [4, 6], loops: 0.5, anchors: [1, 2], hints: 0.1, swaps: 3, objectives: [1, 2], oneStar: 0.95 }
+];
+function bandFor(levelNumber2) {
+  return [...LEVEL_BANDS].reverse().find((b) => levelNumber2 >= b.from) ?? LEVEL_BANDS[0];
+}
 
 // src/core/rng.ts
 function nextRandom(state) {
@@ -767,7 +777,9 @@ function createGame(level) {
     failedSubmits: 0,
     verdictCache: {},
     phase: "playing",
-    lastResult: null
+    lastResult: null,
+    bonusSubmits: 0,
+    boosts: 0
   };
   return refillHand(state);
 }
@@ -869,12 +881,19 @@ function hasNewPhrases(state) {
 function maxSubmits(level) {
   return level.zen ? Infinity : MAX_SUBMITS;
 }
+function submitLimit(state) {
+  return maxSubmits(state.level) + state.bonusSubmits;
+}
 function canSubmit(state) {
-  return state.phase === "playing" && state.submitsUsed < maxSubmits(state.level) && isBoardFull(state) && hasNewPhrases(state);
+  return state.phase === "playing" && state.submitsUsed < submitLimit(state) && isBoardFull(state) && hasNewPhrases(state);
 }
 function gameReducer(state, action) {
   if (action.type === "restart") return createGame(state.level);
   if (action.type === "reconcile") return reconcile(state, action.verdicts);
+  if (action.type === "extraSubmit") {
+    if (state.phase !== "lost") return state;
+    return { ...state, phase: "playing", bonusSubmits: state.bonusSubmits + 1, boosts: state.boosts + 1 };
+  }
   if (state.phase === "judging") {
     if (action.type === "submitResult") return applyVerdicts(state, action.verdicts);
     if (action.type === "submitError") return { ...state, phase: "playing" };
@@ -923,6 +942,26 @@ function gameReducer(state, action) {
     }
     case "submitStart":
       return canSubmit(state) ? { ...state, phase: "judging" } : state;
+    case "addSwaps":
+      if (!Number.isInteger(action.count) || action.count < 1) return state;
+      return { ...state, swapsLeft: state.swapsLeft + action.count, boosts: state.boosts + 1 };
+    case "makeWildcard": {
+      const index = state.hand.findIndex((t) => t.id === action.tileId);
+      if (index === -1 || state.hand[index].wildcard) return state;
+      const hand = [...state.hand];
+      hand[index] = { id: action.tileId, word: WILDCARD, wildcard: true };
+      return { ...state, hand, boosts: state.boosts + 1 };
+    }
+    case "hint": {
+      if (action.places.length === 0) return state;
+      let next = state;
+      for (const { tileId, cell } of action.places) {
+        const tile = next.hand.find((t) => t.id === tileId);
+        if (!tile || tile.wildcard || next.board[cell] !== null) return state;
+        next = gameReducer(next, { type: "place", tileId, cell });
+      }
+      return { ...next, boosts: state.boosts + 1 };
+    }
     default:
       return state;
   }
@@ -949,7 +988,7 @@ function applyVerdicts(state, verdicts) {
     submitsUsed,
     failedSubmits: state.failedSubmits + 1,
     lastResult: result,
-    phase: submitsUsed >= maxSubmits(state.level) ? "lost" : "playing"
+    phase: submitsUsed >= submitLimit(state) ? "lost" : "playing"
   };
 }
 var TIER_RANK = { invalid: 0, ok: 1, great: 2, poetic: 3 };
@@ -1279,10 +1318,11 @@ var builtinJudge = (entries) => entries.map((entry) => localVerdict(entry));
 function replayRun(level, actions, judge) {
   let state = createGame(level);
   for (let i = 0; i < actions.length; i++) {
-    if (state.phase === "won" || state.phase === "lost") {
+    const action = actions[i];
+    const carriesOn = state.phase === "lost" && action.type === "extraSubmit";
+    if ((state.phase === "won" || state.phase === "lost") && !carriesOn) {
       return { state, error: null, extraMoves: actions.length - i };
     }
-    const action = actions[i];
     if (action.type === "submit") {
       if (!canSubmit(state)) return { state, error: `move ${i + 1}: that board can't be submitted`, extraMoves: 0 };
       state = gameReducer(state, { type: "submitStart" });
@@ -1330,11 +1370,57 @@ function parseRun(value) {
       case "submit":
         actions.push({ type: "submit" });
         break;
+      case "addSwaps":
+      case "makeWildcard":
+      case "hint":
+      case "extraSubmit":
+        return "boosted games don't count on leaderboards";
       default:
         return bad;
     }
   }
   return actions;
+}
+
+// src/core/tuning.ts
+var MIN_STARS = 0.5;
+var MAX_STARS = 2;
+function parseTweak(value) {
+  if (typeof value !== "object" || value === null) return null;
+  const { swaps, stars } = value;
+  const tweak = {};
+  if (Number.isInteger(swaps) && Math.abs(swaps) <= 10) tweak.swaps = swaps;
+  if (typeof stars === "number" && stars >= MIN_STARS && stars <= MAX_STARS) tweak.stars = stars;
+  return tweak.swaps === void 0 && tweak.stars === void 0 ? null : tweak;
+}
+function parseTuning(value) {
+  const tuning = {};
+  if (typeof value !== "object" || value === null) return tuning;
+  const { bands, levels } = value;
+  const names = new Set(LEVEL_BANDS.map((b) => b.name));
+  for (const [key, raw] of Object.entries(typeof bands === "object" && bands ? bands : {})) {
+    const tweak = parseTweak(raw);
+    if (tweak && names.has(key)) (tuning.bands ??= {})[key] = tweak;
+  }
+  for (const [key, raw] of Object.entries(typeof levels === "object" && levels ? levels : {})) {
+    const tweak = parseTweak(raw);
+    if (tweak && /^level-\d+$/.test(key)) (tuning.levels ??= {})[key] = tweak;
+  }
+  return tuning;
+}
+function tuneLevel(level, number, tuning) {
+  if (number < LEVEL_BANDS[0].from || level.zen) return level;
+  const band = tuning.bands?.[bandFor(number).name] ?? {};
+  const own = tuning.levels?.[level.id] ?? {};
+  const swapsBonus = (band.swaps ?? 0) + (own.swaps ?? 0);
+  const scale = Math.min(MAX_STARS, Math.max(MIN_STARS, (band.stars ?? 1) * (own.stars ?? 1)));
+  if (swapsBonus === 0 && scale === 1) return level;
+  let floor = 0;
+  const stars = starThresholds(level).map((target) => {
+    floor = Math.max(floor + 1, Math.round(target * scale));
+    return floor;
+  });
+  return { ...level, swaps: Math.max(0, level.swaps + swapsBonus), stars };
 }
 
 // src/data/dailies.generated.json
@@ -5429,6 +5515,9 @@ var LEVEL_IDS = LEVELS.map((level) => level.id);
 function levelById(id) {
   return LEVELS.find((level) => level.id === id);
 }
+function levelNumber(id) {
+  return LEVELS.findIndex((level) => level.id === id) + 1;
+}
 
 // src/server/scores.ts
 var JUDGE_VERSION = BUNDLED_MODEL.trainedAt;
@@ -5453,10 +5542,10 @@ function scoreDaily(day, actions, now) {
   if (day < addDays(today, -1) || day > addDays(today, 1)) return "that daily puzzle is closed";
   return scoreRun(level, actions);
 }
-function scoreLevel(levelId, actions) {
+function scoreLevel(levelId, actions, tuning = {}) {
   const level = typeof levelId === "string" ? levelById(levelId) : void 0;
   if (!level) return "there is no such level";
-  const scored = scoreRun(level, actions);
+  const scored = scoreRun(tuneLevel(level, levelNumber(level.id), parseTuning(tuning)), actions);
   if (typeof scored === "string") return scored;
   return scored.won ? scored : "the built-in judge didn't pass this board";
 }

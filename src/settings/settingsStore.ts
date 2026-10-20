@@ -10,6 +10,8 @@ export interface Settings {
   reduceMotion: boolean;
   /** Verdict colours that stay distinct with common colour blindness. */
   colorBlind: boolean;
+  /** Send anonymous play stats (levels won and lost, boosters used) to help tune the game. */
+  analytics: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -18,6 +20,7 @@ export const DEFAULT_SETTINGS: Settings = {
   haptics: true,
   reduceMotion: false,
   colorBlind: false,
+  analytics: true,
 };
 
 export interface SettingsStore {

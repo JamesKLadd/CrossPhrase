@@ -1,8 +1,11 @@
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { analyticsAvailable, sendFeedback } from '../analytics';
 import type { Tier } from '../core/types';
+import { BUILD } from '../lib/build';
 import { settings, useSettings, type Settings } from '../settings';
 import { colors, TIER_ICON, TIER_LABEL, TIER_PALETTES } from '../ui/theme';
 
@@ -22,6 +25,15 @@ const OPTIONS: { key: keyof Settings; label: string; help: string }[] = [
     label: 'Colour-blind-friendly verdicts',
     help: 'Verdict colours that stay distinct with common colour blindness. Verdicts always show an icon too.',
   },
+  ...(analyticsAvailable
+    ? [
+        {
+          key: 'analytics' as const,
+          label: 'Share anonymous play stats',
+          help: 'Which levels are won, lost or skipped, so the hard ones can be eased. Never your name.',
+        },
+      ]
+    : []),
 ];
 
 export default function SettingsScreen() {
@@ -70,8 +82,57 @@ export default function SettingsScreen() {
         <Text style={styles.note}>
           Text size follows your phone’s setting. Word tiles stay a fixed size so they fit the board.
         </Text>
+
+        {analyticsAvailable && <Feedback />}
+
+        <Text style={styles.version} testID="build-version">
+          Build {BUILD}
+        </Text>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/** A note to the developer: what was confusing, too hard, or broken. */
+function Feedback() {
+  const [text, setText] = useState('');
+  const [sent, setSent] = useState(false);
+  return (
+    <View style={styles.row}>
+      <View style={styles.rowText}>
+        <Text style={styles.label}>Send feedback</Text>
+        <Text style={styles.help}>
+          {sent ? 'Thanks! The owl will pass it on.' : 'Too hard? Confusing? Broken? Tell the developer.'}
+        </Text>
+        {!sent && (
+          <>
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              placeholder="e.g. Level 14 felt impossible"
+              placeholderTextColor={colors.inkSoft}
+              multiline
+              maxLength={500}
+              style={styles.input}
+              testID="feedback-text"
+            />
+            <Pressable
+              onPress={() => {
+                sendFeedback(text, 'settings');
+                setSent(true);
+                setText('');
+              }}
+              disabled={!text.trim()}
+              accessibilityRole="button"
+              style={[styles.send, !text.trim() && styles.sendOff]}
+              testID="feedback-send"
+            >
+              <Text style={styles.sendText}>Send</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -106,4 +167,20 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   note: { textAlign: 'center', fontSize: 13, color: colors.inkSoft, lineHeight: 19 },
+  input: {
+    minHeight: 70,
+    marginTop: 6,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.tileEdge,
+    backgroundColor: colors.white,
+    fontSize: 16,
+    color: colors.ink,
+    textAlignVertical: 'top',
+  },
+  send: { alignSelf: 'flex-end', marginTop: 6, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, backgroundColor: colors.wood },
+  sendOff: { opacity: 0.4 },
+  sendText: { fontSize: 15, fontWeight: '700', color: colors.white },
+  version: { textAlign: 'center', fontSize: 12, color: colors.inkSoft },
 });

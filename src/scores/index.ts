@@ -3,6 +3,7 @@ import 'expo-sqlite/localStorage/install';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import type { RunAction } from '../core/run';
+import { lastSignInError, signedIn } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { progress } from '../progress';
 
@@ -50,28 +51,6 @@ function readOutbox(): Pending[] {
 
 function writeOutbox(items: Pending[]) {
   localStorage.setItem(OUTBOX, JSON.stringify(items.slice(-MAX_OUTBOX)));
-}
-
-/** Why the last anonymous sign-in failed, to show the player. */
-let signInError: string | null = null;
-let signingIn: Promise<boolean> | null = null;
-async function signedIn(): Promise<boolean> {
-  if (!supabase) return false;
-  const { data } = await supabase.auth.getSession();
-  if (data.session) return true;
-  signingIn ??= supabase.auth
-    .signInAnonymously()
-    .then(({ error }) => {
-      signInError = error ? error.message : null;
-      if (error) console.warn('Anonymous sign-in failed:', error.message);
-      return !error;
-    })
-    .catch((e: unknown) => {
-      signInError = String(e);
-      return false;
-    })
-    .finally(() => (signingIn = null));
-  return signingIn;
 }
 
 /** Sends a run. 'rejected' means the server checked it and said no; 'failed' is worth retrying. */
@@ -169,7 +148,7 @@ export async function setPlayerName(name: string): Promise<string | null> {
   const trimmed = name.trim().slice(0, 20);
   if (!supabase) return 'The online backend isn’t configured (.env.local).';
   if (!trimmed) return 'Type a name first.';
-  if (!(await signedIn())) return `Couldn't sign in: ${signInError ?? 'no connection'}`;
+  if (!(await signedIn())) return `Couldn't sign in: ${lastSignInError() ?? 'no connection'}`;
   const { error } = await supabase.rpc('set_player_name', { p_name: trimmed });
   if (error) {
     console.warn('Saving the name failed:', error);

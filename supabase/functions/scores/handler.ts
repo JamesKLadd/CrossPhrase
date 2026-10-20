@@ -17,6 +17,8 @@ export interface ScoreStore {
   saveDaily(row: { userId: string; day: string; actions: unknown; judgeVersion: string } & ScoredRun): Promise<boolean>;
   /** Saves a level clear if it beats the player's best. True if saved. */
   saveLevel(row: { userId: string; levelId: string; actions: unknown; judgeVersion: string } & ScoredRun): Promise<boolean>;
+  /** The remote config's level tuning (the game plays levels with it applied). */
+  tuning(): Promise<unknown>;
 }
 
 export interface Outcome {
@@ -42,7 +44,9 @@ export async function handleScore(body: unknown, userId: string, store: ScoreSto
   if (kind === "level") {
     const { levelId } = body as { levelId?: unknown };
     if (typeof levelId !== "string") return bad("levelId must be a string");
-    const scored = scoreLevel(levelId, actions) as ScoredRun | string;
+    // The bundle's types are inferred from JavaScript; any value is checked by parseTuning.
+    const tuning = (await store.tuning()) as Record<string, unknown>;
+    const scored = scoreLevel(levelId, actions, tuning) as ScoredRun | string;
     if (typeof scored === "string") return bad(scored, 422);
     const saved = await store.saveLevel({ userId, levelId, actions, judgeVersion: JUDGE_VERSION, ...scored });
     return { status: 200, body: { ...scored, saved } };

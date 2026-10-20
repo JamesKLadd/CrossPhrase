@@ -87,6 +87,23 @@ Docs: https://docs.expo.dev/eas/index.md
 - New native libraries must be in Expo Go's bundle
   (`node_modules/expo/bundledNativeModules.json`) and installed with
   `npx expo install`, since the developer tests in the App Store's Expo Go.
+  Anything new must also work on the web: the game ships as a website
+  (`npm run build:web`, published to GitHub Pages by
+  `.github/workflows/website.yml`), so guard native-only APIs with
+  `Platform.OS` and check `npm run build:web` still succeeds.
+- The economy (hearts, feathers, boosters) is pure logic in
+  `src/core/economy.ts`; the wallet store is `src/economy/`. Boosters are
+  reducer actions and run actions, and `parseRun` refuses them so boosted
+  runs never reach leaderboards. Hearts and boosters only apply from
+  `ECONOMY_FROM_LEVEL`; the daily and zen never use them.
+- Remote config (`src/remote/`, the `remote_config` table) feeds
+  `parseEconomy` and `parseTuning`; both must ignore anything malformed and
+  fall back to defaults. Level tuning (`src/core/tuning.ts`) is applied by
+  both the app and the leaderboard server; never tune the tutorial or the
+  daily puzzles.
+- Play stats go through `track()` in `src/analytics/` (queued, batched,
+  switchable in Settings). Never put anything a player typed in an event
+  except the feedback they choose to send, and no names.
 - Before declaring work done: `npm test`, `npm run typecheck`, `npm run lint`,
   plus `npm run test:pc-judge` when touching `pc-judge/`, and `npm run test:db` /
   `npm run test:functions` when touching `supabase/`.

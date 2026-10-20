@@ -11,13 +11,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { MAX_SUBMITS } from '../core/config';
-import { canSubmit, entryWords, isBoardFull, type GameState } from '../core/game';
+import { analyticsAvailable, track, type EventProps } from '../analytics';
+import type { BoosterKind } from '../core/economy';
+import { canSubmit, entryWords, isBoardFull, submitLimit, verdictFor, type GameState } from '../core/game';
+import { hintLine } from '../core/levelBot';
 import type { RunAction } from '../core/run';
 import type { CellKey, Entry, LevelDef, Tier, Tile } from '../core/types';
+import { displayWord } from '../core/words';
 import { THEMES } from '../data/themes';
-import { useReduceMotion } from '../settings';
+import { useWallet, wallet } from '../economy';
+import { useRemoteConfig } from '../remote';
+import { useReduceMotion, useSettings } from '../settings';
 import { Board, boardCellSize } from './Board';
+import { BoosterSheet } from './BoosterSheet';
 import { Confetti } from './Confetti';
 import { DragProvider, type DragSource, type ZoneId } from './drag';
 import { haptic, playSound, type HapticKind, type SoundName } from './feedback';
@@ -39,6 +45,13 @@ const TIER_FEEDBACK: Record<Tier, [SoundName, HapticKind]> = {
 
 type Selection = { kind: 'hand'; tileId: number } | { kind: 'cell'; cell: CellKey } | null;
 
+/** What play stats say about a game: its mode, and the level's number or the daily's day. */
+export interface GameStats {
+  mode: 'level' | 'daily' | 'zen';
+  number?: number;
+  day?: string;
+}
+
 /**
  * One board, played: the level, daily puzzle and zen screens all use this,
  * each with their own result-card buttons and their own saving.
@@ -53,11 +66,16 @@ export function GameView({
   actions,
   newBest,
   note,
+  stats,
+  economy = false,
 }: {
   level: LevelDef;
   title: string;
   backLabel: string;
   options?: GameOptions;
+  stats: GameStats;
+  /** Hearts and boosters apply: losing costs a heart, and feathers buy boosters. */
+  economy?: boolean;
   /** Called whenever the game changes, with its run log (to save progress). */
   onChange?: (state: GameState, log: readonly RunAction[]) => void;
   /** The result card's title. */
@@ -68,11 +86,16 @@ export function GameView({
   /** A line under the score on the result card, e.g. a streak. */
   note?: (state: GameState) => string | null;
 }) {
-  const { state, log, dispatch, submit, error, mode, notice, corrections, correct } = useGame(
+  const { state, log, dispatch, submit, error, mode, notice, corrections, correct, say } = useGame(
     level,
     options,
   );
   const still = useReduceMotion();
+  const { economy: economyConfig } = useRemoteConfig();
+  const { feathers } = useWallet();
+  const { analytics: statsOn } = useSettings();
+  const boosters = economy && economyConfig.boosters.enabled;
+  const [boosting, setBoosting] = useState(false);
   const [confetti, setConfetti] = useState(0);
   const [selection, setSelection] = useState<Selection>(null);
   const [highlightedEntry, setHighlightedEntry] = useState<string | null>(null);
@@ -92,6 +115,59 @@ export function GameView({
   useEffect(() => {
     latestOnChange.current?.(state, log);
   }, [state, log]);
+
+  // Play stats: the game's start, each counted submit, its end, or leaving part-way.
+  const statsProps = useMemo<EventProps>(() => {
+    const props: EventProps = { mode: stats.mode, level: level.id };
+    if (stats.number !== undefined) props.number = stats.number;
+    if (stats.day !== undefined) props.day = stats.day;
+    return props;
+  }, [stats.mode, stats.number, stats.day, level.id]);
+  const resumed = (options?.resume?.length ?? 0) > 0;
+  const latest = useRef({ state, log });
+  useLayoutEffect(() => {
+    latest.current = { state, log };
+  });
+  useEffect(() => {
+    track('game_start', { ...statsProps, resumed });
+    return () => {
+      const { state: last, log: moves } = latest.current;
+      if (last.phase === 'playing' && moves.length > 0) {
+        track('game_quit', { ...statsProps, submits: last.submitsUsed, moves: moves.length });
+      }
+    };
+  }, [statsProps, resumed]);
+
+  const seen = useRef({ submits: state.submitsUsed, finished });
+  useEffect(() => {
+    const before = seen.current;
+    seen.current = { submits: state.submitsUsed, finished };
+    const result = state.lastResult;
+    if (state.submitsUsed > before.submits && result) {
+      track('game_submit', {
+        ...statsProps,
+        submit: state.submitsUsed,
+        score: result.total,
+        passed: result.passed,
+        valid: state.entries.filter((e) => verdictFor(state, e)?.valid).length,
+        lines: state.entries.length,
+      });
+    }
+    if (finished && !before.finished) {
+      const won = state.phase === 'won';
+      track('game_end', {
+        ...statsProps,
+        won,
+        score: won ? (result?.total ?? 0) : 0,
+        stars: won ? (result?.stars ?? 0) : 0,
+        submits: state.submitsUsed,
+        swaps_left: state.swapsLeft,
+        boosted: state.boosts > 0,
+      });
+      // Losing a level costs a heart ("One more submit" gives it back).
+      if (economy && !won) wallet.loseLife();
+    }
+  }, [state, finished, statsProps, economy]);
 
   const contentWidth = Math.min(width, 520) - 32;
   const rows = level.layout.length;
@@ -184,8 +260,73 @@ export function GameView({
     setSelection(null);
   };
 
+  const buy = (kind: BoosterKind) => {
+    const cost = economyConfig.boosters[kind].cost;
+    setBoosting(false);
+    if (kind === 'hint') {
+      const hint = hintLine(state);
+      if (!hint) {
+        say("I can't make a line from this hand. A swap might help, and the hint is still yours.");
+        return;
+      }
+      if (!wallet.spend(cost)) return;
+      const words = hint.entry.cells.map((cell) => {
+        const place = hint.places.find((p) => p.cell === cell);
+        const tile = place ? state.hand.find((t) => t.id === place.tileId) : state.board[cell];
+        return displayWord(tile?.word ?? '');
+      });
+      dispatch({ type: 'hint', places: hint.places });
+      setHighlightedEntry(hint.entry.id);
+      say(`${hint.entry.id}: how about “${words.join(' ')}”?`);
+    } else if (kind === 'swaps') {
+      if (!wallet.spend(cost)) return;
+      const { count } = economyConfig.boosters.swaps;
+      dispatch({ type: 'addSwaps', count });
+      say(`${count} more swaps. Spend them wisely.`);
+    } else if (kind === 'wildcard') {
+      if (selection?.kind !== 'hand' || !wallet.spend(cost)) return;
+      dispatch({ type: 'makeWildcard', tileId: selection.tileId });
+      setSelection(null);
+      say('A wildcard! Put it on the board and pick any word.');
+    } else {
+      return;
+    }
+    playSound('great');
+    haptic('success');
+    track('booster', { ...statsProps, kind, cost });
+  };
+
+  /** On a lost level: one more submit, carrying on from the same board. */
+  const continueActions = (): ResultAction[] => {
+    if (!boosters || state.phase !== 'lost') return [];
+    const cost = economyConfig.boosters.submit.cost;
+    const affordable = feathers >= cost;
+    return [
+      {
+        label: affordable ? `One more submit · ${cost} 🪶` : `One more submit · needs ${cost} 🪶`,
+        primary: true,
+        disabled: !affordable,
+        testID: 'one-more-submit',
+        onPress: () => {
+          if (!wallet.spend(cost)) return;
+          dispatch({ type: 'extraSubmit' });
+          wallet.gainLife();
+          say('One more go. Make it count.');
+          track('booster', { ...statsProps, kind: 'submit', cost });
+        },
+      },
+    ];
+  };
+
+  const resultActions = (): ResultAction[] => {
+    const extra = continueActions();
+    const own = actions(state);
+    return extra.length ? [...extra, ...own.map((a) => ({ ...a, primary: false }))] : own;
+  };
+
   const theme = THEMES[level.theme];
   const filled = state.entries.filter((e) => entryWords(state, e)).length;
+  const submitsLeft = submitLimit(state) - state.submitsUsed;
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -203,11 +344,8 @@ export function GameView({
                 ∞
               </Text>
             ) : (
-              <Text
-                style={styles.submits}
-                accessibilityLabel={`${MAX_SUBMITS - state.submitsUsed} submits left`}
-              >
-                {'●'.repeat(MAX_SUBMITS - state.submitsUsed)}
+              <Text style={styles.submits} accessibilityLabel={`${submitsLeft} submits left`}>
+                {'●'.repeat(submitsLeft)}
                 <Text style={styles.submitsUsed}>{'●'.repeat(state.submitsUsed)}</Text>
               </Text>
             )}
@@ -260,6 +398,16 @@ export function GameView({
             </View>
           ) : (
             <View style={styles.actions}>
+              {boosters && (
+                <ActionButton
+                  label="🪶"
+                  narrow
+                  onPress={() => setBoosting(true)}
+                  enabled={playing}
+                  accessibilityLabel="Boosters"
+                  testID="boosters"
+                />
+              )}
               {selection?.kind === 'cell' ? (
                 <ActionButton label="Return to hand" onPress={returnSelected} enabled={playing} />
               ) : (
@@ -297,6 +445,16 @@ export function GameView({
           onCancel={() => setWildcardTarget(null)}
         />
 
+        <BoosterSheet
+          visible={boosting}
+          economy={economyConfig}
+          feathers={feathers}
+          selectedWord={selection?.kind === 'hand' ? (state.hand.find((t) => t.id === selection.tileId)?.word ?? null) : null}
+          swapsLeft={state.swapsLeft}
+          onBuy={buy}
+          onClose={() => setBoosting(false)}
+        />
+
         {!reviewing && !reveal.active && finished && (
           <ResultOverlay
             state={state}
@@ -304,8 +462,13 @@ export function GameView({
             newBest={newBest?.(state) ?? false}
             note={note?.(state) ?? null}
             still={still}
-            actions={actions(state)}
+            actions={resultActions()}
             onReview={() => setReviewing(true)}
+            onRate={
+              analyticsAvailable && statsOn && stats.mode !== 'zen'
+                ? (rating) => track('rating', { ...statsProps, rating })
+                : undefined
+            }
           />
         )}
         <Confetti burst={confetti} />
@@ -317,21 +480,35 @@ export function GameView({
 function ActionButton({
   label,
   primary,
+  narrow,
   enabled,
   onPress,
+  accessibilityLabel,
+  testID,
 }: {
   label: string;
   primary?: boolean;
+  /** Just wide enough for an icon. */
+  narrow?: boolean;
   enabled: boolean;
   onPress: () => void;
+  accessibilityLabel?: string;
+  testID?: string;
 }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={!enabled}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: !enabled }}
-      style={[styles.action, primary && styles.actionPrimary, !enabled && styles.actionDisabled]}
+      testID={testID}
+      style={[
+        styles.action,
+        narrow && styles.actionNarrow,
+        primary && styles.actionPrimary,
+        !enabled && styles.actionDisabled,
+      ]}
     >
       <Text style={[styles.actionText, primary && styles.actionTextPrimary]} maxFontSizeMultiplier={1.3}>
         {label}
@@ -360,6 +537,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.wood,
   },
+  actionNarrow: { flex: 0, paddingHorizontal: 14 },
   actionPrimary: { backgroundColor: colors.wood },
   actionDisabled: { opacity: 0.4 },
   actionText: { fontSize: 15, fontWeight: '700', color: colors.wood },

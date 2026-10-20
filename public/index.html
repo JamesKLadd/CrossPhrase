@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="%LANG_ISO_CODE%">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <!-- viewport-fit=cover: the game draws behind the notch and keeps clear of it with safe-area insets. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- Added to the home screen, it opens full screen like an app. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="CrossPhrase" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>%WEB_TITLE%</title>
+    <!-- The react-native-web style reset (https://necolas.github.io/react-native-web/docs/setup/#root-element), plus touch fixes for phones. -->
+    <style id="expo-reset">
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #f5eedc;
+        /* No pull-to-refresh or rubber-banding while dragging words. */
+        overscroll-behavior: none;
+        /* No text selection, magnifier or callout menu on a long press. */
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+        /* No double-tap zoom when tapping tiles quickly (pinch zoom still works). */
+        touch-action: manipulation;
+      }
+      input,
+      textarea {
+        -webkit-user-select: text;
+        user-select: text;
+      }
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+      .boot {
+        margin: auto;
+        font: 600 16px -apple-system, system-ui, sans-serif;
+        color: #6b6257;
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript>CrossPhrase needs JavaScript to run.</noscript>
+    <!-- The game replaces this as soon as it has loaded. -->
+    <div id="root"><div class="boot">🦉 Loading CrossPhrase…</div></div>
+  </body>
+</html>
