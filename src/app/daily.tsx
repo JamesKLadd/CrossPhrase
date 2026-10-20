@@ -81,7 +81,11 @@ function DailyGame({ level, day }: { level: LevelDef; day: string }) {
       stats={{ mode: 'daily', day }}
       onChange={save}
       heading={(state) => (state.phase === 'won' ? 'Daily puzzle solved!' : 'Out of submits')}
-      note={() => {
+      note={(state) => {
+        if (state.phase === 'lost') {
+          // The points shown above don't reach the leaderboard: only a solve (one star or more) does.
+          return scoresEnabled ? 'Not enough for a star, so this counts as unsolved on the leaderboard.' : null;
+        }
         const streak = dailyStreak(progress.snapshot(), day, previousDay);
         return [streak > 1 ? `🔥 ${streak}-day streak` : '', earned > 0 ? `+${earned} 🪶` : ''].filter(Boolean).join(' · ') || null;
       }}

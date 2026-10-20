@@ -122,19 +122,35 @@ function Boards() {
         </Text>
       ) : (
         rows.map((row, i) => (
-          <View key={i} style={[styles.row, row.me && styles.rowMe]} testID={row.me ? 'board-me' : undefined}>
+          <View
+            key={i}
+            style={[styles.row, row.me && styles.rowMe]}
+            testID={row.me ? 'board-me' : undefined}
+            accessible
+            accessibilityLabel={`${row.rank}. ${row.name}${row.me ? ' (you)' : ''}: ${
+              row.stars === 0 ? 'out of submits before the first star' : `${row.score} points, ${row.stars} stars`
+            }`}
+          >
             <Text style={styles.rank}>{row.rank}</Text>
             <Text style={styles.name} numberOfLines={1}>
               {row.name}
               {row.me ? ' (you)' : ''}
             </Text>
-            <Text style={styles.stars}>{'★'.repeat(row.stars)}</Text>
-            <Text style={styles.score}>{row.score}</Text>
+            {/* A daily puzzle that ran out of submits before its first star counts as unsolved, ranked below every solve. */}
+            {row.stars === 0 ? (
+              <Text style={styles.unsolved}>unsolved</Text>
+            ) : (
+              <>
+                <Text style={styles.stars}>{'★'.repeat(row.stars)}</Text>
+                <Text style={styles.score}>{row.score}</Text>
+              </>
+            )}
           </View>
         ))
       )}
       <Text style={styles.footnote}>
-        Scores are checked on the server: it replays every move and re-judges each line with the
+        A daily puzzle only counts as solved with at least one star; one that runs out of submits
+        first is listed as unsolved. Scores are checked on the server: it replays every move and re-judges each line with the
         built-in judge, so a PC-judged level can score differently here.
       </Text>
     </View>
@@ -217,6 +233,7 @@ const styles = StyleSheet.create({
   rank: { width: 28, fontSize: 16, fontWeight: '900', color: colors.wood, textAlign: 'center' },
   name: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.ink },
   stars: { fontSize: 13, color: colors.star },
+  unsolved: { fontSize: 13, fontStyle: 'italic', color: colors.inkSoft },
   score: { width: 44, fontSize: 16, fontWeight: '800', color: colors.ink, textAlign: 'right' },
   footnote: { fontSize: 12, lineHeight: 17, color: colors.inkSoft, textAlign: 'center' },
 });
