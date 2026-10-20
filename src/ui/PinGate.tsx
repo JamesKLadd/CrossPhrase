@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { unlock } from './devAccess';
+import { useAccount } from '../account';
+import { devToolsEnabled, isUnlocked, unlock } from './devAccess';
 import { Owl } from './Owl';
 import { colors } from './theme';
 
@@ -38,14 +39,27 @@ export function PinGate({ onUnlock }: { onUnlock: () => void }) {
   );
 }
 
-/** Shown in place of the developer tools when no PIN is configured. */
+/** Shown in place of the developer tools to everyone else. */
 export function DevToolsOff() {
   return (
     <Text style={styles.note}>
-      Developer tools are turned off. Add EXPO_PUBLIC_DEV_PIN=your-pin to .env.local and restart
-      the app with `npx expo start --clear`.
+      These tools are for the game’s admin account. In a development build they also open with
+      EXPO_PUBLIC_DEV_PIN=your-pin in .env.local (restart with `npx expo start --clear`).
     </Text>
   );
+}
+
+/**
+ * The developer tools: open to the admin account, or with the PIN in a
+ * development build (EXPO_PUBLIC_DEV_PIN). The server checks admin requests
+ * itself, so this only decides what's shown.
+ */
+export function DevGate({ children }: { children: ReactNode }) {
+  const { admin } = useAccount();
+  const [open, setOpen] = useState(isUnlocked);
+  if (admin) return children;
+  if (!devToolsEnabled) return <DevToolsOff />;
+  return open ? children : <PinGate onUnlock={() => setOpen(true)} />;
 }
 
 const styles = StyleSheet.create({

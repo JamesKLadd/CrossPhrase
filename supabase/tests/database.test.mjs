@@ -394,3 +394,91 @@ describe('accounts and cloud saves', () => {
     assert.equal((await q('select * from saves where user_id = $1', [DAVE])).rows.length, 0);
   });
 });
+
+describe('admin', () => {
+  const log = (user, events) =>
+    asPlayer(user, () => one(`select log_events($1, $2::jsonb) as saved`, ['session-admin1', JSON.stringify(events)]));
+  const JAMES = '66666666-6666-6666-6666-666666666666';
+  const PLAYER = '77777777-7777-7777-7777-777777777777';
+  const asJames = (fn) => asPlayer(JAMES, fn);
+
+  before(async () => {
+    await q('insert into auth.users values ($1), ($2)', [JAMES, PLAYER]);
+    await q(`insert into accounts (user_id, username) values ($1, 'James')`, [JAMES]);
+    // What the migration does for the real database, where James's account already existed.
+    await q(`insert into admins (user_id) select user_id from accounts where username_key = 'james'`);
+  });
+
+  test('only the admin is an admin', async () => {
+    assert.equal((await asJames(() => one('select is_admin() as yes'))).yes, true);
+    assert.equal((await asPlayer(PLAYER, () => one('select is_admin() as yes'))).yes, false);
+    await assert.rejects(asPlayer(PLAYER, () => q(`insert into admins values ($1)`, [PLAYER])), /permission denied/);
+  });
+
+  test('every admin function refuses other players', async () => {
+    for (const sql of [
+      `select admin_stats('overview')`,
+      `select admin_review_queue()`,
+      `select admin_review('the moon glows', 'ok')`,
+      `select * from admin_training_labels()`,
+      `select admin_get_config()`,
+      `select admin_set_config('economy', '{}')`,
+    ]) {
+      await assert.rejects(asPlayer(PLAYER, () => q(sql)), /Admins only/, sql);
+    }
+    await assert.rejects(asAnon(() => q(`select admin_stats('overview')`)), /permission denied/);
+  });
+
+  test("players' corrections wait for review; the admin's own labels count at once", async () => {
+    await asPlayer(PLAYER, () => q(`select submit_label('The Moon glows', 'poetic', 'ok')`));
+    await asPlayer(BOB, () => q(`select submit_label('the moon glows', 'great', 'ok')`));
+    await asJames(() => q(`select submit_label('owl reads the news', 'great')`));
+    await assert.rejects(asPlayer(PLAYER, () => q(`select submit_label('x', 'ok')`)), /check/);
+    await assert.rejects(asPlayer(PLAYER, () => q(`select submit_label('two words', 'amazing')`)), /check/);
+    await assert.rejects(asPlayer(PLAYER, () => q('select * from labels')), /permission denied/);
+
+    const queue = (await asJames(() => one('select admin_review_queue() as q'))).q;
+    const moon = queue.find((r) => r.phrase === 'the moon glows');
+    assert.deepEqual([moon.players, moon.judged, moon.votes], [2, 'ok', { poetic: 1, great: 1 }]);
+    assert.equal(queue.some((r) => r.phrase === 'owl reads the news'), false);
+    const training = (await asJames(() => q('select phrase, tier, source from admin_training_labels()'))).rows;
+    assert.deepEqual(training, [{ phrase: 'owl reads the news', tier: 'great', source: 'admin' }]);
+  });
+
+  test('reviewing approves (as the tier chosen) or rejects every correction of a phrase', async () => {
+    assert.equal((await asJames(() => one(`select admin_review('the moon glows', 'great') as n`))).n, 2);
+    await asPlayer(PLAYER, () => q(`select submit_label('dog of the eat', 'ok', 'invalid')`));
+    assert.equal((await asJames(() => one(`select admin_review('dog of the eat', null) as n`))).n, 1);
+    const training = (await asJames(() => q('select phrase, tier from admin_training_labels()'))).rows;
+    assert.deepEqual(training.map((r) => `${r.phrase}:${r.tier}`).sort(), [
+      'owl reads the news:great',
+      'the moon glows:great',
+      'the moon glows:great',
+    ]);
+    assert.deepEqual((await asJames(() => one('select admin_review_queue() as q'))).q, []);
+  });
+
+  test('the dashboard reads the stats views', async () => {
+    const overview = (await asJames(() => one(`select admin_stats('overview') as o`))).o;
+    assert.ok(overview.accounts >= 1);
+    assert.equal(typeof overview.labels_pending, 'number');
+    const levels = (await asJames(() => one(`select admin_stats('level_stats') as r`))).r;
+    assert.ok(levels.some((row) => row.number === 11));
+    await log(ALICE, [{ name: 'feedback', props: { text: 'Level 12 is hard', version: 'abc1234', platform: 'web' } }]);
+    const feedback = (await asJames(() => one(`select admin_stats('feedback') as r`))).r;
+    assert.equal(feedback[0].text, 'Level 12 is hard');
+    assert.equal(feedback[0].username, 'Alice');
+    await assert.rejects(asJames(() => q(`select admin_stats('events')`)), /Unknown view/);
+  });
+
+  test('the admin can read and set the economy and tuning, and nothing else', async () => {
+    await asJames(() => q(`select admin_set_config('tuning', '{"levels": {"level-37": {"stars": 0.85}}}')`));
+    const config = (await asJames(() => one('select admin_get_config() as c'))).c;
+    assert.deepEqual(config.tuning, { levels: { 'level-37': { stars: 0.85 } } });
+    // The game reads it like any other remote config.
+    const seen = await asAnon(() => one(`select value from remote_config where key = 'tuning'`));
+    assert.deepEqual(seen.value, { levels: { 'level-37': { stars: 0.85 } } });
+    await assert.rejects(asJames(() => q(`select admin_set_config('secrets', '{}')`)), /Unknown config/);
+    await assert.rejects(asJames(() => q(`select admin_set_config('economy', '[1]')`)), /JSON object/);
+  });
+});

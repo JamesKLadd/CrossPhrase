@@ -29,8 +29,8 @@ to turn what you learn into changes, most of them without a new build.
 - [ ] **You've played it on your own phone.** Open
   https://jameskladd.github.io/CrossPhrase/ in Safari, **Share → Add to Home
   Screen**, open it from the home screen and clear level 1.
-- [ ] **The stats arrive.** In Supabase, Table Editor → `level_stats` shows your
-  game (events are sent every 30 seconds and when the game goes to the
+- [ ] **The stats arrive.** Logged in as James, 🛠 Admin → Dashboard → Levels
+  shows your game (events are sent every 30 seconds and when the game goes to the
   background).
 - [ ] **Decide on hearts for this round.** The suggestion: leave them on, since
   how they feel is one of the questions. If they annoy people, switch them off
@@ -121,31 +121,29 @@ both.
 
 ## Reading the numbers
 
-Every few days, open Supabase → SQL Editor and run these (or browse the views
-in the Table Editor). Wait for at least **5 players on a level** before
-trusting its numbers.
+Every few days, log in as James and open **🛠 Admin → 📊 Dashboard**. Wait for
+at least **5 players on a level** before trusting its numbers.
+
+- **Players**: players ever, accounts, who played today and this week, games,
+  feedback, and corrections waiting for review; players per day; each daily
+  puzzle (is anyone still playing in week two?).
+- **Levels**: every level with games: players, won, lost, quit, the share
+  lost, submits to win, stars, boosted clears and the 😴/🙂/😤 ratings. **⚠
+  (hard)** marks levels most players lose or call too hard; **Hardest first**
+  sorts by the share lost. Below it, how far players get: a sudden drop is a
+  wall.
+- **Economy**: boosters bought, hearts refilled, how often players run out.
+- **Feedback**: what testers wrote, with their username and build.
+
+The same numbers are views in Supabase (`level_stats`, `level_funnel`,
+`daily_stats`, `active_players`, `economy_stats`, `feedback`) for anything the
+dashboard doesn't show, e.g. in the SQL Editor:
 
 ```sql
--- Levels people fail most, or call too hard.
 select number, level, players, wins, losses, quits, fail_rate, rated_easy, rated_right, rated_hard
 from level_stats
 where fail_rate > 0.5 or rated_hard > rated_right or quits > wins
 order by number;
-
--- Where people stop playing: a big drop between two levels is a wall.
-select * from level_funnel;
-
--- What testers wrote.
-select * from feedback;
-
--- The daily puzzle: is anyone still playing it in week two?
-select * from daily_stats;
-
--- Boosters bought, hearts refilled, how often people run out.
-select * from economy_stats;
-
--- How many people played each day.
-select * from active_players;
 ```
 
 **Rules of thumb:**
@@ -162,10 +160,12 @@ select * from active_players;
 
 ## Fixing what you find
 
-Most fixes are a change to the `remote_config` table (Supabase → Table Editor →
-`remote_config` → edit the `value`). Players get the change the next time they
-open the game; there's no new build. The leaderboard server picks it up within
-a minute.
+Most fixes are made from the dashboard, with no new build: tap a level on
+**Levels** to change its star targets or swaps (or its whole band's), and use
+the **Economy** tab for hearts, rewards and booster prices. Players get the
+change the next time they open the game; the leaderboard server within a
+minute. Underneath, these edit the `remote_config` table, so the same values
+can be written there by hand:
 
 | Problem | Change |
 |---|---|
@@ -190,20 +190,23 @@ Bigger changes need code and a push (the website rebuilds itself):
 
 ## Teach the owl from playtests
 
-When testers tap **Wrong?** on a verdict, the correction is sent with their
-play stats. To use them as training data:
+When testers tap **Wrong?** on a verdict, the correction lands in your review
+queue. To use them as training data:
 
-1. Supabase → SQL Editor: `select at, phrase, tier, judged from player_labels;`
-   then export the result as CSV. Skim it first and delete anything silly.
-2. `npm run import:labels -- path/to/the.csv` adds them to
-   `training/labels.jsonl` (it skips ones already there).
-3. `npm run train:judge`, check the agreement it prints, then commit
-   `training/labels.jsonl` and `src/data/judgeModel.json`. Rebuild the server
-   bundle (`npm run bundle:server`) and redeploy `scores`, because leaderboards
-   re-judge with the built-in judge.
+1. **🛠 Admin → Review players' corrections**: each phrase shows what the owl
+   said and how many players suggested each tier. Tap the tier it deserves to
+   approve it, or **Reject** anything silly. Your own labels (the labelling
+   screen, or your own "Wrong?" taps) skip the queue.
+2. On the PC: `npm run pull:labels` (asks for James's password) adds every
+   approved label to `training/labels.jsonl`.
+3. `npm run train:judge`, check the agreement it prints, then
+   `npm run bundle:server`, commit `training/labels.jsonl`,
+   `src/data/judgeModel.json` and the bundle, push, and
+   `npx supabase functions deploy scores` (leaderboards re-judge with the
+   built-in judge, so the server needs the same model).
 
-A few hundred labels (yours from the labelling screen plus the testers') is
-also what the planned fine-tune of the launch judge needs.
+A few hundred labels (yours plus approved corrections) is also what the
+planned fine-tune of the launch judge needs.
 
 ## Keep a log
 

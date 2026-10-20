@@ -7,9 +7,10 @@ import { BUNDLED_MODEL, localVerdict } from '../../core/localJudge';
 import { labellingCandidate, Rng } from '../../core/phraseGen';
 import type { Tier } from '../../core/types';
 import { displayWord } from '../../core/words';
+import { useAccount } from '../../account';
 import { judgeService } from '../../judge';
-import { devToolsEnabled, isUnlocked } from '../../ui/devAccess';
-import { DevToolsOff, PinGate } from '../../ui/PinGate';
+import { sendLabel } from '../../labels';
+import { DevGate } from '../../ui/PinGate';
 import { colors, TIER_ICON, TIER_LABEL, useTierColors } from '../../ui/theme';
 
 const TIERS: Tier[] = ['invalid', 'ok', 'great', 'poetic'];
@@ -22,7 +23,6 @@ const TIER_HELP: Record<Tier, string> = {
 
 /** Quick labelling for training the judges. Developer only: see ui/devAccess.ts. */
 export default function LabelScreen() {
-  const [open, setOpen] = useState(isUnlocked());
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.column}>
@@ -33,13 +33,9 @@ export default function LabelScreen() {
           <Text style={styles.title}>Label phrases</Text>
           <View style={styles.headerSpacer} />
         </View>
-        {!devToolsEnabled ? (
-          <DevToolsOff />
-        ) : open ? (
+        <DevGate>
           <Labeller />
-        ) : (
-          <PinGate onUnlock={() => setOpen(true)} />
-        )}
+        </DevGate>
       </View>
     </SafeAreaView>
   );
@@ -47,6 +43,7 @@ export default function LabelScreen() {
 
 function Labeller() {
   const tierColors = useTierColors();
+  const { admin } = useAccount();
   const [rng] = useState(() => new Rng(Date.now() | 0));
   /** Phrases already labelled, so none comes up twice. */
   const [seen, setSeen] = useState<ReadonlySet<string>>(
@@ -63,6 +60,8 @@ function Labeller() {
     const phrase = words.join(' ');
     const builtIn = localVerdict({ id: '1A', words }).tier;
     judgeService.label({ phrase, tier, source: 'labeler' });
+    // Also to the backend, where the admin's labels count for training at once (npm run pull:labels).
+    sendLabel({ phrase, tier });
     const updated = new Set(seen).add(phrase);
     setSeen(updated);
     setTotal((n) => n + 1);
@@ -88,11 +87,13 @@ function Labeller() {
     <View style={styles.labeller}>
       <Text style={styles.stats}>
         {total} labelled
-        {judgeService.remoteKind === 'pc'
-          ? unsent > 0
-            ? ` · ${unsent} waiting for the PC judge`
-            : ' · all saved on your PC'
-          : ' · on this phone (export below)'}
+        {admin
+          ? ' · saved to your account for training (npm run pull:labels)'
+          : judgeService.remoteKind === 'pc'
+            ? unsent > 0
+              ? ` · ${unsent} waiting for the PC judge`
+              : ' · all saved on your PC'
+            : ' · on this phone (export below)'}
         {agreed.of > 0 ? `\nBuilt-in judge agreed with you ${agreed.yes} of ${agreed.of} times today.` : ''}
       </Text>
 

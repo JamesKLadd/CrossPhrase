@@ -57,6 +57,13 @@ export function syncAccount(): Promise<unknown> {
   return sync.sync();
 }
 
+/** Asks the server whether this account is the game's admin (only the buttons depend on it). */
+async function refreshAdmin(): Promise<void> {
+  if (!client || !sync.state().userId) return;
+  const { data, error } = await client.rpc('is_admin');
+  if (!error) sync.setAdmin(data === true);
+}
+
 /** The message in a failed function call's response, if it has one. */
 async function functionError(error: unknown): Promise<string> {
   if (error instanceof FunctionsHttpError) {
@@ -88,6 +95,7 @@ export async function createAccount(username: string, password: string): Promise
   sync.signIn(userId, (data as { username?: string })?.username ?? name);
   track('account', { action: 'created' });
   void sync.sync();
+  void refreshAdmin();
   return null;
 }
 
@@ -109,6 +117,7 @@ export async function logIn(username: string, password: string): Promise<string 
   sync.signIn(data.user.id, (row as { username?: string } | null)?.username ?? name);
   track('account', { action: 'login' });
   await sync.sync();
+  await refreshAdmin();
   return null;
 }
 
@@ -171,5 +180,5 @@ export function startAccountSync(): void {
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => void sync.sync());
   }
-  void sync.sync();
+  void sync.sync().then(refreshAdmin);
 }

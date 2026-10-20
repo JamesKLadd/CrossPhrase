@@ -13,6 +13,8 @@ export interface AccountState {
   /** The Supabase user the account is, or null for a guest. */
   userId: string | null;
   username: string | null;
+  /** The game's admin (the developer's account): the dashboard and training tools. Only decides which buttons show; the server checks for itself. */
+  admin: boolean;
   /** When this device last saved to (or caught up with) the cloud, ISO time. */
   syncedAt: string | null;
   /** What happened on the last try, for the account screen. */
@@ -31,7 +33,7 @@ export interface SaveBackend {
 export type SyncResult = 'saved' | 'up-to-date' | 'guest' | 'signed-out' | 'offline';
 
 const KEY = 'crossphrase:v1:account';
-const GUEST: AccountState = { userId: null, username: null, syncedAt: null, status: 'idle' };
+const GUEST: AccountState = { userId: null, username: null, admin: false, syncedAt: null, status: 'idle' };
 /** Writes lost to another device saving at the same moment are retried this many times. */
 const ATTEMPTS = 3;
 
@@ -54,7 +56,13 @@ export function createAccountSync({
   try {
     const saved = JSON.parse(storage.getItem(KEY) ?? 'null');
     if (saved && typeof saved.userId === 'string' && typeof saved.username === 'string') {
-      state = { ...GUEST, userId: saved.userId, username: saved.username, syncedAt: saved.syncedAt ?? null };
+      state = {
+        ...GUEST,
+        userId: saved.userId,
+        username: saved.username,
+        admin: saved.admin === true,
+        syncedAt: saved.syncedAt ?? null,
+      };
     }
   } catch {
     // A guest, then.
@@ -62,8 +70,8 @@ export function createAccountSync({
   const listeners = new Set<() => void>();
   const set = (changes: Partial<AccountState>) => {
     state = { ...state, ...changes };
-    const { userId, username, syncedAt } = state;
-    storage.setItem(KEY, JSON.stringify({ userId, username, syncedAt }));
+    const { userId, username, admin, syncedAt } = state;
+    storage.setItem(KEY, JSON.stringify({ userId, username, admin, syncedAt }));
     for (const listener of listeners) listener();
   };
 
@@ -91,7 +99,7 @@ export function createAccountSync({
       if ((await backend.userId()) !== userId) {
         // The login ended (deleted on another device, or signed out): keep the
         // progress here and ask to log in again, which merges it back.
-        set({ userId: null, status: 'signed-out' });
+        set({ userId: null, admin: false, status: 'signed-out' });
         return 'signed-out';
       }
       set({ status: 'syncing' });
@@ -145,7 +153,10 @@ export function createAccountSync({
     /** True while sync is writing a merged save into the stores. */
     applying: () => applying,
     signIn(userId: string, username: string) {
-      set({ userId, username, syncedAt: null, status: 'idle' });
+      set({ userId, username, admin: false, syncedAt: null, status: 'idle' });
+    },
+    setAdmin(admin: boolean) {
+      if (state.userId && admin !== state.admin) set({ admin });
     },
     /** Forgets the account on this device (logging out). */
     forget() {

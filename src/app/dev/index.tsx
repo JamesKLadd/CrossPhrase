@@ -6,14 +6,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LEVELS } from '../../data/levels';
 import { useLives, useWallet, wallet } from '../../economy';
 import { progress, totalStars, useProgress } from '../../progress';
-import { devToolsEnabled, isUnlocked } from '../../ui/devAccess';
-import { DevToolsOff, PinGate } from '../../ui/PinGate';
+import { DevGate } from '../../ui/PinGate';
 import { colors } from '../../ui/theme';
 import { useJudgeStatus } from '../../ui/useJudgeStatus';
 
-/** Developer tools behind the PIN: labelling, and shortcuts for testing levels. */
+/** The admin's tools (and, in development builds, behind the PIN): stats, tuning, labelling, and shortcuts for testing. */
 export default function DevMenu() {
-  const [open, setOpen] = useState(isUnlocked());
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.column}>
@@ -21,10 +19,12 @@ export default function DevMenu() {
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <Text style={styles.back}>‹ Back</Text>
           </Pressable>
-          <Text style={styles.title}>Developer</Text>
+          <Text style={styles.title}>Admin</Text>
           <View style={styles.headerSpacer} />
         </View>
-        {!devToolsEnabled ? <DevToolsOff /> : open ? <Tools /> : <PinGate onUnlock={() => setOpen(true)} />}
+        <DevGate>
+          <Tools />
+        </DevGate>
       </View>
     </SafeAreaView>
   );
@@ -45,7 +45,9 @@ function Tools() {
         {cleared} of {LEVELS.length} levels cleared · {totalStars(saved)} of {LEVELS.length * 3} stars
       </Text>
 
-      <Button label="Label phrases" primary onPress={() => router.push('/dev/label')} />
+      <Button label="📊 Dashboard: stats and tuning" primary onPress={() => router.push('/dev/stats')} testID="dev-stats" />
+      <Button label="Review players' corrections" onPress={() => router.push('/dev/review')} testID="dev-review" />
+      <Button label="Label phrases" onPress={() => router.push('/dev/label')} />
       <Button label="The owl's moods" onPress={() => router.push('/dev/owl')} />
       <Button
         label={saved.unlockAll ? 'Unlock all levels: on' : 'Unlock all levels: off'}

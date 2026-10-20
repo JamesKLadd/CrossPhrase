@@ -114,13 +114,41 @@ Study App's training kit) on the NVIDIA desktop.
 - Progress (best stars and score per level) is saved on the device. A level
   unlocks when the one before it is cleared.
 
-### Developer tools
+### Admin and developer tools
 
-With `EXPO_PUBLIC_DEV_PIN` set in `.env.local`, **long-press the owl** on the
-home screen and enter the PIN for: the labelling screen, a gallery of **the
-owl's moods**, **Unlock all levels** (to try any level), **Add 100 feathers**,
-**Lose a heart** (to try the economy) and **Reset progress**. The website is
-built without a PIN, so these don't exist there.
+The admin account (**James**) gets a **🛠 Admin** button on the home screen,
+on the website and in the app, with no PIN. Development builds also open the
+same tools with `EXPO_PUBLIC_DEV_PIN` in `.env.local` (long-press the owl):
+
+- **📊 Dashboard**: play stats in four tabs (Players: headline numbers, players
+  per day, each daily puzzle; Levels: every level's wins, losses, quits, fail
+  rate and ratings with ⚠ on hard ones, and how far players get; Economy:
+  boosters and hearts, plus the economy settings; Feedback). Tap a level (or
+  pick one) to **tune** it or its band (star targets and extra swaps); the
+  Economy tab edits hearts, rewards and booster prices. Saving writes the
+  remote config, so players get it next time they open the game.
+- **Review players' corrections**: "Wrong?" taps from players, one card per
+  phrase with how many players suggested each tier. Approve one as the tier it
+  deserves, or reject it.
+- **Label phrases**: rate generated phrases; the admin's labels count for
+  training straight away.
+- **The owl's moods**, **Unlock all levels**, **Add 100 feathers**, **Lose a
+  heart** and **Reset progress**, for testing.
+
+Admins are listed by account (`admins` table), not by name, so a deleted
+"James" can't be re-registered by someone else to get in; the server checks
+every admin request itself. To add another admin, in the SQL Editor:
+`insert into admins (user_id) select user_id from accounts where username_key = 'name';`
+
+**Training the built-in judge from the labels** (on the PC):
+
+```sh
+npm run pull:labels     # logs in as James (asks for the password) and adds approved labels to training/labels.jsonl
+npm run train:judge     # retrains; check the agreement it prints
+npm run bundle:server   # the leaderboard server judges with the same model
+```
+
+Then commit and push (the website rebuilds) and `npx supabase functions deploy scores`.
 
 ## Modes
 
@@ -226,9 +254,10 @@ the wallet moves to the server so purchases can be checked.
 
 ## Tune it without an update (remote config)
 
-The `remote_config` table (Supabase → Table Editor → `remote_config`) holds
-settings the game reads when it starts; edit a row's `value` and players get
-it next time they open the game. Anything the game doesn't understand is
+The `remote_config` table holds settings the game reads when it starts. The
+admin edits them from the in-game Dashboard (tune a level, the Economy tab);
+they're also editable in Supabase → Table Editor → `remote_config`. Players
+get a change the next time they open the game. Anything the game doesn't understand is
 ignored, so a typo can't break it.
 
 - **`economy`**: overrides for the defaults in `src/core/economy.ts`, e.g.
@@ -247,8 +276,9 @@ ignored, so a typo can't break it.
 With the backend set up, the game sends small anonymous events (a level
 started, each submit, won or lost, boosters used, the 😴/🙂/😤 rating on the
 result card, feedback typed in Settings) to the `events` table, a batch at a
-time. Players can switch this off in Settings. Read them in the Supabase
-Table Editor (or SQL Editor) through these views:
+time. Players can switch this off in Settings. The admin reads them on the
+in-game **Dashboard** (above); they're also in the Supabase Table Editor (or
+SQL Editor) as these views:
 
 | View | Shows |
 |---|---|
@@ -258,7 +288,6 @@ Table Editor (or SQL Editor) through these views:
 | `active_players` | Players, sessions and games per day |
 | `economy_stats` | Boosters bought, hearts refilled, players running out of hearts |
 | `feedback` | What players wrote in Settings → Send feedback |
-| `player_labels` | "Wrong?" corrections from play, for training (see `npm run import:labels`) |
 
 Judge cost is in `judge_cost_daily` (from Phase 2). Events stay until you
 delete them; on the free tier, `delete from events where created_at < now() - interval '90 days';`
@@ -296,7 +325,7 @@ leaderboards.
   Authentication → Users, accounts show with their made-up address.
 
 **After pulling these changes**, update the backend: `npx supabase db push`
-(the new tables and views), `npx supabase functions deploy scores` (it now
+(new tables, views and the admin functions), `npx supabase functions deploy scores` (it now
 applies the tuning) and `npx supabase functions deploy account` (new).
 
 ## The owl, sound and settings
@@ -332,7 +361,7 @@ applies the tuning) and `npx supabase functions deploy account` (new).
 | `npm run test:pc-judge` | PC judge server tests |
 | `npm run test:functions` | Edge Function tests: the judge and scores (needs [Deno](https://deno.com)) |
 | `npm run train:judge` | Retrains the built-in judge from `training/` |
-| `npm run import:labels -- <file.csv>` | Adds testers' "Wrong?" corrections (exported from `player_labels`) to `training/labels.jsonl` |
+| `npm run pull:labels` | Downloads approved training labels (yours and reviewed corrections) into `training/labels.jsonl` |
 | `npm run generate:levels` | Regenerates levels 11–120 (see Levels above) |
 | `npm run generate:dailies` | Regenerates a year of daily puzzles |
 | `npm run bundle:server` | Rebuilds the leaderboard server's copy of the game core |

@@ -87,6 +87,7 @@ export default function LevelMap() {
   const amplitude = Math.min(Math.min(width, 520) * 0.26, 120);
   const still = useReduceMotion();
   const [hoots, setHoots] = useState(0);
+  const { admin } = useAccount();
 
   // Send any leaderboard scores that couldn't go when they were made.
   useEffect(() => {
@@ -125,7 +126,7 @@ export default function LevelMap() {
               haptic('tap');
               setHoots((h) => h + 1);
             }}
-            onLongPress={() => devToolsEnabled && router.push('/dev')}
+            onLongPress={() => (devToolsEnabled || admin) && router.push('/dev')}
             delayLongPress={800}
             accessibilityLabel="The owl"
           >
@@ -138,7 +139,12 @@ export default function LevelMap() {
           </Text>
           <WalletBar />
           {/* Which judge is grading: for development, not for players on the website. */}
-          {(__DEV__ || devToolsEnabled) && <Text style={styles.devNote}>{judgeStatus}</Text>}
+          {(__DEV__ || devToolsEnabled || admin) && <Text style={styles.devNote}>{judgeStatus}</Text>}
+          {admin && (
+            <Pressable onPress={() => router.push('/dev')} style={styles.admin} accessibilityRole="button" testID="admin-button">
+              <Text style={styles.adminText}>🛠 Admin: stats, tuning and training</Text>
+            </Pressable>
+          )}
           <InstallTip />
           <Modes saved={saved} />
         </View>
@@ -340,6 +346,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paperDeep,
   },
   accountText: { fontSize: 13, fontWeight: '700', color: colors.ink },
+  admin: { marginTop: 8, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: colors.ink },
+  adminText: { fontSize: 14, fontWeight: '700', color: colors.white },
   settingsIcon: { fontSize: 24 },
   title: { fontSize: 34, fontWeight: '900', color: colors.ink, letterSpacing: 0.5 },
   subtitle: { fontSize: 15, color: colors.inkSoft },

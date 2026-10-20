@@ -55,7 +55,7 @@
     "test:db": "node --test supabase/tests/database.test.mjs",
     "test:functions": "deno test --no-lock supabase/functions",
     "train:judge": "tsx scripts/train-judge.ts",
-    "import:labels": "node scripts/import-labels.mjs",
+    "pull:labels": "tsx scripts/pull-labels.mts",
     "generate:levels": "tsx scripts/generate-levels.ts",
     "generate:dailies": "tsx scripts/generate-dailies.ts",
     "make:sounds": "node scripts/make-sounds.mjs",

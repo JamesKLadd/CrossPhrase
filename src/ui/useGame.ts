@@ -9,10 +9,10 @@ import {
   type GameAction,
   type GameState,
 } from '../core/game';
-import { track } from '../analytics';
 import { builtinJudge, replayRun, runActionFor, type RunAction } from '../core/run';
 import type { LevelDef, Tier } from '../core/types';
 import { judgeService, type JudgeMode } from '../judge';
+import { sendLabel } from '../labels';
 import { haptic, playSound } from './feedback';
 
 /** How often to retry offline phrases while any are queued. */
@@ -143,8 +143,8 @@ export function useGame(level: LevelDef, options: GameOptions = {}) {
   const correct = useCallback((phrase: string, judged: Tier, tier: Tier) => {
     setCorrections((prev) => new Map(prev).set(phrase, tier));
     judgeService.label({ phrase, tier, judged, source: 'play' });
-    // With play stats on, corrections reach the developer too (see npm run import:labels).
-    track('label', { phrase, tier, judged });
+    // Corrections also go to the developer's review queue, for training the built-in judge.
+    sendLabel({ phrase, tier, judged });
     setNotice(
       tier === judged
         ? 'So we agree after all. How novel.'

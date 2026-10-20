@@ -109,6 +109,14 @@ Docs: https://docs.expo.dev/eas/index.md
   merges must never lose progress (`mergeSaves`): keep anything new in a save
   mergeable the same way, and keep feathers in the wallet ledger, never as a
   plain balance. Leaderboard names come from `accounts.username`.
+- Admin: the `admins` table (by user id, seeded with James's account) and
+  `is_admin()`. Every admin RPC (`admin_*` in the admin migration) calls
+  `require_admin()` itself; the app's `admin` flag and `DevGate` only decide
+  what's shown, so never rely on them for security. Admin screens live in
+  `src/app/dev/`, their API in `src/admin/`. Training labels go to the
+  `labels` table through `submit_label` (`src/labels/`); players' wait for
+  review, the admin's are approved at once; `npm run pull:labels` brings the
+  approved ones to `training/labels.jsonl`.
 - Play stats go through `track()` in `src/analytics/` (queued, batched,
   switchable in Settings). Never put anything a player typed in an event
   except the feedback they choose to send, and no names.
