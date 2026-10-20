@@ -1,6 +1,6 @@
 import 'expo-sqlite/localStorage/install';
 import { createClient } from '@supabase/supabase-js';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -18,8 +18,10 @@ export const supabase =
       })
     : null;
 
-if (supabase) {
-  // Only refresh the session while the app is in the foreground.
+// In a browser, supabase-js pauses and resumes refreshing the login itself
+// as the tab is hidden and shown (and coordinates tabs, so two never refresh
+// at once). In the app, it only refreshes while the app is in front.
+if (supabase && Platform.OS !== 'web') {
   AppState.addEventListener('change', (state) => {
     if (state === 'active') supabase.auth.startAutoRefresh();
     else supabase.auth.stopAutoRefresh();

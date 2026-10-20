@@ -3,7 +3,7 @@ import { createWalletStore } from '../../economy/walletStore';
 import type { KeyValueStorage } from '../../judge/verdictStore';
 import { createProgressStore } from '../../progress/progressStore';
 import type { SaveData } from '../merge';
-import { createAccountSync, type SaveBackend } from '../sync';
+import { accountRemembered, createAccountSync, type SaveBackend } from '../sync';
 
 function memoryStorage(): KeyValueStorage {
   const data = new Map<string, string>();
@@ -129,6 +129,12 @@ describe('account sync', () => {
     expect(await phone.sync.sync()).toBe('signed-out');
     expect(phone.sync.state()).toMatchObject({ userId: null, username: 'Hoot', status: 'signed-out' });
     expect(phone.progress.snapshot().levels['first-light']).toBeDefined();
+    // Still remembered after a restart, so the game asks to log in again rather than starting a guest.
+    expect(accountRemembered(phone.storage)).toBe(true);
+    const restarted = createAccountSync({ storage: phone.storage, backend, progress: phone.progress, wallet: phone.wallet, today: () => '2026-10-20' });
+    expect(restarted.state()).toMatchObject({ userId: null, username: 'Hoot', status: 'signed-out' });
+    restarted.forget();
+    expect(accountRemembered(phone.storage)).toBe(false);
   });
 
   it('says when it is offline, and remembers the account across restarts', async () => {

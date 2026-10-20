@@ -174,7 +174,7 @@ export default function LevelMap() {
 
 /** Top left of the home screen: who's playing, or a way to make an account. */
 function AccountButton() {
-  const { userId, username } = useAccount();
+  const { userId, username, status } = useAccount();
   return (
     <Pressable
       onPress={() => router.push('/account')}
@@ -185,7 +185,7 @@ function AccountButton() {
       testID="account-button"
     >
       <Text style={styles.accountText} numberOfLines={1}>
-        👤 {userId ? username : 'Sign in'}
+        👤 {userId ? username : status === 'signed-out' ? 'Log in again' : 'Sign in'}
       </Text>
     </Pressable>
   );

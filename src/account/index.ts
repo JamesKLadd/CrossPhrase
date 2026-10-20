@@ -86,6 +86,8 @@ export async function createAccount(username: string, password: string): Promise
   const name = username.trim();
   const problem = usernameProblem(name) ?? passwordProblem(password);
   if (problem) return problem;
+  // A new account instead of logging back in to the old one: this device stops waiting for it.
+  if (!sync.state().userId) sync.forget();
   if (!(await signedIn())) return `Couldn't connect: ${lastSignInError() ?? 'no connection'}`;
   const { data, error } = await client.functions.invoke('account', { body: { action: 'signup', username: name, password } });
   if (error) return functionError(error);
@@ -119,6 +121,11 @@ export async function logIn(username: string, password: string): Promise<string 
   await sync.sync();
   await refreshAdmin();
   return null;
+}
+
+/** Stops waiting to log back in to an account whose login ended; keeps playing here as a guest. */
+export function playAsGuest(): void {
+  if (!sync.state().userId) sync.forget();
 }
 
 /** Starts this device over as a new guest: the account's progress stays in the cloud. */

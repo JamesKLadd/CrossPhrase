@@ -10,6 +10,7 @@ import {
   deleteAccount,
   logIn,
   logOut,
+  playAsGuest,
   syncAccount,
   useAccount,
   usernameProblem,
@@ -191,9 +192,12 @@ function SignedOut({ account }: { account: AccountState }) {
   return (
     <View style={styles.stack}>
       {ended && (
-        <Text style={styles.warning}>
-          {'Your login on this device ended. Log in again to keep saving; your progress here is kept and added back.'}
-        </Text>
+        <>
+          <Text style={styles.warning} testID="login-ended">
+            {`Your login as ${account.username} on this device ended. Log in again to keep saving; your progress here is kept and added back.`}
+          </Text>
+          <Button label="Play as a guest instead" onPress={playAsGuest} testID="play-as-guest" />
+        </>
       )}
       <View style={styles.tabs} accessibilityRole="tablist">
         {(['create', 'login'] as const).map((m) => (

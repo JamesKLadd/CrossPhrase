@@ -33,6 +33,19 @@ export interface SaveBackend {
 export type SyncResult = 'saved' | 'up-to-date' | 'guest' | 'signed-out' | 'offline';
 
 const KEY = 'crossphrase:v1:account';
+
+/**
+ * True when this device belongs to an account, logged in or waiting to log
+ * in again. The game must then never start a guest session of its own: that
+ * would replace the account's saved login (see signedIn in src/lib/auth.ts).
+ */
+export function accountRemembered(storage: KeyValueStorage): boolean {
+  try {
+    return typeof JSON.parse(storage.getItem(KEY) ?? 'null')?.username === 'string';
+  } catch {
+    return false;
+  }
+}
 const GUEST: AccountState = { userId: null, username: null, admin: false, syncedAt: null, status: 'idle' };
 /** Writes lost to another device saving at the same moment are retried this many times. */
 const ATTEMPTS = 3;
@@ -55,13 +68,16 @@ export function createAccountSync({
   let state: AccountState = GUEST;
   try {
     const saved = JSON.parse(storage.getItem(KEY) ?? 'null');
-    if (saved && typeof saved.userId === 'string' && typeof saved.username === 'string') {
+    if (saved && typeof saved.username === 'string') {
+      const loggedIn = typeof saved.userId === 'string';
       state = {
         ...GUEST,
-        userId: saved.userId,
+        // An account whose login ended stays remembered until the player logs in again (or chooses to be a guest).
+        userId: loggedIn ? saved.userId : null,
         username: saved.username,
-        admin: saved.admin === true,
+        admin: loggedIn && saved.admin === true,
         syncedAt: saved.syncedAt ?? null,
+        status: loggedIn ? 'idle' : 'signed-out',
       };
     }
   } catch {
@@ -160,7 +176,9 @@ export function createAccountSync({
     },
     /** Forgets the account on this device (logging out). */
     forget() {
-      set({ ...GUEST });
+      state = { ...GUEST };
+      storage.removeItem(KEY);
+      for (const listener of listeners) listener();
     },
   };
 }
