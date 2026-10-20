@@ -33,7 +33,8 @@ const json = JSON.stringify({ generatedBy: 'scripts/build-grammar.mjs', verbs: O
 if (process.argv.includes('--check')) {
   let current = '';
   try {
-    current = readFileSync(OUT, 'utf8');
+    // Git on Windows may check the file out with CRLF line endings; compare the content, not those.
+    current = readFileSync(OUT, 'utf8').replace(/\r\n/g, '\n');
   } catch {}
   if (current !== json) {
     console.error('src/data/grammar.json is out of date: run npm run build:grammar');

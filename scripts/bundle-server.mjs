@@ -8,12 +8,14 @@
 
 import { build } from 'esbuild';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const OUT = new URL('../supabase/functions/_shared/scores.bundle.js', import.meta.url);
 
 async function bundleServer() {
   const result = await build({
-    entryPoints: [new URL('../src/server/scores.ts', import.meta.url).pathname],
+    // fileURLToPath, not .pathname: on Windows that gives "/C:/...", which esbuild can't find.
+    entryPoints: [fileURLToPath(new URL('../src/server/scores.ts', import.meta.url))],
     bundle: true,
     format: 'esm',
     platform: 'neutral',
@@ -28,7 +30,8 @@ async function bundleServer() {
 
 const code = await bundleServer();
 if (process.argv.includes('--check')) {
-  if (!existsSync(OUT) || readFileSync(OUT, 'utf8') !== code) {
+  // Git on Windows may check the bundle out with CRLF line endings; compare the code, not those.
+  if (!existsSync(OUT) || readFileSync(OUT, 'utf8').replace(/\r\n/g, '\n') !== code) {
     console.error('supabase/functions/_shared/scores.bundle.js is out of date: run npm run bundle:server');
     process.exit(1);
   }
