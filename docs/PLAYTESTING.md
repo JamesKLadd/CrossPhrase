@@ -19,8 +19,10 @@ to turn what you learn into changes, most of them without a new build.
 ## Before you invite anyone
 
 - [ ] **The backend is up to date.** Supabase set up as in the README, then
-  `npx supabase db push` and `npx supabase functions deploy scores` for this
-  phase's changes.
+  `npx supabase db push`, `npx supabase functions deploy scores` and
+  `npx supabase functions deploy account` for this phase's changes.
+- [ ] **Accounts work.** Make one on your phone, then log in to it in another
+  browser and check your stars came along.
 - [ ] **The website is live.** GitHub Pages is switched on, the two
   `EXPO_PUBLIC_SUPABASE_*` repository variables are set, and the latest push
   finished in the Actions tab. See "Play it as a website" in the README.
@@ -55,6 +57,10 @@ to turn what you learn into changes, most of them without a new build.
 > On iPhone, open it in Safari, tap Share, then "Add to Home Screen". It
 > then opens like an app and keeps your progress. On Android, open it in
 > Chrome, then ⋮ → "Add to Home screen".
+>
+> **Make an account** (👤 at the top left) so your progress is safe and you
+> can play on any device. Pick a password you'll remember: there's no email,
+> so it can't be reset.
 >
 > **What I'd love:** play about 10 minutes a day, and do the 📅 daily puzzle
 > each day. Post your daily result here (the Share button), it's spoiler-free.

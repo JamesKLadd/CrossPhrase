@@ -6,22 +6,15 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAccount } from '../account';
 import { dayKey, dayLabel } from '../data/dailies';
 import { LEVEL_IDS, LEVELS } from '../data/levels';
 import { currentLevelIndex, useProgress } from '../progress';
-import {
-  dailyBoard,
-  levelBoard,
-  playerName,
-  scoresEnabled,
-  setPlayerName,
-  type BoardRow,
-} from '../scores';
+import { dailyBoard, levelBoard, scoresEnabled, type BoardRow } from '../scores';
 import { colors } from '../ui/theme';
 
 type Tab = 'daily' | 'level';
@@ -80,7 +73,7 @@ function Boards() {
 
   return (
     <View style={styles.boards}>
-      <NameEditor />
+      <YourName />
       <View style={styles.tabs} accessibilityRole="tablist">
         {(['daily', 'level'] as const).map((t) => (
           <Pressable
@@ -148,43 +141,27 @@ function Boards() {
   );
 }
 
-function NameEditor() {
-  const [name, setName] = useState(playerName);
-  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
-  const [problem, setProblem] = useState<string | null>(null);
-  const save = async () => {
-    setStatus('saving');
-    const error = await setPlayerName(name);
-    setProblem(error);
-    setStatus(error ? 'failed' : 'saved');
-  };
+/** Your name on the boards: your account's username, or Anonymous owl without one. */
+function YourName() {
+  const { userId, username } = useAccount();
+  if (userId && username) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.note} testID="board-name">
+          You’re on the boards as <Text style={styles.strong}>{username}</Text>.
+        </Text>
+      </View>
+    );
+  }
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>Your name on the boards</Text>
-      <View style={styles.nameRow}>
-        <TextInput
-          value={name}
-          onChangeText={(text) => {
-            setName(text);
-            setStatus('idle');
-          }}
-          onSubmitEditing={save}
-          placeholder="Anonymous owl"
-          placeholderTextColor={colors.inkSoft}
-          maxLength={20}
-          style={styles.input}
-          testID="player-name"
-        />
-        <Pressable onPress={save} style={styles.save} accessibilityRole="button" disabled={!name.trim()}>
-          <Text style={styles.saveText}>{status === 'saving' ? '…' : 'Save'}</Text>
-        </Pressable>
-      </View>
-      {status === 'saved' && <Text style={styles.note}>Saved.</Text>}
-      {status === 'failed' && (
-        <Text style={styles.note} testID="name-problem">
-          {`Couldn't save that. ${problem ?? ''}`}
-        </Text>
-      )}
+      <Text style={styles.note} testID="board-name">
+        You’re on the boards as <Text style={styles.strong}>Anonymous owl</Text>. Create an account to use your own
+        name, and to keep your progress on any device.
+      </Text>
+      <Pressable onPress={() => router.push('/account')} style={styles.save} accessibilityRole="button" testID="board-account">
+        <Text style={styles.saveText}>Create an account</Text>
+      </Pressable>
     </View>
   );
 }
@@ -207,19 +184,8 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 16, fontWeight: '800', color: colors.ink },
   note: { fontSize: 14, lineHeight: 20, color: colors.inkSoft, textAlign: 'center' },
-  nameRow: { flexDirection: 'row', gap: 8 },
-  input: {
-    flex: 1,
-    minWidth: 0,
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: colors.tileEdge,
-    backgroundColor: colors.white,
-    fontSize: 16,
-    color: colors.ink,
-  },
-  save: { justifyContent: 'center', paddingHorizontal: 16, borderRadius: 10, backgroundColor: colors.wood },
+  strong: { fontWeight: '800', color: colors.ink },
+  save: { alignItems: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: colors.wood },
   saveText: { fontSize: 15, fontWeight: '700', color: colors.white },
   tabs: { flexDirection: 'row', gap: 8 },
   tab: {

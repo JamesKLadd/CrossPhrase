@@ -201,7 +201,7 @@ describe('leaderboards', () => {
   test('ranks by score, then fewer submits, with the player shown even below the cut', async () => {
     await saveDaily(BOB, 40, 2);
     await saveDaily(CAROL, 10, 3, false);
-    await asPlayer(ALICE, () => q(`select set_player_name('  Alice  ')`));
+    await q(`insert into accounts (user_id, username) values ($1, 'Alice')`, [ALICE]);
     const rows = (await asPlayer(BOB, () => q(`select * from daily_leaderboard('2026-10-20', 1)`))).rows;
     assert.deepEqual(
       rows.map((r) => [Number(r.rank), r.name, r.score, r.is_me]),
@@ -234,9 +234,8 @@ describe('leaderboards', () => {
     assert.equal(seen.rows.length, 0);
   });
 
-  test('names must be 1-20 characters', async () => {
-    await assert.rejects(asPlayer(BOB, () => q(`select set_player_name('   ')`)), /check/);
-    await assert.rejects(asPlayer(BOB, () => q(`select set_player_name(repeat('x', 21))`)), /check/);
+  test('names come from accounts: free-text names are retired', async () => {
+    await assert.rejects(asPlayer(BOB, () => q(`select set_player_name('Alice')`)), /permission denied/);
   });
 });
 
@@ -322,5 +321,76 @@ describe('analytics events', () => {
     assert.equal(Number(row.fail_rate), 0.5);
     assert.equal(Number(row.submits_to_win), 2);
     assert.equal(Number(row.rated_hard), 1);
+  });
+});
+
+describe('accounts and cloud saves', () => {
+  const DAVE = '44444444-4444-4444-4444-444444444444';
+  const ERIN = '55555555-5555-5555-5555-555555555555';
+  const put = (user, data, expected = null) =>
+    asPlayer(user, () => one(`select put_save($1::jsonb, $2::timestamptz) as at`, [JSON.stringify(data), expected]));
+
+  before(async () => {
+    await q('insert into auth.users values ($1), ($2)', [DAVE, ERIN]);
+  });
+
+  test('usernames are unique whatever their case, and well-formed', async () => {
+    await q(`insert into accounts (user_id, username) values ($1, 'Dave_99')`, [DAVE]);
+    await assert.rejects(q(`insert into accounts (user_id, username) values ($1, 'dave_99')`, [ERIN]), /unique/);
+    await assert.rejects(q(`insert into accounts (user_id, username) values ($1, 'x')`, [ERIN]), /check/);
+    await assert.rejects(q(`insert into accounts (user_id, username) values ($1, 'has space')`, [ERIN]), /check/);
+  });
+
+  test('players see only their own account and cannot make one themselves', async () => {
+    const mine = await asPlayer(DAVE, () => q('select username from accounts'));
+    assert.deepEqual(mine.rows, [{ username: 'Dave_99' }]);
+    await assert.rejects(
+      asPlayer(ERIN, () => q(`insert into accounts (user_id, username) values ($1, 'Erin')`, [ERIN])),
+      /permission denied/,
+    );
+  });
+
+  test('a save needs an account', async () => {
+    await assert.rejects(put(ERIN, { progress: {} }), /Create an account first/);
+  });
+
+  test('saves only write over the version that was read', async () => {
+    const first = await put(DAVE, { progress: { v: 1 } });
+    assert.ok(first.at);
+    // A second "first save" (another device that hadn't seen this one) is refused.
+    assert.equal((await put(DAVE, { progress: { v: 2 } })).at, null);
+    const read = await asPlayer(DAVE, () => one('select data, updated_at from get_save()'));
+    assert.deepEqual(read.data, { progress: { v: 1 } });
+    const second = await put(DAVE, { progress: { v: 3 } }, read.updated_at);
+    assert.ok(second.at);
+    // Writing over the old version again fails: someone saved since.
+    assert.equal((await put(DAVE, { progress: { v: 4 } }, read.updated_at)).at, null);
+    const latest = await asPlayer(DAVE, () => one('select data from get_save()'));
+    assert.deepEqual(latest.data, { progress: { v: 3 } });
+  });
+
+  test('players never see anyone else\'s save, and saves have a size limit', async () => {
+    const other = await asPlayer(ERIN, () => q('select * from get_save()'));
+    assert.equal(other.rows.length, 0);
+    await assert.rejects(asPlayer(DAVE, () => q('select * from saves')), /permission denied/);
+    const read = await asPlayer(DAVE, () => one('select updated_at from get_save()'));
+    await assert.rejects(put(DAVE, { blob: 'x'.repeat(300000) }, read.updated_at), /too big/);
+    await assert.rejects(asAnon(() => q('select * from get_save()')), /permission denied/);
+  });
+
+  test('leaderboards show usernames, and Anonymous owl for players without an account', async () => {
+    await q(`select save_level_score($1, 'level-12', 50, 3::smallint, '[]'::jsonb, 'v1')`, [DAVE]);
+    await q(`select save_level_score($1, 'level-12', 40, 2::smallint, '[]'::jsonb, 'v1')`, [ERIN]);
+    const rows = (await asPlayer(ERIN, () => q(`select name, is_me from level_leaderboard('level-12')`))).rows;
+    assert.deepEqual(rows, [
+      { name: 'Dave_99', is_me: false },
+      { name: 'Anonymous owl', is_me: true },
+    ]);
+  });
+
+  test('deleting the user deletes the account and its save', async () => {
+    await q('delete from auth.users where id = $1', [DAVE]);
+    assert.equal((await q('select * from accounts where user_id = $1', [DAVE])).rows.length, 0);
+    assert.equal((await q('select * from saves where user_id = $1', [DAVE])).rows.length, 0);
   });
 });

@@ -3,7 +3,7 @@ import 'expo-sqlite/localStorage/install';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
 import type { RunAction } from '../core/run';
-import { lastSignInError, signedIn } from '../lib/auth';
+import { signedIn } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { progress } from '../progress';
 
@@ -37,7 +37,6 @@ type Pending =
   | { kind: 'level'; levelId: string; actions: RunAction[] };
 
 const OUTBOX = 'crossphrase:v1:score-outbox';
-const NAME = 'crossphrase:v1:player-name';
 const MAX_OUTBOX = 50;
 
 function readOutbox(): Pending[] {
@@ -91,6 +90,11 @@ export function submitLevelScore(levelId: string, actions: readonly RunAction[])
   void submit({ kind: 'level', levelId, actions: [...actions] });
 }
 
+/** Drops runs waiting to be sent (when a player logs out, so they aren't sent as the next player). */
+export function clearScoreOutbox(): void {
+  writeOutbox([]);
+}
+
 /** Retries queued runs. */
 export async function flushScores(): Promise<void> {
   if (!scoresEnabled) return;
@@ -136,24 +140,4 @@ export async function levelBoard(levelId: string): Promise<BoardRow[] | null> {
   if (!supabase || !(await signedIn())) return null;
   const { data, error } = await supabase.rpc('level_leaderboard', { p_level: levelId });
   return error ? null : (data as RawRow[]).map(toRow);
-}
-
-/** The name you go by on leaderboards, as last set on this device. */
-export function playerName(): string {
-  return localStorage.getItem(NAME) ?? '';
-}
-
-/** Saves your leaderboard name. Returns null on success, or what went wrong. */
-export async function setPlayerName(name: string): Promise<string | null> {
-  const trimmed = name.trim().slice(0, 20);
-  if (!supabase) return 'The online backend isn’t configured (.env.local).';
-  if (!trimmed) return 'Type a name first.';
-  if (!(await signedIn())) return `Couldn't sign in: ${lastSignInError() ?? 'no connection'}`;
-  const { error } = await supabase.rpc('set_player_name', { p_name: trimmed });
-  if (error) {
-    console.warn('Saving the name failed:', error);
-    return `The server said: ${error.message}`;
-  }
-  localStorage.setItem(NAME, trimmed);
-  return null;
 }

@@ -24,6 +24,7 @@ import {
   useProgress,
   type ProgressSnapshot,
 } from '../progress';
+import { accountsAvailable, useAccount } from '../account';
 import { flushScores } from '../scores';
 import { useReduceMotion } from '../settings';
 import { devToolsEnabled } from '../ui/devAccess';
@@ -106,6 +107,7 @@ export default function LevelMap() {
     <SafeAreaView style={styles.screen}>
       <ScrollView ref={scroll} contentContainerStyle={styles.content}>
         <View style={styles.header}>
+          {accountsAvailable && <AccountButton />}
           <Pressable
             onPress={() => router.push('/settings')}
             style={styles.settings}
@@ -161,6 +163,25 @@ export default function LevelMap() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/** Top left of the home screen: who's playing, or a way to make an account. */
+function AccountButton() {
+  const { userId, username } = useAccount();
+  return (
+    <Pressable
+      onPress={() => router.push('/account')}
+      style={styles.account}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={userId ? `Account: ${username}` : 'Create an account or log in'}
+      testID="account-button"
+    >
+      <Text style={styles.accountText} numberOfLines={1}>
+        👤 {userId ? username : 'Sign in'}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -308,6 +329,17 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 48, maxWidth: 520, width: '100%', alignSelf: 'center' },
   header: { alignItems: 'center', gap: 4, marginBottom: 8 },
   settings: { position: 'absolute', right: 0, top: 0, padding: 4 },
+  account: {
+    position: 'absolute',
+    left: 0,
+    top: 6,
+    maxWidth: 120,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: colors.paperDeep,
+  },
+  accountText: { fontSize: 13, fontWeight: '700', color: colors.ink },
   settingsIcon: { fontSize: 24 },
   title: { fontSize: 34, fontWeight: '900', color: colors.ink, letterSpacing: 0.5 },
   subtitle: { fontSize: 15, color: colors.inkSoft },

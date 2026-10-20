@@ -2,8 +2,8 @@ import type { RunAction } from '../core/run';
 import type { KeyValueStorage } from '../judge/verdictStore';
 
 // The player's progress on this device: the best stars and score per level,
-// which decides what's unlocked on the level map. (Cloud save is for later,
-// with the Supabase backend.)
+// which decides what's unlocked on the level map, daily puzzles and zen
+// totals. With an account it's also kept in a cloud save (src/account).
 
 export interface LevelProgress {
   stars: 0 | 1 | 2 | 3;
@@ -53,6 +53,8 @@ export interface ProgressStore {
   markDailySubmitted(day: string): void;
   recordZenBoard(total: number): void;
   reset(): void;
+  /** Replaces everything, e.g. with progress merged from an account's cloud save. */
+  replace(next: ProgressSnapshot): void;
   subscribe(listener: () => void): () => void;
 }
 
@@ -60,21 +62,28 @@ const KEY = 'crossphrase:v1:progress';
 
 const EMPTY_ZEN: ZenStats = { boards: 0, points: 0, best: 0 };
 
+/** Progress from untrusted JSON (storage or a cloud save). Null if it isn't progress. */
+export function parseProgress(value: unknown): ProgressSnapshot | null {
+  const v = value as Partial<ProgressSnapshot> | null;
+  if (!v || typeof v !== 'object' || !v.levels || typeof v.levels !== 'object') return null;
+  return {
+    levels: v.levels,
+    unlockAll: v.unlockAll === true,
+    daily: v.daily && typeof v.daily === 'object' ? v.daily : {},
+    zen: { ...EMPTY_ZEN, ...(v.zen ?? {}) },
+  };
+}
+
+export const EMPTY_PROGRESS: ProgressSnapshot = { levels: {}, unlockAll: false, daily: {}, zen: EMPTY_ZEN };
+
 function read(storage: KeyValueStorage): ProgressSnapshot {
   try {
-    const value = JSON.parse(storage.getItem(KEY) ?? 'null');
-    if (value && typeof value === 'object' && value.levels && typeof value.levels === 'object') {
-      return {
-        levels: value.levels,
-        unlockAll: value.unlockAll === true,
-        daily: value.daily && typeof value.daily === 'object' ? value.daily : {},
-        zen: { ...EMPTY_ZEN, ...(value.zen ?? {}) },
-      };
-    }
+    const parsed = parseProgress(JSON.parse(storage.getItem(KEY) ?? 'null'));
+    if (parsed) return parsed;
   } catch {
     // Unreadable progress starts over rather than crashing the map.
   }
-  return { levels: {}, unlockAll: false, daily: {}, zen: EMPTY_ZEN };
+  return EMPTY_PROGRESS;
 }
 
 export function createProgressStore(storage: KeyValueStorage): ProgressStore {
@@ -121,7 +130,10 @@ export function createProgressStore(storage: KeyValueStorage): ProgressStore {
       });
     },
     reset() {
-      update({ levels: {}, unlockAll: current.unlockAll, daily: {}, zen: EMPTY_ZEN });
+      update({ ...EMPTY_PROGRESS, unlockAll: current.unlockAll });
+    },
+    replace(next) {
+      update(next);
     },
     subscribe(listener) {
       listeners.add(listener);

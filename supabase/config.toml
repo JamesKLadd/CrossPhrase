@@ -426,3 +426,9 @@ verify_jwt = true
 [functions.scores]
 enabled = true
 verify_jwt = true
+
+# Accounts (supabase/functions/account): turns a player's anonymous user into
+# a username-and-password account, and deletes accounts. Signed-in players only.
+[functions.account]
+enabled = true
+verify_jwt = true

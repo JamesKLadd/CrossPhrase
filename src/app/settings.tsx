@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { accountsAvailable, useAccount } from '../account';
 import { analyticsAvailable, sendFeedback } from '../analytics';
 import type { Tier } from '../core/types';
 import { BUILD } from '../lib/build';
@@ -52,6 +53,8 @@ export default function SettingsScreen() {
           <View style={styles.spacer} />
         </View>
 
+        {accountsAvailable && <AccountRow />}
+
         {OPTIONS.map(({ key, label, help }) => (
           <View key={key} style={styles.row}>
             <View style={styles.rowText}>
@@ -90,6 +93,21 @@ export default function SettingsScreen() {
         </Text>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function AccountRow() {
+  const { userId, username } = useAccount();
+  return (
+    <Pressable onPress={() => router.push('/account')} style={styles.row} accessibilityRole="button" testID="settings-account">
+      <View style={styles.rowText}>
+        <Text style={styles.label}>👤 {userId ? username : 'Account'}</Text>
+        <Text style={styles.help}>
+          {userId ? 'Saved to your account. Change password, log out.' : 'Create an account to keep your progress on any device.'}
+        </Text>
+      </View>
+      <Text style={styles.chevron}>›</Text>
+    </Pressable>
   );
 }
 
@@ -183,4 +201,5 @@ const styles = StyleSheet.create({
   sendOff: { opacity: 0.4 },
   sendText: { fontSize: 15, fontWeight: '700', color: colors.white },
   version: { textAlign: 'center', fontSize: 12, color: colors.inkSoft },
+  chevron: { fontSize: 24, fontWeight: '700', color: colors.wood },
 });

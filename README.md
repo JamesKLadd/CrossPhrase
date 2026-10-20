@@ -135,9 +135,9 @@ built without a PIN, so these don't exist there.
   before it runs out (it covers 19 Oct 2026 to 19 Oct 2027).
 - **Zen** (🧘): endless boards made on the spot. No star targets, no penalty,
   no limit on submits or swaps; a board clears when every line reads.
-- **Leaderboards** (🏆): today's daily puzzle and each level, with display
-  names. They need the backend below; until then the screen says how to
-  switch them on.
+- **Leaderboards** (🏆): today's daily puzzle and each level. Players with an
+  account show by their username, everyone else as "Anonymous owl". They need
+  the backend below; until then the screen says how to switch them on.
 
 ### Switch on the leaderboards (free)
 
@@ -155,13 +155,15 @@ differently on the board.)
    npx supabase link --project-ref <your-project-ref>
    npx supabase db push                      # creates the tables in supabase/migrations
    npx supabase functions deploy scores
+   npx supabase functions deploy account
    ```
 2. In `.env.local`, fill in `EXPO_PUBLIC_SUPABASE_URL` and
    `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (Project Settings → API keys) and
    restart with `npx expo start --clear`. This does **not** switch on the
    paid Claude judge (that needs `EXPO_PUBLIC_CLAUDE_JUDGE=on` as well).
-3. Give friends a build with the same settings. Each phone signs in
-   anonymously; players pick a name on the Leaderboards screen.
+3. Give friends a build with the same settings (or the website). Each phone
+   signs in anonymously as a guest; players who make an account (below) show
+   by their username.
 
 The function bundles the game core (`npm run bundle:server` writes
 `supabase/functions/_shared/scores.bundle.js`). After changing the core, the
@@ -262,9 +264,40 @@ Judge cost is in `judge_cost_daily` (from Phase 2). Events stay until you
 delete them; on the free tier, `delete from events where created_at < now() - interval '90 days';`
 in the SQL Editor keeps the table small.
 
-**After pulling this change**, update the backend: `npx supabase db push`
-(the new tables and views) and `npx supabase functions deploy scores` (it
-now applies the tuning).
+## Accounts and cloud save
+
+Players can make an account (👤 at the top left of the home screen, or
+Settings → Account) with a **username and password**, and log in with it on
+any device: the website on a phone, another browser, the app. Their stars,
+daily puzzles, zen totals, hearts and feathers are kept in a cloud save
+(the `saves` table) and synced at start-up, a few seconds after each change
+and when the game goes to the background. The username is their name on the
+leaderboards.
+
+- **Making an account** turns the player's guest (anonymous) user into the
+  account, so everything played so far, leaderboard scores included, stays
+  theirs. The `account` function ([`supabase/functions/account`](supabase/functions/account/index.ts))
+  does it with Supabase Auth.
+- **Logging in on another device** adds what was played there as a guest to
+  the account. Merging never loses progress: the best stars and score per
+  level, finished daily puzzles, and feathers kept as a ledger so earning on
+  one device and spending on another both count.
+- **Logging out** saves first, then starts that device over as a guest.
+  **Delete account** (on the account screen) removes the account, its save and
+  its scores everywhere.
+- There's **no email**, so a forgotten password can't be reset. Under the hood
+  each account is a Supabase Auth user with a made-up address
+  (`<username>@players.crossphrase.invalid`, a domain that can never receive
+  mail); nothing is ever sent to it. Usernames are 3–16 letters, numbers,
+  `-` and `_`; passwords need 8 characters and can't be a common one
+  (`supabase/functions/_shared/accountRules.ts`).
+- Nothing to switch on in the dashboard beyond what the leaderboards need
+  (anonymous sign-ins; the Email provider stays on, as it is by default). In
+  Authentication → Users, accounts show with their made-up address.
+
+**After pulling these changes**, update the backend: `npx supabase db push`
+(the new tables and views), `npx supabase functions deploy scores` (it now
+applies the tuning) and `npx supabase functions deploy account` (new).
 
 ## The owl, sound and settings
 
@@ -351,6 +384,8 @@ src/
   economy/        The wallet: hearts and feathers on this device
   remote/         Remote config: economy and level tuning read from the backend
   analytics/      Play stats: queued anonymous events sent in batches
+  account/        Accounts and the cloud save: sign up / log in, merging, syncing
+  app/account.tsx The account screen
   scores/         Leaderboard client: sends runs, queues them offline, reads boards
   server/         What the leaderboard server runs (scoring by replay), bundled for Supabase
   settings/       Sound, music, vibration, motion and colour settings
@@ -365,9 +400,11 @@ supabase/
   functions/      _shared/judgePrompt.ts is the judge prompt every judge uses;
                   judge/ is the optional Claude judge (judge.ts is the
                   testable request core, shared with the PC judge);
-                  scores/ checks and saves leaderboard runs
+                  scores/ checks and saves leaderboard runs;
+                  account/ makes and deletes accounts
   migrations/     Verdict cache, appeals, rate limits, usage log, cost view,
-                  leaderboards, remote config, play stats and their views
+                  leaderboards, remote config, play stats and their views,
+                  accounts and cloud saves
   tests/          Database tests
 scripts/          Word list builder, word sources, judge eval, train-judge.ts,
                   generate-levels.ts, generate-dailies.ts, make-sounds.mjs,

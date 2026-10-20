@@ -24,6 +24,7 @@ Status: pre-production · Target: phones, first as a website, then iOS + Android
 | Stack | React Native + Expo (TypeScript). **Ships first as a website** (Expo's web build on GitHub Pages), so testers need no Expo Go, app store or Apple Developer account; native app builds come later (decided after Phase 5) |
 | Monetization | Hearts (lives) that refill over time, feathers earned by play that buy boosters, and later feather purchases. **Ads are rare and only ever optional, watched for a reward; never forced** (decided after Phase 5) |
 | Modes | Level map, Daily puzzle (shareable, one attempt), Zen (endless) and Leaderboards (server-checked by replaying each run) |
+| Accounts | Optional **username + password** accounts (no email, so no password reset), with a cloud save across devices; players without one are guests ("Anonymous owl" on leaderboards) |
 | Art | Cozy mascot: **a smart-looking owl in reading glasses**, and it's allowed to be snarky |
 | Offline | Offline fallback (cached verdicts + lenient local check, re-verified later) |
 | Levels | Procedurally generated, each with a **theme that has its own word pool** |
@@ -302,7 +303,7 @@ Each phase ends in a **playable build** with a clear exit test.
 - [x] Level map: winding path in theme chapters, stars per level, locked levels, scrolls to the next level to play
 - [x] Local save (best stars and score per level; unlocking); PIN-locked developer menu with labelling, unlock-all and reset
 - [x] Nouns drawn a little more often (draw balance)
-- [ ] Cloud save via Supabase (waits on the backend being switched on)
+- [x] Cloud save via Supabase: with an account (Phase 6), see below
 - [ ] Playtest the curve: are 1★ targets fair with the PC judge (stricter than the built-in judge the bot uses)? Adjust `LEVEL_BANDS` / `STAR_BASELINE` and regenerate
 
 ### Phase 4: Identity & juice (≈3 weeks)
@@ -338,7 +339,7 @@ Each phase ends in a **playable build** with a clear exit test.
 - [x] Leaderboards on Supabase's free tier (switched off until configured): `scores` Edge Function replays each run with the bundled game core and re-judges it with the built-in judge before saving; first daily result is final, level boards keep each player's best; names via `set_player_name`; boards read through `daily_leaderboard` / `level_leaderboard` (top 50 plus you); players can't write scores or read others' moves; rate limited; offline submissions queued and retried
 - [x] The paid Claude judge now needs `EXPO_PUBLIC_CLAUDE_JUDGE=on`, so switching on Supabase for leaderboards never starts API spending
 - [ ] Set up the Supabase project and run the daily with friends for two weeks (the exit test)
-- [ ] Later: account linking so a player keeps their scores across devices (anonymous sign-in is per device)
+- [x] Account linking so a player keeps their scores across devices: username-and-password accounts (Phase 6)
 
 ### Phase 6: Website & live ops (≈3 weeks)
 *Revised after Phase 5:* web first instead of EAS dev builds (no Apple Developer account needed to test on iPhones), ads only as optional rewards, and the launch judge is our own model on a server.
@@ -357,6 +358,7 @@ Each phase ends in a **playable build** with a clear exit test.
 - [x] Remote config (`remote_config` table, read at start-up, cached, validated): the economy, and swaps / star targets by band or level; the leaderboard server applies the same tuning
 - [x] Play stats: anonymous events queued on the device and sent in batches (`log_events`, rate limited), switchable in Settings; dashboard views for level stats and fail rates, the funnel, dailies, active players, the economy and feedback; a too easy / just right / too hard rating on result cards; Send feedback in Settings
 - [x] Playtesting guide: [PLAYTESTING.md](PLAYTESTING.md)
+- [x] Accounts (requested after the site went live, like Greed's): username and password, no email. Creating one turns the player's anonymous user into the account (the `account` function, Supabase Auth with a made-up `.invalid` address), so scores stay theirs; logging in elsewhere merges that device's guest progress into the cloud save. Saves merge without losing progress (best stars and scores, furthest daily state, a feather ledger per wallet) and write with a version check so two devices can't overwrite each other. Leaderboard names are usernames; the free-text name box is gone. Log out (this device only), change password, delete account
 - [ ] Switch on GitHub Pages and the Supabase variables, then the two-week playtest (the exit test)
 - [ ] Rewarded ads: optional only ("watch a short ad for a heart / one more submit"), capped per day; pick a web ad network once the site has players
 - [ ] Feather purchases: a server-side wallet first (so purchases can be checked), then a web payment provider; app-store purchases with the native apps

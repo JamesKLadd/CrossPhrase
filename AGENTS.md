@@ -101,6 +101,14 @@ Docs: https://docs.expo.dev/eas/index.md
   fall back to defaults. Level tuning (`src/core/tuning.ts`) is applied by
   both the app and the leaderboard server; never tune the tutorial or the
   daily puzzles.
+- Accounts: `src/account/` (client, cloud-save merge and sync), the `account`
+  function, and `supabase/functions/_shared/accountRules.ts` (username and
+  password rules, imported by both the app and the function). Account users
+  are Supabase Auth users with a made-up `<username>@players.crossphrase.invalid`
+  email that's set already confirmed, so no mail is ever sent. Cloud-save
+  merges must never lose progress (`mergeSaves`): keep anything new in a save
+  mergeable the same way, and keep feathers in the wallet ledger, never as a
+  plain balance. Leaderboard names come from `accounts.username`.
 - Play stats go through `track()` in `src/analytics/` (queued, batched,
   switchable in Settings). Never put anything a player typed in an event
   except the feedback they choose to send, and no names.
