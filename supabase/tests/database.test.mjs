@@ -409,6 +409,16 @@ describe('admin', () => {
     await q(`insert into admins (user_id) select user_id from accounts where username_key = 'james'`);
   });
 
+  test("the second-admin migration makes Kimberly's account an admin", async () => {
+    const KIMBERLY = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+    await q('insert into auth.users values ($1)', [KIMBERLY]);
+    await q(`insert into accounts (user_id, username) values ($1, 'kimberlymladd')`, [KIMBERLY]);
+    // What the migration does for the real database, where her account already exists.
+    await q(readFileSync(new URL('20261025120000_second_admin.sql', MIGRATIONS), 'utf8'));
+    assert.equal((await asPlayer(KIMBERLY, () => one('select is_admin() as yes'))).yes, true);
+    assert.equal((await asPlayer(PLAYER, () => one('select is_admin() as yes'))).yes, false);
+  });
+
   test('only the admin is an admin', async () => {
     assert.equal((await asJames(() => one('select is_admin() as yes'))).yes, true);
     assert.equal((await asPlayer(PLAYER, () => one('select is_admin() as yes'))).yes, false);

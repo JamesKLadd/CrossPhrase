@@ -119,7 +119,7 @@ Docs: https://docs.expo.dev/eas/index.md
   merges must never lose progress (`mergeSaves`): keep anything new in a save
   mergeable the same way, and keep feathers in the wallet ledger, never as a
   plain balance. Leaderboard names come from `accounts.username`.
-- Admin: the `admins` table (by user id, seeded with James's account) and
+- Admin: the `admins` table (by user id, seeded with James's and Kimberly's (kimberlymladd) accounts, each in a migration) and
   `is_admin()`. Every admin RPC (`admin_*` in the admin migration) calls
   `require_admin()` itself; the app's `admin` flag and `DevGate` only decide
   what's shown, so never rely on them for security. Admin screens live in
