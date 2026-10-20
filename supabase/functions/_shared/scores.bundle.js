@@ -1804,7 +1804,8 @@ var VERBS_NEVER_WITH_OBJECT = /* @__PURE__ */ new Set([
   "dream"
 ]);
 var VERBS_RARELY_WITH_OBJECT = /* @__PURE__ */ new Set(["dance", "run", "walk", "fly", "swim", "sing"]);
-var VERBS_NEED_OBJECT = /* @__PURE__ */ new Set(["have", "find", "make", "take", "love", "borrow"]);
+var VERBS_NEED_OBJECT = /* @__PURE__ */ new Set(["have", "find", "make", "take", "love", "borrow", "do"]);
+var VERBS_WITH_OF = /* @__PURE__ */ new Set(["dream"]);
 var ADJ_JOINERS = /* @__PURE__ */ new Set(["and", "or", "but"]);
 var has = (word, pos) => isWord(word) && wordInfo(word).pos.includes(pos);
 var isAdj = (w) => has(w, "adj");
@@ -1844,18 +1845,21 @@ var Parser = class {
   at(i) {
     return this.w[i];
   }
-  /** An adjective, optionally "very" first: "very warm". */
-  adj(i) {
+  /** An adjective, optionally "very" first: "very warm". Before a noun (`attributive`), strictly not "too": "our too small nest". */
+  adj(i, attributive = false) {
     const word = this.at(i);
-    if (word && DEGREE.has(word)) return this.at(i + 1) && isAdj(this.at(i + 1)) ? [i + 2] : [];
+    if (word && DEGREE.has(word)) {
+      if (this.strict && attributive && word === "too") return [];
+      return this.at(i + 1) && isAdj(this.at(i + 1)) ? [i + 2] : [];
+    }
     return word && isAdj(word) ? [i + 1] : [];
   }
   /** One adjective, or two joined by "and"/"or": "warm and sweet". */
-  adjPhrase(i) {
-    const ends = this.adj(i);
+  adjPhrase(i, attributive = false) {
+    const ends = this.adj(i, attributive);
     const more = [];
     for (const end of ends) {
-      if (this.at(end) && ADJ_JOINERS.has(this.at(end))) more.push(...this.adj(end + 1));
+      if (this.at(end) && ADJ_JOINERS.has(this.at(end))) more.push(...this.adj(end + 1, attributive));
     }
     return uniq([...ends, ...more]);
   }
@@ -1865,7 +1869,7 @@ var Parser = class {
     if (!word || !isAdv(word)) return [];
     if (DEGREE.has(word)) {
       const next = this.at(i + 1);
-      return next && isAdv(next) && !DEGREE.has(next) ? [i + 2] : [];
+      return next && isAdv(next) && !DEGREE.has(next) && !BEFORE_ONLY.has(next) ? [i + 2] : [];
     }
     return [i + 1];
   }
@@ -1883,7 +1887,7 @@ var Parser = class {
       let positions = [at];
       const before = [at];
       for (let n = 0; n < 2; n++) {
-        positions = uniq(positions.flatMap((p) => this.adjPhrase(p)));
+        positions = uniq(positions.flatMap((p) => this.adjPhrase(p, true)));
         before.push(...positions);
       }
       const heads = !this.strict ? uniq([...before, ...before.filter((p) => this.at(p) && isNoun(this.at(p))).map((p) => p + 1)]) : before;
@@ -1917,21 +1921,22 @@ var Parser = class {
     return [...one, ...joined];
   }
   /** A noun phrase after a verb or preposition: "the toast", "me", "tea and toast". */
-  object(i, bare = !this.strict) {
+  object(i, bare = !this.strict, pronouns = true) {
     const word = this.at(i);
     const one = this.nounGroup(i, bare).map((n) => n.end);
-    if (word && (OBJECT_PRONOUNS.has(word) || DEMONSTRATIVES[word])) one.push(i + 1);
+    if (pronouns && word && (OBJECT_PRONOUNS.has(word) || DEMONSTRATIVES[word])) one.push(i + 1);
     const joined = [];
     for (const end of one) {
       const conj = this.at(end);
-      if (conj === "and" || conj === "or") joined.push(...this.object(end + 1, bare));
+      if (conj === "and" || conj === "or") joined.push(...this.object(end + 1, bare, pronouns));
     }
     return uniq([...one, ...joined]);
   }
-  /** "under the quiet moon", "with me", "of tea" (a bare noun is fine after "of", even when strict). */
+  /** "under the quiet moon", "with me", "of tea" (strictly, a bare noun is fine after "of", but a pronoun isn't: "the sand of them"). */
   pp(i) {
     const word = this.at(i);
-    return word && isPrep(word) ? this.object(i + 1, word === "of" || !this.strict) : [];
+    if (!word || !isPrep(word)) return [];
+    return this.object(i + 1, word === "of" || !this.strict, !(this.strict && word === "of"));
   }
   /** What follows "is"/"was"/"be": an adjective, a noun phrase or a place. */
   predicate(i) {
@@ -1950,8 +1955,9 @@ var Parser = class {
     const base = VERBS[verb]?.base ?? verb;
     let ends = this.strict && VERBS_NEED_OBJECT.has(base) ? [] : [i];
     if (!VERBS_NEVER_WITH_OBJECT.has(base) && !(this.strict && VERBS_RARELY_WITH_OBJECT.has(base))) ends = uniq([...ends, ...this.object(i)]);
+    const pp = (e) => this.strict && this.at(e) === "of" && !(e === i && VERBS_WITH_OF.has(base)) ? [] : this.pp(e);
     for (let n = 0; n < 2; n++) {
-      ends = uniq([...ends, ...ends.flatMap((e) => [...this.pp(e), ...this.advAfter(e)])]);
+      ends = uniq([...ends, ...ends.flatMap((e) => [...pp(e), ...this.advAfter(e)])]);
     }
     const infinitives = uniq([i, ...ends]).flatMap((e) => this.at(e) === "to" ? this.baseVerbPhrase(e + 1) : []);
     return uniq([...ends, ...infinitives]);
@@ -2471,7 +2477,7 @@ function tuneLevel(level, number, tuning) {
 }
 
 // src/data/dailies.generated.json
-var dailies_generated_default = { generatedBy: "scripts/generate-dailies.ts", start: "2026-10-19", levels: [{ id: "daily-2026-10-19", name: "Honey & Kitchen", theme: "breakfast", layout: [".###", ".##.", ".##.", ".##.", "...."], anchors: { "2,0": "through", "4,1": "for" }, swaps: 4, seed: 1844232109, hints: { "1,0": "verb", "4,0": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2026-10-20", name: "Dream & Sky", theme: "night-sky", layout: ["##.##", "#....", "##.#.", ".....", "##.#."], anchors: { "2,4": "with", "1,1": "i" }, swaps: 4, seed: 1419436208, hints: { "1,2": "verb", "3,1": "prep" }, stars: [38, 46, 54], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2026-10-21", name: "Sunny Rain", theme: "garden", layout: ["###.", "#.#.", "#.#.", "....", "#.##"], anchors: { "4,1": "flower" }, swaps: 4, seed: 38474032, draw: 2, hints: { "3,3": "noun", "3,0": "verb" }, stars: [28, 34, 40], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2026-10-22", name: "The Sand", theme: "seaside", layout: ["##.##", ".....", "##.##", "....#"], anchors: { "1,3": "of", "2,2": "on" }, swaps: 4, seed: 844275676, draw: 2, hints: { "3,3": "verb", "3,2": "pron" }, stars: [18, 26, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-10-23", name: "Dictionary & Cover", theme: "library", layout: ["##.#.", "##.#.", "##.#.", "##.#.", "....."], anchors: { "2,4": "under" }, swaps: 4, seed: 634173987, draw: 2, hints: { "4,2": "adj", "0,2": "noun" }, stars: [35, 42, 49], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2026-10-24", name: "Delicious Honey", theme: "breakfast", layout: ["#.##", "#.#.", "....", "#.#.", "###."], anchors: { "3,3": "near" }, swaps: 4, seed: 1201806818, draw: 2, hints: { "1,1": "noun", "1,3": "det" }, stars: [27, 32, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-10-25", name: "Horizon & Wish", theme: "night-sky", layout: ["#....", "##.##", "....#", "##.##"], anchors: { "2,1": "in", "0,1": "my" }, swaps: 4, seed: 929973291, draw: 2, hints: { "2,2": "det", "0,2": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-10-26", name: "Blooming Pumpkin", theme: "garden", layout: ["#....", ".##.#", ".....", ".##.#", ".####"], anchors: { "1,0": "this", "0,2": "under" }, swaps: 4, seed: 1535512859, draw: 2, hints: { "1,3": "verb", "2,0": "noun" }, stars: [34, 41, 48], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2026-10-27", name: "Foamy Fish", theme: "seaside", layout: [".....", ".##.#", ".##.#", "....."], anchors: { "0,2": "in" }, swaps: 4, seed: 1466567954, draw: 2, hints: { "3,3": "verb", "3,1": "prep", "0,3": "det" }, stars: [34, 41, 48], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2026-10-28", name: "Forgotten Pen", theme: "library", layout: ["##.#", ".#.#", "....", ".#.#", ".#.#"], anchors: { "1,2": "of" }, swaps: 4, seed: 436579873, draw: 2, hints: { "2,0": "noun", "4,0": "verb" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2026-10-29", name: "Yolk & Toaster", theme: "breakfast", layout: [".####", ".....", ".###.", ".###.", "#...."], anchors: { "1,1": "under", "0,0": "our" }, swaps: 4, seed: 521748223, draw: 2, hints: { "4,2": "verb", "4,4": "noun" }, stars: [39, 47, 55], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2026-10-30", name: "Endless Cloud", theme: "night-sky", layout: ["##.##", "....#", "##.##", "#...."], anchors: { "1,2": "of", "3,1": "i" }, swaps: 4, seed: 1317513856, draw: 2, hints: { "1,1": "verb", "3,2": "verb" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-10-31", name: "Blooming Leaf", theme: "garden", layout: [".....", "##.##", "#....", "##.##", "#...."], anchors: { "3,2": "near", "4,3": "under" }, swaps: 4, seed: 183371892, draw: 2, hints: { "1,2": "noun", "0,4": "noun", "4,2": "pron" }, stars: [33, 40, 47], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2026-11-01", name: "Deep Coral", theme: "seaside", layout: [".##.#", ".##.#", ".##.#", ".##.#", "....."], anchors: { "2,3": "in" }, swaps: 4, seed: 478649091, draw: 2, hints: { "4,0": "noun", "4,3": "noun" }, stars: [34, 41, 48], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2026-11-02", name: "The Novel", theme: "library", layout: ["....", ".#.#", ".#.#", ".#.#"], anchors: { "1,0": "and", "0,1": "of" }, swaps: 4, seed: 599586770, draw: 2, hints: { "2,0": "verb", "0,2": "det" }, stars: [21, 25, 29], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2026-11-03", name: "Sticky Jam", theme: "breakfast", layout: [".....", "#.##.", ".....", "#.##."], anchors: { "0,2": "with" }, swaps: 4, seed: 908105775, draw: 2, hints: { "0,1": "noun", "0,4": "noun", "2,2": "noun" }, stars: [35, 42, 49], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2026-11-04", name: "Silent Firefly", theme: "night-sky", layout: ["....", "###.", "###.", "...."], anchors: { "0,0": "i" }, swaps: 4, seed: 512859702, draw: 2, hints: { "2,3": "noun", "0,3": "adv" }, stars: [22, 26, 30], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-11-05", name: "The Worm", theme: "garden", layout: ["##.#.", ".....", ".#.#.", ".#.#.", ".####"], anchors: { "1,2": "near" }, swaps: 4, seed: 699815186, draw: 2, hints: { "1,4": "noun", "1,1": "verb", "3,2": "noun" }, stars: [37, 44, 51], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2026-11-06", name: "Shiny Coral", theme: "seaside", layout: [".....", "###.#", "....#", "###.#", "....#"], anchors: { "2,0": "some", "3,3": "with" }, swaps: 4, seed: 758967319, draw: 2, hints: { "4,3": "pron", "0,2": "prep", "2,2": "adv" }, stars: [34, 41, 48], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2026-11-07", name: "Famous Shelf", theme: "library", layout: ["#....", "#.##.", "#.##.", "....."], anchors: { "3,0": "a" }, swaps: 4, seed: 1650254232, draw: 2, hints: { "3,4": "noun", "0,1": "pron" }, stars: [26, 36, 46], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2026-11-08", name: "Burnt Croissant", theme: "breakfast", layout: ["#.###", "#.###", "....#", "#.###", "....."], anchors: { "4,0": "every", "2,2": "near" }, swaps: 4, seed: 1703951660, draw: 2, hints: { "2,3": "pron", "2,0": "verb" }, stars: [28, 34, 40], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2026-11-09", name: "Lunar Orbit", theme: "night-sky", layout: ["###.#", "#....", "###.#", "....."], anchors: { "1,1": "they", "3,1": "near" }, swaps: 4, seed: 1792194828, draw: 2, hints: { "1,3": "prep", "3,3": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2026-11-10", name: "Petal & Pond", theme: "garden", layout: [".#.##", ".....", ".#.#.", ".#.#.", "####."], anchors: { "2,0": "in", "1,1": "near" }, swaps: 4, seed: 1300136170, draw: 2, hints: { "2,2": "adj", "1,2": "det" }, stars: [31, 37, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2026-11-11", name: "Shiny Captain", theme: "seaside", layout: ["###.#", ".....", "#.#.#", "#.#.#", "#.#.#"], anchors: { "0,3": "i" }, swaps: 4, seed: 1815332729, draw: 2, hints: { "1,1": "noun", "1,3": "verb" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2026-11-12", name: "The Shelf", theme: "library", layout: ["####.", "#....", "##.#.", "##.#.", "....#"], anchors: { "2,2": "near", "0,4": "my" }, swaps: 4, seed: 1330885936, draw: 2, hints: { "4,2": "noun", "3,4": "pron" }, stars: [31, 37, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2026-11-13", name: "Early Croissant", theme: "breakfast", layout: [".....", ".###.", ".###.", ".###.", ".####"], anchors: { "1,0": "for", "0,1": "with" }, swaps: 4, seed: 1969921043, draw: 2, hints: { "4,0": "verb", "1,4": "prep" }, stars: [28, 35, 42], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2026-11-14", name: "The Dawn", theme: "night-sky", layout: ["#.###", "....#", "#.###", "....."], anchors: { "3,2": "under", "0,1": "our" }, swaps: 4, seed: 1558872994, draw: 2, hints: { "1,1": "adj", "3,0": "pron" }, stars: [26, 31, 36], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2026-11-15", name: "Thorny Pond", theme: "garden", layout: ["#....", ".##.#", ".##.#", "....#", ".####"], anchors: { "1,0": "this" }, swaps: 4, seed: 1420437089, draw: 2, hints: { "3,0": "prep", "0,3": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2026-11-16", name: "Coral & Pirate", theme: "seaside", layout: ["#.#.", "....", "#.#.", "...."], anchors: { "0,3": "i" }, swaps: 4, seed: 479174501, draw: 2, hints: { "3,1": "noun", "1,1": "det" }, stars: [28, 34, 40], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2026-11-17", name: "Bookish Reader", theme: "library", layout: ["#....", "###.#", "###.#", "###.#", "....#"], anchors: { "0,4": "word" }, swaps: 4, seed: 1612300369, draw: 2, hints: { "1,3": "adj", "4,3": "pron" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-11-18", name: "Fluffy Yolk", theme: "breakfast", layout: ["###.", "....", "#.#.", "....", "#.##"], anchors: { "1,3": "milk" }, swaps: 4, seed: 1791519799, draw: 2, hints: { "1,2": "adj", "1,1": "det" }, stars: [31, 37, 43], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2026-11-19", name: "Infinite Midnight", theme: "night-sky", layout: ["###.", "#.#.", "#.#.", "....", "#.#."], anchors: { "2,3": "for" }, swaps: 4, seed: 508979399, draw: 2, hints: { "2,1": "adj", "1,1": "det" }, stars: [23, 28, 33], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-11-20", name: "Tomato & Carrot", theme: "garden", layout: ["###.", "....", ".##.", ".##.", "...."], anchors: { "3,3": "through", "1,1": "in" }, swaps: 4, seed: 1591721030, draw: 2, hints: { "1,3": "noun", "2,0": "verb" }, stars: [34, 41, 48], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2026-11-21", name: "Pebble & Lighthouse", theme: "seaside", layout: ["##.#.", ".....", ".#.#.", ".#.#.", ".####"], anchors: { "4,0": "treasure" }, swaps: 4, seed: 2068642142, draw: 2, hints: { "3,0": "det", "1,2": "prep", "2,0": "verb" }, stars: [36, 45, 53], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2026-11-22", name: "Hushed Cover", theme: "library", layout: ["....#", "##.##", "##.##", "##.##", "#...."], anchors: { "0,1": "for" }, swaps: 4, seed: 650706553, draw: 2, hints: { "4,3": "prep", "4,2": "noun" }, stars: [20, 25, 30], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2026-11-23", name: "The Jam", theme: "breakfast", layout: ["##.##", "#....", "##.##", ".....", "##.##"], anchors: { "0,2": "the" }, swaps: 4, seed: 630373726, draw: 2, hints: { "4,2": "pron", "1,3": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2026-11-24", name: "Distant Firefly", theme: "night-sky", layout: ["#.###", "#.#.#", "#....", "#.#.#", "....#"], anchors: { "0,1": "this" }, swaps: 4, seed: 2126942457, draw: 2, hints: { "4,1": "pron", "2,4": "noun" }, stars: [30, 36, 42], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2026-11-25", name: "Sunny Leaf", theme: "garden", layout: ["##.##", ".....", ".#.##", "....#", ".#.##"], anchors: { "1,2": "of" }, swaps: 4, seed: 1500101708, draw: 2, hints: { "1,4": "adv", "3,0": "det", "3,1": "adj" }, stars: [35, 42, 49], objectives: [{ kind: "greatLines", count: 1, points: 7 }] }, { id: "daily-2026-11-26", name: "Shiny Shore", theme: "seaside", layout: ["#.##.", ".....", "#.##.", "#.##.", "#.###"], anchors: { "1,2": "on", "4,1": "beach" }, swaps: 4, seed: 1052549284, draw: 2, hints: { "2,1": "verb", "1,1": "pron" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2026-11-27", name: "Mystery & Spine", theme: "library", layout: ["##.##", "....#", "##.##", "##.##", "#...."], anchors: { "0,2": "my" }, swaps: 4, seed: 2078965933, draw: 2, hints: { "4,2": "noun", "4,4": "pron" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-11-28", name: "The Kitchen", theme: "breakfast", layout: ["###.", "....", "#.#.", "#.#.", "#.#."], anchors: { "3,1": "for" }, swaps: 4, seed: 1229189840, draw: 2, hints: { "1,3": "verb", "1,0": "adv" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-11-29", name: "Mysterious Shadow", theme: "night-sky", layout: [".####", ".....", ".###.", ".###.", "####."], anchors: { "1,0": "planet" }, swaps: 4, seed: 1620633452, draw: 2, hints: { "3,0": "verb", "4,4": "noun" }, stars: [27, 33, 39], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2026-11-30", name: "Lush Bird", theme: "garden", layout: ["###.", ".##.", "....", ".##.", ".###"], anchors: { "3,0": "under" }, swaps: 4, seed: 1003401303, draw: 2, hints: { "4,0": "pron", "1,0": "det" }, stars: [26, 31, 36], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2026-12-01", name: "Sunlit Dolphin", theme: "seaside", layout: [".####", ".#.#.", ".....", ".#.#.", "#...."], anchors: { "2,3": "under", "0,0": "our" }, swaps: 4, seed: 1832968130, draw: 2, hints: { "2,0": "noun", "4,4": "pron", "1,0": "adj" }, stars: [37, 44, 51], objectives: [{ kind: "themeWords", count: 4, points: 7 }] }, { id: "daily-2026-12-02", name: "The Cover", theme: "library", layout: [".#.#", ".#.#", "....", ".#.#"], anchors: { "2,1": "near", "3,2": "secret" }, swaps: 4, seed: 1522940653, draw: 2, hints: { "2,0": "adv", "0,2": "noun" }, stars: [21, 25, 29], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2026-12-03", name: "The Banana", theme: "breakfast", layout: [".##.", "....", ".##.", ".##.", "...."], anchors: { "4,3": "tea", "2,0": "through" }, swaps: 4, seed: 1247923916, draw: 2, hints: { "3,3": "det", "2,3": "prep" }, stars: [35, 42, 49], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2026-12-04", name: "The Satellite", theme: "night-sky", layout: ["#....", "#.###", "....#", "#.###"], anchors: { "2,1": "over" }, swaps: 4, seed: 1186181077, draw: 2, hints: { "2,2": "det", "0,4": "verb" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-12-05", name: "Vine & Butterfly", theme: "garden", layout: ["....", "##.#", "##.#", "##.#", "...."], anchors: { "0,1": "through" }, swaps: 4, seed: 1801732301, draw: 2, hints: { "0,2": "det", "1,2": "verb" }, stars: [29, 35, 41], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2026-12-06", name: "Blue Jellyfish", theme: "seaside", layout: [".....", ".###.", ".###.", ".###."], anchors: { "0,2": "in", "3,4": "boat" }, swaps: 4, seed: 1255265843, draw: 2, hints: { "2,4": "det", "0,4": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2026-12-07", name: "Dusty Riddle", theme: "library", layout: ["#....", ".##.#", ".....", ".##.#", ".####"], anchors: { "3,3": "paper" }, swaps: 4, seed: 232314125, draw: 2, hints: { "1,3": "verb", "2,0": "det", "2,3": "det" }, stars: [31, 37, 43], objectives: [{ kind: "themeWords", count: 6, points: 6 }] }, { id: "daily-2026-12-08", name: "The Spoon", theme: "breakfast", layout: [".....", "##.#.", "##.#.", "##.#.", "##.##"], anchors: { "3,2": "of" }, swaps: 4, seed: 453361085, draw: 2, hints: { "3,4": "noun", "1,4": "prep" }, stars: [26, 31, 36], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2026-12-09", name: "The Sky", theme: "night-sky", layout: ["##.#", "....", ".#.#", "....", ".###"], anchors: { "1,3": "cloud" }, swaps: 4, seed: 795932534, draw: 2, hints: { "2,2": "adj", "3,2": "noun" }, stars: [38, 46, 54], objectives: [{ kind: "swapsLeft", count: 2, points: 8 }] }, { id: "daily-2026-12-10", name: "Bee & Bird", theme: "garden", layout: ["####.", "#....", "##.#.", "##.#.", "....#"], anchors: { "2,4": "for", "1,1": "they" }, swaps: 4, seed: 1685113205, draw: 2, hints: { "0,4": "det", "1,2": "verb" }, stars: [31, 37, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2026-12-11", name: "Sandy Seagull", theme: "seaside", layout: [".#.#", ".#.#", "....", ".#.#", "##.#"], anchors: { "2,1": "in" }, swaps: 4, seed: 448139405, draw: 2, hints: { "2,2": "det", "0,0": "det" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2026-12-12", name: "Famous Pencil", theme: "library", layout: ["##.##", "....#", ".#.##", ".....", ".####"], anchors: { "3,3": "under" }, swaps: 4, seed: 767638327, draw: 2, hints: { "3,2": "noun", "2,0": "verb" }, stars: [26, 31, 36], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2026-12-13", name: "Kitchen & Jam", theme: "breakfast", layout: ["#.#.#", "#.#.#", ".....", "#.#.#"], anchors: { "3,3": "table", "1,1": "on" }, swaps: 4, seed: 1667799301, draw: 2, hints: { "0,3": "pron", "2,0": "verb" }, stars: [22, 26, 30], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-12-14", name: "The Nebula", theme: "night-sky", layout: [".##.#", ".....", ".##.#", ".##.#", ".####"], anchors: { "1,2": "for" }, swaps: 4, seed: 1393538029, draw: 2, hints: { "3,3": "noun", "1,0": "adj" }, stars: [26, 31, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-12-15", name: "Blooming Root", theme: "garden", layout: ["....", ".#.#", "....", ".#.#"], anchors: { "2,2": "near" }, swaps: 4, seed: 1692837956, draw: 2, hints: { "2,0": "det", "1,2": "verb" }, stars: [31, 37, 43], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2026-12-16", name: "Deep Towel", theme: "seaside", layout: ["##.##", "....#", "##.##", "#...."], anchors: { "1,2": "of", "3,3": "on" }, swaps: 4, seed: 256870891, draw: 2, hints: { "0,2": "verb", "3,2": "noun" }, stars: [22, 26, 30], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2026-12-17", name: "The Poet", theme: "library", layout: ["###.", "#.#.", "#.#.", "#.#.", "...."], anchors: { "4,2": "of" }, swaps: 4, seed: 2101871503, draw: 2, hints: { "4,3": "noun", "4,1": "verb" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2026-12-18", name: "Hungry Table", theme: "breakfast", layout: ["....#", "###.#", "#....", "###.#"], anchors: { "2,2": "under", "0,1": "through" }, swaps: 4, seed: 815131721, draw: 2, hints: { "2,3": "det", "2,4": "noun" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-12-19", name: "Universe & Firefly", theme: "night-sky", layout: ["....", ".#.#", "....", ".#.#"], anchors: { "2,2": "of" }, swaps: 4, seed: 1933558288, draw: 2, hints: { "0,0": "noun", "2,0": "adv" }, stars: [29, 37, 45], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2026-12-20", name: "Sprout & Frog", theme: "garden", layout: ["#....", "#.###", "#.###", "#.###", "....#"], anchors: { "2,1": "through" }, swaps: 4, seed: 261026493, draw: 2, hints: { "0,3": "adj", "0,2": "det" }, stars: [25, 30, 35], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-12-21", name: "Towel & Sunset", theme: "seaside", layout: ["....", "#.##", "#.##", "....", "#.##"], anchors: { "0,2": "through" }, swaps: 4, seed: 815826644, draw: 2, hints: { "3,0": "det", "3,1": "adj" }, stars: [26, 32, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-12-22", name: "Overdue Paper", theme: "library", layout: ["#....", "####.", ".....", "####.", "....."], anchors: { "0,2": "of" }, swaps: 4, seed: 1135280013, draw: 2, hints: { "2,4": "verb", "0,1": "noun", "3,4": "det" }, stars: [36, 43, 50], objectives: [{ kind: "greatLines", count: 1, points: 7 }] }, { id: "daily-2026-12-23", name: "Croissant & Butter", theme: "breakfast", layout: [".....", ".#.##", ".#.##", "....."], anchors: { "0,1": "with" }, swaps: 4, seed: 1142191990, draw: 2, hints: { "3,0": "noun", "0,3": "noun", "3,2": "verb" }, stars: [44, 53, 62], objectives: [{ kind: "rareCrossing", value: 6, points: 9 }] }, { id: "daily-2026-12-24", name: "Comet & Astronaut", theme: "night-sky", layout: [".####", "....#", ".#.##", ".#.##", "#...."], anchors: { "1,3": "cloud" }, swaps: 4, seed: 511174746, draw: 2, hints: { "4,1": "pron", "4,2": "verb" }, stars: [35, 42, 49], objectives: [{ kind: "greatLines", count: 1, points: 7 }] }, { id: "daily-2026-12-25", name: "The Sun", theme: "garden", layout: ["....", "#.#.", "#.#.", "#.#.", "...."], anchors: { "0,0": "a", "1,3": "near" }, swaps: 4, seed: 2068566136, draw: 2, hints: { "0,3": "noun", "0,2": "adj" }, stars: [42, 50, 58], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2026-12-26", name: "Sunlit Sand", theme: "seaside", layout: ["####.", "##.#.", "##.#.", ".....", "##.#."], anchors: { "3,0": "some" }, swaps: 4, seed: 1225712927, draw: 2, hints: { "1,2": "det", "0,4": "det" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-12-27", name: "Famous Page", theme: "library", layout: ["#.##", "....", "#.##", "....", "#.##"], anchors: { "3,1": "for", "1,0": "my" }, swaps: 4, seed: 1740795110, draw: 2, hints: { "1,1": "noun", "2,1": "verb" }, stars: [21, 25, 29], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-12-28", name: "Butter & Milk", theme: "breakfast", layout: ["#....", "#.###", "....#", "#.###", "#.###"], anchors: { "2,1": "on", "0,2": "for" }, swaps: 4, seed: 1422607314, draw: 2, hints: { "0,4": "noun", "2,2": "det" }, stars: [27, 32, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-12-29", name: "Lunar Moon", theme: "night-sky", layout: [".##.#", ".....", ".##.#", ".##.#", ".##.#"], anchors: { "2,3": "of", "0,0": "this" }, swaps: 4, seed: 213062773, draw: 2, hints: { "3,0": "det", "1,3": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2026-12-30", name: "Colorful Flower", theme: "garden", layout: ["##.#", "....", "##.#", "...."], anchors: { "0,2": "your" }, swaps: 4, seed: 45783402, draw: 2, hints: { "3,2": "verb", "1,1": "det" }, stars: [30, 36, 42], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2026-12-31", name: "Salty Whale", theme: "seaside", layout: [".....", ".###.", ".###.", ".###.", "....#"], anchors: { "0,2": "over" }, swaps: 4, seed: 196520299, draw: 2, hints: { "0,4": "noun", "1,0": "det", "4,3": "noun" }, stars: [33, 40, 47], objectives: [{ kind: "themeWords", count: 5, points: 7 }] }, { id: "daily-2027-01-01", name: "Hushed Scroll", theme: "library", layout: ["###.#", "#....", "#.#.#", "#.#.#", "....#"], anchors: { "4,1": "page" }, swaps: 4, seed: 1356587272, draw: 2, hints: { "0,3": "verb", "3,3": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-01-02", name: "Sleepy Omelette", theme: "breakfast", layout: ["....#", ".###.", ".###.", ".....", "####."], anchors: { "3,1": "of", "0,0": "this" }, swaps: 4, seed: 467433499, draw: 2, hints: { "3,0": "noun", "0,1": "verb" }, stars: [36, 43, 50], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-01-03", name: "Starry Nebula", theme: "night-sky", layout: [".###", "....", ".##.", ".##.", ".##."], anchors: { "0,0": "this" }, swaps: 4, seed: 37367627, draw: 2, hints: { "1,0": "adv", "1,1": "verb" }, stars: [28, 34, 40], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-01-04", name: "The Bee", theme: "garden", layout: ["####.", ".....", "####.", "####.", "#...."], anchors: { "4,1": "this" }, swaps: 4, seed: 131624387, draw: 2, hints: { "4,2": "noun", "1,4": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-01-05", name: "Tropical Umbrella", theme: "seaside", layout: ["#.###", "#.##.", ".....", "#.##.", "####."], anchors: { "2,2": "over" }, swaps: 4, seed: 1728756664, draw: 2, hints: { "2,4": "noun", "2,1": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-01-06", name: "The Author", theme: "library", layout: [".....", ".#.##", "....#", ".#.##", ".#.##"], anchors: { "1,0": "for", "4,2": "library" }, swaps: 4, seed: 1666501491, draw: 2, hints: { "0,2": "det", "2,3": "pron", "0,4": "pron" }, stars: [38, 46, 54], objectives: [{ kind: "swapsLeft", count: 2, points: 8 }] }, { id: "daily-2027-01-07", name: "Burnt Morning", theme: "breakfast", layout: [".##.#", ".##.#", ".....", ".##.#"], anchors: { "0,0": "our" }, swaps: 4, seed: 167356303, draw: 2, hints: { "2,2": "det", "2,3": "adj" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 4, points: 6 }] }, { id: "daily-2027-01-08", name: "Endless Comet", theme: "night-sky", layout: [".#.#.", ".....", ".#.#.", ".#.#."], anchors: { "1,4": "night" }, swaps: 4, seed: 1721830924, draw: 2, hints: { "1,2": "verb", "0,2": "det", "3,0": "verb" }, stars: [27, 33, 38], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-01-09", name: "The Seed", theme: "garden", layout: ["####.", "#.##.", ".....", "#.##.", "#...."], anchors: { "4,3": "over" }, swaps: 4, seed: 1743598970, draw: 2, hints: { "4,1": "noun", "4,2": "verb", "2,4": "noun" }, stars: [43, 52, 61], objectives: [{ kind: "themeWords", count: 6, points: 9 }] }, { id: "daily-2027-01-10", name: "Lighthouse & Breeze", theme: "seaside", layout: ["#.##", "....", "#.#.", "#.#.", "...."], anchors: { "4,0": "your", "1,0": "some" }, swaps: 4, seed: 1136097833, draw: 2, hints: { "1,1": "noun", "4,1": "noun" }, stars: [38, 46, 54], objectives: [{ kind: "swapsLeft", count: 2, points: 8 }] }, { id: "daily-2027-01-11", name: "The Secret", theme: "library", layout: ["##.##", "#....", "##.#.", "##.#.", "....."], anchors: { "4,1": "with", "3,2": "on" }, swaps: 4, seed: 1927195929, draw: 2, hints: { "4,2": "pron", "1,4": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-01-12", name: "Pancake & Morning", theme: "breakfast", layout: [".....", ".###.", ".###.", ".###.", "....#"], anchors: { "0,2": "for", "4,2": "near" }, swaps: 4, seed: 338319008, draw: 2, hints: { "1,0": "det", "3,4": "noun", "0,0": "verb" }, stars: [35, 42, 49], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-01-13", name: "Silent Midnight", theme: "night-sky", layout: ["#.###", ".....", "#.##.", "#.##.", "####."], anchors: { "2,4": "on" }, swaps: 4, seed: 659288032, draw: 2, hints: { "1,1": "prep", "3,4": "det" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-01-14", name: "Fragrant Garden", theme: "garden", layout: ["....", ".###", ".###", "...."], anchors: { "0,1": "for", "1,0": "under" }, swaps: 4, seed: 242445070, draw: 2, hints: { "0,0": "verb", "3,0": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-01-15", name: "Sail & Wave", theme: "seaside", layout: ["#.##", "#.#.", "#.#.", "....", "#.#."], anchors: { "0,1": "this", "1,3": "a" }, swaps: 4, seed: 1123159084, draw: 2, hints: { "3,3": "noun", "4,3": "verb" }, stars: [27, 32, 37], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-01-16", name: "The Librarian", theme: "library", layout: ["....#", "###.#", "###.#", "#....", "###.#"], anchors: { "0,0": "this" }, swaps: 4, seed: 926061208, draw: 2, hints: { "4,3": "noun", "0,3": "noun" }, stars: [26, 31, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-01-17", name: "Creamy Waffle", theme: "breakfast", layout: [".####", ".#.##", "....#", ".#.##", "#...."], anchors: { "0,0": "they" }, swaps: 4, seed: 2131159420, draw: 2, hints: { "2,3": "verb", "2,1": "adj" }, stars: [31, 37, 43], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-01-18", name: "Lunar Lantern", theme: "night-sky", layout: ["....#", "#.#.#", ".....", "#.#.#"], anchors: { "1,1": "over", "2,2": "and" }, swaps: 4, seed: 229281023, draw: 2, hints: { "0,3": "pron", "2,3": "verb" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-01-19", name: "Busy Petal", theme: "garden", layout: ["....", ".###", ".###", "...."], anchors: { "3,0": "sun", "0,1": "and" }, swaps: 4, seed: 263449472, draw: 2, hints: { "0,2": "pron", "0,0": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-01-20", name: "Deep Sand", theme: "seaside", layout: ["....", "#.#.", "#.#.", "#.#.", "###."], anchors: { "3,3": "on" }, swaps: 4, seed: 235192044, draw: 2, hints: { "2,3": "det", "0,1": "prep" }, stars: [18, 24, 29], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-01-21", name: "The Bookmark", theme: "library", layout: [".....", ".####", "....#", ".####", ".####"], anchors: { "2,0": "story" }, swaps: 4, seed: 384892032, draw: 2, hints: { "0,0": "det", "0,2": "verb" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-01-22", name: "Toast & Bacon", theme: "breakfast", layout: ["....#", "#.###", "#.###", "#.###", "....."], anchors: { "4,0": "our" }, swaps: 4, seed: 1564760033, draw: 2, hints: { "4,1": "noun", "3,1": "adj" }, stars: [28, 34, 40], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-01-23", name: "Astronaut & Midnight", theme: "night-sky", layout: ["....#", "#.##.", "#....", "#.##.", "####."], anchors: { "1,4": "the" }, swaps: 4, seed: 2013867221, draw: 2, hints: { "0,1": "noun", "0,0": "det" }, stars: [38, 46, 54], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2027-01-24", name: "Butterfly & Frog", theme: "garden", layout: [".....", "##.#.", "##.#.", "....."], anchors: { "2,2": "under" }, swaps: 4, seed: 1563744090, draw: 2, hints: { "3,2": "pron", "0,4": "noun", "3,4": "pron" }, stars: [37, 44, 51], objectives: [{ kind: "themeWords", count: 4, points: 7 }] }, { id: "daily-2027-01-25", name: "Breezy Umbrella", theme: "seaside", layout: ["##.##", ".....", ".#.#.", ".#.#.", ".#.#."], anchors: { "2,2": "for", "2,0": "on" }, swaps: 4, seed: 17700026, draw: 2, hints: { "3,0": "det", "1,0": "verb", "0,2": "adj" }, stars: [35, 42, 49], objectives: [{ kind: "themeWords", count: 6, points: 7 }] }, { id: "daily-2027-01-26", name: "Overdue Bookmark", theme: "library", layout: ["#.##", "....", "#.#.", "#.#.", "###."], anchors: { "1,0": "a" }, swaps: 4, seed: 369692647, draw: 2, hints: { "3,1": "pron", "3,3": "det" }, stars: [20, 24, 28], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-01-27", name: "Delicious Waffle", theme: "breakfast", layout: [".###.", ".#.#.", ".#.#.", ".....", ".#.#."], anchors: { "3,4": "coffee", "0,0": "some" }, swaps: 4, seed: 695998771, draw: 2, hints: { "4,0": "noun", "3,0": "det", "3,1": "noun" }, stars: [35, 42, 49], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-01-28", name: "Celestial Dream", theme: "night-sky", layout: ["....#", ".####", ".####", "....."], anchors: { "0,2": "near", "3,3": "with" }, swaps: 4, seed: 130697767, draw: 2, hints: { "0,0": "det", "0,3": "pron" }, stars: [23, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-01-29", name: "Blooming Vine", theme: "garden", layout: ["#.###", "....#", "#.#.#", "#....", "###.#"], anchors: { "1,0": "this" }, swaps: 4, seed: 678070606, draw: 2, hints: { "1,3": "noun", "3,1": "noun" }, stars: [39, 47, 55], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2027-01-30", name: "Sandy Pier", theme: "seaside", layout: [".....", "#.#.#", "#.#.#", "#.#.#"], anchors: { "2,3": "under" }, swaps: 4, seed: 129264399, draw: 2, hints: { "3,3": "pron", "1,3": "noun" }, stars: [25, 30, 35], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-01-31", name: "Forgotten Candle", theme: "library", layout: ["#.#.", "....", "#.#.", "#.#.", "...."], anchors: { "2,3": "under" }, swaps: 4, seed: 194545478, draw: 2, hints: { "4,1": "verb", "4,3": "noun", "3,1": "noun" }, stars: [41, 49, 57], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2027-02-01", name: "Sugary Napkin", theme: "breakfast", layout: ["###.#", ".....", "#.#.#", ".....", "#.###"], anchors: { "3,0": "some" }, swaps: 4, seed: 1800379748, draw: 2, hints: { "1,1": "prep", "3,1": "adj", "1,3": "verb" }, stars: [38, 46, 54], objectives: [{ kind: "longWord", letters: 7, points: 8 }] }, { id: "daily-2027-02-02", name: "Infinite Lantern", theme: "night-sky", layout: ["###.", "###.", "....", "###.", "...."], anchors: { "3,3": "with", "4,0": "this" }, swaps: 4, seed: 363779796, draw: 2, hints: { "2,3": "noun", "4,3": "pron" }, stars: [23, 28, 33], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-02-03", name: "Wilted Rain", theme: "garden", layout: ["###.", "....", ".##.", ".##.", ".##."], anchors: { "2,0": "for" }, swaps: 4, seed: 856552417, draw: 2, hints: { "3,0": "det", "0,3": "pron" }, stars: [24, 29, 34], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-02-04", name: "Sunlit Crab", theme: "seaside", layout: ["###.#", ".....", "###.#", "....#"], anchors: { "1,2": "over" }, swaps: 4, seed: 676956843, draw: 2, hints: { "3,1": "prep", "1,3": "det" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-02-05", name: "Wise Desk", theme: "library", layout: [".....", "#.#.#", "#....", "#.#.#"], anchors: { "3,1": "letter", "0,0": "our" }, swaps: 4, seed: 1683117885, draw: 2, hints: { "0,1": "noun", "2,1": "det" }, stars: [29, 35, 41], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-02-06", name: "Fluffy Sunrise", theme: "breakfast", layout: ["##.#", "....", "##.#", "##.#", "...."], anchors: { "1,0": "they", "4,2": "coffee" }, swaps: 4, seed: 465624202, draw: 2, hints: { "1,3": "pron", "1,1": "verb" }, stars: [26, 31, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-07", name: "Silent Lantern", theme: "night-sky", layout: [".....", "###.#", "###.#", "###.#", "#...."], anchors: { "0,0": "every" }, swaps: 4, seed: 653641728, draw: 2, hints: { "4,2": "noun", "0,3": "det" }, stars: [28, 34, 40], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-02-08", name: "Snail & Worm", theme: "garden", layout: ["....#", "#.###", "#....", "#.###"], anchors: { "0,2": "over" }, swaps: 4, seed: 34729320, draw: 2, hints: { "1,1": "verb", "2,2": "noun" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-09", name: "Pebble & Anchor", theme: "seaside", layout: [".....", ".####", ".####", "....#"], anchors: { "3,3": "treasure" }, swaps: 4, seed: 920528135, draw: 2, hints: { "0,1": "verb", "0,0": "pron" }, stars: [22, 30, 37], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-02-10", name: "The Story", theme: "library", layout: ["###.", "#.#.", "....", "#.#.", "...."], anchors: { "2,1": "for", "0,3": "a" }, swaps: 4, seed: 2086675749, draw: 2, hints: { "4,3": "noun", "1,1": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-02-11", name: "Crispy Juice", theme: "breakfast", layout: [".....", "#.###", "#.###", "#.###", "#...."], anchors: { "0,0": "i", "2,1": "with" }, swaps: 4, seed: 874932680, draw: 2, hints: { "1,1": "verb", "4,1": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-02-12", name: "Sparkling Wish", theme: "night-sky", layout: [".####", ".#.##", ".....", ".#.##", ".#.##"], anchors: { "2,3": "on", "1,2": "our" }, swaps: 4, seed: 197542509, draw: 2, hints: { "2,0": "det", "2,4": "pron" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-13", name: "Ripe Fence", theme: "garden", layout: [".##.#", ".##.#", ".....", ".##.#", ".####"], anchors: { "2,3": "through" }, swaps: 4, seed: 1831547556, draw: 2, hints: { "2,2": "verb", "0,3": "adj" }, stars: [26, 31, 36], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-02-14", name: "Shell & Fish", theme: "seaside", layout: ["#.#.", "#.#.", "#.#.", "...."], anchors: { "1,1": "on", "1,3": "with" }, swaps: 4, seed: 1603874198, draw: 2, hints: { "3,1": "verb", "3,3": "noun" }, stars: [25, 30, 35], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-15", name: "Famous Spine", theme: "library", layout: ["....#", "##.##", "##.##", "#....", "##.##"], anchors: { "3,2": "under", "0,3": "library" }, swaps: 4, seed: 1288247646, draw: 2, hints: { "1,2": "adj", "2,2": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-16", name: "Hungry Sunrise", theme: "breakfast", layout: ["##.#", "....", "##.#", "....", "##.#"], anchors: { "4,2": "table" }, swaps: 4, seed: 2042776737, draw: 2, hints: { "1,2": "noun", "3,1": "det" }, stars: [26, 31, 36], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-02-17", name: "The Rocket", theme: "night-sky", layout: ["....", "#.#.", "#.#.", "#.#.", "#.##"], anchors: { "1,3": "for", "2,1": "over" }, swaps: 4, seed: 365196327, draw: 2, hints: { "0,3": "noun", "2,3": "det" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-18", name: "Bird & Weed", theme: "garden", layout: ["....", ".###", ".###", "...."], anchors: { "1,0": "in" }, swaps: 4, seed: 1138520810, draw: 2, hints: { "3,0": "noun", "0,0": "adv" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-02-19", name: "Sunlit Treasure", theme: "seaside", layout: ["#.#.", "#.#.", "#.#.", "....", "#.##"], anchors: { "0,1": "some", "2,3": "with" }, swaps: 4, seed: 1834571200, draw: 2, hints: { "4,1": "verb", "1,1": "adj" }, stars: [21, 25, 29], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-20", name: "Hushed Novel", theme: "library", layout: ["#.#.#", "#.#.#", "#.#.#", "....."], anchors: { "1,3": "under" }, swaps: 4, seed: 440968676, draw: 2, hints: { "3,3": "noun", "2,3": "det" }, stars: [26, 31, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-21", name: "Hungry Cinnamon", theme: "breakfast", layout: [".####", "....#", ".#.##", ".#.##", "#...."], anchors: { "1,0": "morning", "4,3": "on" }, swaps: 4, seed: 308002122, draw: 2, hints: { "1,3": "noun", "1,1": "verb" }, stars: [32, 38, 44], objectives: [{ kind: "themeWords", count: 4, points: 6 }] }, { id: "daily-2027-02-22", name: "Lunar Comet", theme: "night-sky", layout: ["###.", ".##.", ".##.", "....", ".##."], anchors: { "1,3": "of", "1,0": "this" }, swaps: 4, seed: 574702340, draw: 2, hints: { "3,3": "noun", "0,3": "noun" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-02-23", name: "Damp Garden", theme: "garden", layout: [".###", ".##.", "....", ".##.", "...."], anchors: { "4,0": "sun" }, swaps: 4, seed: 2015583940, draw: 2, hints: { "0,0": "verb", "2,0": "noun" }, stars: [39, 47, 55], objectives: [{ kind: "themeWords", count: 5, points: 8 }] }, { id: "daily-2027-02-24", name: "Sunburnt Pirate", theme: "seaside", layout: ["##.##", "#....", "##.##", "....#"], anchors: { "3,0": "the", "1,2": "in" }, swaps: 4, seed: 118213630, draw: 2, hints: { "3,3": "verb", "3,2": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-02-25", name: "Dusty Library", theme: "library", layout: [".#.#", "....", ".#.#", ".#.#", ".#.#"], anchors: { "0,0": "your", "1,2": "over" }, swaps: 4, seed: 807366933, draw: 2, hints: { "1,0": "adj", "1,1": "noun" }, stars: [20, 24, 28], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-02-26", name: "Fresh Yolk", theme: "breakfast", layout: ["##.##", "....#", "##.##", "#....", "##.##"], anchors: { "1,1": "in" }, swaps: 4, seed: 1450434180, draw: 2, hints: { "1,3": "noun", "0,2": "verb" }, stars: [28, 34, 40], objectives: [{ kind: "themeWords", count: 6, points: 6 }] }, { id: "daily-2027-02-27", name: "The Telescope", theme: "night-sky", layout: ["....#", ".####", ".####", ".####", "....."], anchors: { "0,0": "a" }, swaps: 4, seed: 309718447, draw: 2, hints: { "4,3": "adj", "4,0": "noun" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-02-28", name: "Ripe Worm", theme: "garden", layout: [".#.##", ".....", ".#.##", "....#", "##.##"], anchors: { "2,0": "of" }, swaps: 4, seed: 1532515855, draw: 2, hints: { "0,2": "det", "3,2": "prep", "1,3": "prep" }, stars: [36, 43, 50], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-03-01", name: "Shiny Sunset", theme: "seaside", layout: [".#.#", ".#.#", ".#.#", "....", "##.#"], anchors: { "1,2": "and" }, swaps: 4, seed: 923643533, draw: 2, hints: { "3,3": "noun", "3,2": "det" }, stars: [32, 38, 44], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-03-02", name: "Curious Page", theme: "library", layout: ["#....", "###.#", "....#", "###.#"], anchors: { "1,3": "through" }, swaps: 4, seed: 1844239567, draw: 2, hints: { "0,3": "noun", "2,3": "pron" }, stars: [23, 29, 34], objectives: [{ kind: "themeWords", count: 6, points: 5 }] }, { id: "daily-2027-03-03", name: "Early Butter", theme: "breakfast", layout: ["##.#", ".#.#", "....", ".#.#", ".###"], anchors: { "1,0": "a" }, swaps: 4, seed: 213929264, draw: 2, hints: { "2,0": "noun", "2,2": "det" }, stars: [24, 29, 34], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-03-04", name: "Glowing Night", theme: "night-sky", layout: [".....", ".###.", ".###.", ".###.", ".####"], anchors: { "2,0": "under", "3,4": "cloud" }, swaps: 4, seed: 340357300, draw: 2, hints: { "0,2": "pron", "0,0": "pron" }, stars: [24, 29, 34], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-03-05", name: "Sunny Daisy", theme: "garden", layout: ["#.###", ".....", "#.#.#", "#.#.#", "###.#"], anchors: { "2,1": "in" }, swaps: 4, seed: 538692240, draw: 2, hints: { "1,1": "det", "0,1": "verb" }, stars: [22, 26, 30], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-03-06", name: "Salty Surf", theme: "seaside", layout: ["#.#.", "#.#.", "#.#.", "#.#.", "...."], anchors: { "0,1": "a", "1,3": "through" }, swaps: 4, seed: 782257504, draw: 2, hints: { "3,3": "verb", "4,3": "pron" }, stars: [29, 35, 41], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-03-07", name: "The Reader", theme: "library", layout: ["....", ".#.#", ".#.#", ".#.#", ".###"], anchors: { "0,0": "every", "1,2": "on" }, swaps: 4, seed: 488866867, draw: 2, hints: { "0,2": "adv", "1,0": "adj" }, stars: [26, 31, 36], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-03-08", name: "Fluffy Omelette", theme: "breakfast", layout: ["##.#", "....", ".#.#", ".#.#", ".###"], anchors: { "1,3": "kitchen" }, swaps: 4, seed: 36763828, draw: 2, hints: { "2,0": "det", "1,2": "adj" }, stars: [30, 36, 42], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-03-09", name: "Shadow & Galaxy", theme: "night-sky", layout: [".####", ".###.", ".###.", ".###.", "....."], anchors: { "1,0": "and", "1,4": "i" }, swaps: 4, seed: 1517880033, draw: 2, hints: { "4,4": "noun", "4,1": "adv" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-03-10", name: "Pond & Root", theme: "garden", layout: ["####.", "#....", "##.#.", "##.#.", "....#"], anchors: { "4,0": "some" }, swaps: 4, seed: 1259762390, draw: 2, hints: { "4,3": "pron", "4,2": "verb" }, stars: [36, 43, 50], objectives: [{ kind: "themeWords", count: 5, points: 7 }] }, { id: "daily-2027-03-11", name: "Deep Tide", theme: "seaside", layout: ["#....", "##.##", "##.##", "....#"], anchors: { "0,3": "near", "1,2": "over" }, swaps: 4, seed: 1061128081, draw: 2, hints: { "0,1": "adj", "0,2": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-03-12", name: "The Candle", theme: "library", layout: ["....", ".###", ".###", "...."], anchors: { "0,1": "near" }, swaps: 4, seed: 833185566, draw: 2, hints: { "3,3": "noun", "2,0": "det" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-03-13", name: "The Fork", theme: "breakfast", layout: [".....", "###.#", "###.#", "....."], anchors: { "3,2": "over", "2,3": "under" }, swaps: 4, seed: 1393664971, draw: 2, hints: { "0,4": "noun", "3,1": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-03-14", name: "Infinite Crater", theme: "night-sky", layout: ["###.#", ".....", "###.#", "....#", "###.#"], anchors: { "1,2": "under" }, swaps: 4, seed: 404237547, draw: 2, hints: { "1,1": "pron", "1,3": "det" }, stars: [28, 34, 40], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-03-15", name: "Wilted Bee", theme: "garden", layout: [".....", ".#.##", ".#.##", "....#", ".#.##"], anchors: { "3,2": "on" }, swaps: 4, seed: 2096425756, draw: 2, hints: { "2,0": "verb", "1,0": "pron" }, stars: [35, 42, 49], objectives: [{ kind: "themeWords", count: 5, points: 7 }] }, { id: "daily-2027-03-16", name: "The Seagull", theme: "seaside", layout: ["....", ".##.", ".##.", ".##.", "...."], anchors: { "1,3": "and" }, swaps: 4, seed: 2059644938, draw: 2, hints: { "0,3": "pron", "4,3": "noun", "2,3": "det" }, stars: [38, 46, 54], objectives: [{ kind: "swapsLeft", count: 2, points: 8 }] }, { id: "daily-2027-03-17", name: "Tale & Librarian", theme: "library", layout: [".....", "#.###", "#.###", "....#"], anchors: { "1,1": "under" }, swaps: 4, seed: 732886757, draw: 2, hints: { "0,4": "noun", "3,0": "det" }, stars: [22, 26, 30], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-03-18", name: "Berry & Chef", theme: "breakfast", layout: ["##.#.", ".....", "##.#.", "##.#.", "####."], anchors: { "1,1": "with" }, swaps: 4, seed: 1868036919, draw: 2, hints: { "2,4": "prep", "3,2": "pron" }, stars: [31, 37, 43], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-03-19", name: "Mysterious Meteor", theme: "night-sky", layout: [".####", ".####", ".....", ".####", "....."], anchors: { "2,2": "of", "4,2": "over" }, swaps: 4, seed: 753423956, draw: 2, hints: { "4,0": "adv", "4,3": "det" }, stars: [27, 32, 37], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-03-20", name: "The Hose", theme: "garden", layout: ["###.", "#.#.", "#.#.", "....", "#.##"], anchors: { "3,2": "in" }, swaps: 4, seed: 1299676710, draw: 2, hints: { "3,1": "noun", "1,1": "det" }, stars: [22, 26, 30], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-03-21", name: "The Sunset", theme: "seaside", layout: [".###", "....", ".###", "...."], anchors: { "1,0": "sea" }, swaps: 4, seed: 1075950062, draw: 2, hints: { "1,2": "det", "3,3": "noun" }, stars: [21, 26, 30], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-03-22", name: "Overdue Librarian", theme: "library", layout: ["####.", ".....", ".###.", ".###.", "....#"], anchors: { "4,2": "under" }, swaps: 4, seed: 966235046, draw: 2, hints: { "4,0": "noun", "2,0": "verb", "1,3": "adj" }, stars: [35, 42, 49], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-03-23", name: "Chef & Table", theme: "breakfast", layout: [".##.", ".##.", ".##.", "....", "###."], anchors: { "3,1": "over" }, swaps: 4, seed: 1577596431, draw: 2, hints: { "0,0": "verb", "0,3": "adv" }, stars: [29, 35, 41], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-03-24", name: "The Wish", theme: "night-sky", layout: ["....", "#.#.", "#.#.", "#.#.", "###."], anchors: { "0,0": "we", "1,3": "on" }, swaps: 4, seed: 1678805675, draw: 2, hints: { "0,3": "noun", "0,1": "verb" }, stars: [24, 29, 34], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-03-25", name: "Shovel & Rose", theme: "garden", layout: [".....", "###.#", "#....", "###.#", "....#"], anchors: { "2,3": "under" }, swaps: 4, seed: 1394425907, draw: 2, hints: { "4,2": "pron", "4,3": "verb", "0,4": "noun" }, stars: [36, 43, 50], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-03-26", name: "Sand & Bucket", theme: "seaside", layout: ["....#", ".####", ".....", ".####"], anchors: { "0,2": "through" }, swaps: 4, seed: 269097205, draw: 2, hints: { "2,0": "verb", "2,4": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-03-27", name: "Ink & Chapter", theme: "library", layout: ["#....", "#.###", "#.###", ".....", "#.###"], anchors: { "3,0": "some" }, swaps: 4, seed: 705348621, draw: 2, hints: { "0,3": "det", "3,2": "verb" }, stars: [27, 32, 37], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-03-28", name: "Golden Pancake", theme: "breakfast", layout: [".##.#", ".##.#", ".##.#", "....."], anchors: { "1,0": "over", "1,3": "for" }, swaps: 4, seed: 248043821, draw: 2, hints: { "3,2": "det", "3,3": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-03-29", name: "Ancient Telescope", theme: "night-sky", layout: ["....#", "#.###", "#....", "#.###"], anchors: { "0,2": "with" }, swaps: 4, seed: 1359349369, draw: 2, hints: { "2,1": "det", "2,3": "verb" }, stars: [25, 31, 36], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-03-30", name: "Leafy Flower", theme: "garden", layout: ["....", ".##.", ".##.", "...."], anchors: { "1,0": "on", "0,1": "on" }, swaps: 4, seed: 989157533, draw: 2, hints: { "0,3": "noun", "3,2": "det" }, stars: [37, 44, 51], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2027-03-31", name: "Blue Coral", theme: "seaside", layout: [".#.#", ".#.#", "....", ".#.#"], anchors: { "2,2": "under", "0,0": "they" }, swaps: 4, seed: 1029238191, draw: 2, hints: { "2,3": "pron", "1,0": "verb" }, stars: [20, 24, 28], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-01", name: "Bookish Chapter", theme: "library", layout: ["###.", "#.#.", "....", "#.#.", "#.##"], anchors: { "1,1": "this" }, swaps: 4, seed: 1941753287, draw: 2, hints: { "2,3": "pron", "3,3": "verb" }, stars: [25, 30, 35], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-04-02", name: "Milk & Banana", theme: "breakfast", layout: ["##.##", "##.#.", "##.#.", "##.#.", "....."], anchors: { "1,2": "near", "4,3": "under" }, swaps: 4, seed: 1638637982, draw: 2, hints: { "4,4": "pron", "4,2": "adv" }, stars: [26, 32, 38], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-04-03", name: "Silent Astronaut", theme: "night-sky", layout: ["##.#", ".#.#", "....", ".#.#", ".#.#"], anchors: { "2,2": "over" }, swaps: 4, seed: 205477550, draw: 2, hints: { "3,2": "det", "2,3": "pron" }, stars: [20, 24, 28], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-04-04", name: "The Daisy", theme: "garden", layout: ["....", ".##.", "....", ".##.", "###."], anchors: { "0,0": "my", "3,3": "of" }, swaps: 4, seed: 655648974, draw: 2, hints: { "2,2": "prep", "1,3": "verb" }, stars: [32, 40, 47], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-04-05", name: "Island & Tide", theme: "seaside", layout: [".####", ".#.##", ".....", ".#.##", "#...."], anchors: { "4,1": "every" }, swaps: 4, seed: 217101785, draw: 2, hints: { "4,3": "verb", "4,2": "noun", "2,3": "det" }, stars: [36, 43, 50], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-04-06", name: "The Atlas", theme: "library", layout: ["###.#", ".....", "###.#", "....#"], anchors: { "1,2": "for" }, swaps: 4, seed: 1208489954, draw: 2, hints: { "3,3": "noun", "1,3": "det" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-07", name: "Crispy Orange", theme: "breakfast", layout: [".#.#", "....", ".#.#", ".#.#"], anchors: { "0,2": "my" }, swaps: 4, seed: 589726273, draw: 2, hints: { "1,1": "det", "1,2": "adj" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-04-08", name: "Pale Lantern", theme: "night-sky", layout: ["#....", "#.###", "#.###", "....."], anchors: { "0,4": "space" }, swaps: 4, seed: 747155846, draw: 2, hints: { "3,1": "pron", "3,2": "prep" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-04-09", name: "Lush Tulip", theme: "garden", layout: ["##.##", "##.#.", ".....", "##.#.", "####."], anchors: { "1,4": "our", "2,0": "we" }, swaps: 4, seed: 1998765722, draw: 2, hints: { "2,4": "noun", "2,2": "det" }, stars: [24, 29, 34], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-04-10", name: "Shell & Seagull", theme: "seaside", layout: ["....", ".#.#", ".#.#", ".#.#", "##.#"], anchors: { "2,0": "under" }, swaps: 4, seed: 749695302, draw: 2, hints: { "0,0": "det", "3,2": "det" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-04-11", name: "Forgotten Scroll", theme: "library", layout: ["#....", "##.##", "##.##", "....#", "##.##"], anchors: { "3,1": "under" }, swaps: 4, seed: 184140543, draw: 2, hints: { "3,2": "det", "0,4": "noun" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-04-12", name: "Spoon & Mug", theme: "breakfast", layout: ["##.#", ".#.#", "....", ".#.#", ".###"], anchors: { "2,3": "egg" }, swaps: 4, seed: 1269464754, draw: 2, hints: { "2,1": "verb", "1,0": "det" }, stars: [27, 32, 37], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-04-13", name: "Lunar Meteor", theme: "night-sky", layout: [".###.", ".###.", ".###.", ".....", "####."], anchors: { "0,0": "my" }, swaps: 4, seed: 342923649, draw: 2, hints: { "3,0": "verb", "1,4": "prep" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-04-14", name: "Busy Shovel", theme: "garden", layout: [".###.", ".###.", ".###.", "....."], anchors: { "1,4": "on" }, swaps: 4, seed: 1816576350, draw: 2, hints: { "0,0": "det", "3,4": "noun" }, stars: [25, 30, 35], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-04-15", name: "Harbor & Umbrella", theme: "seaside", layout: ["#.###", ".....", "#.###", "#...."], anchors: { "0,1": "i" }, swaps: 4, seed: 2045336759, draw: 2, hints: { "3,1": "noun", "1,2": "conj" }, stars: [24, 29, 34], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-04-16", name: "Scroll & Lamp", theme: "library", layout: ["####.", ".###.", ".....", ".###.", ".###."], anchors: { "2,2": "with", "3,4": "and" }, swaps: 4, seed: 1160317619, draw: 2, hints: { "2,0": "adj", "2,4": "noun" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-04-17", name: "Kitchen & Grandma", theme: "breakfast", layout: [".#.##", ".....", ".#.##", ".#.##"], anchors: { "0,0": "the" }, swaps: 4, seed: 883736089, draw: 2, hints: { "2,0": "prep", "1,2": "det" }, stars: [31, 37, 43], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-04-18", name: "The Orbit", theme: "night-sky", layout: ["##.##", "#....", "##.#.", ".....", "####."], anchors: { "3,3": "with" }, swaps: 4, seed: 2035662339, draw: 2, hints: { "1,1": "pron", "1,3": "det" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-04-19", name: "Nest & Gnome", theme: "garden", layout: [".##.", ".##.", "....", ".##."], anchors: { "0,3": "our" }, swaps: 4, seed: 1414475981, draw: 2, hints: { "2,3": "verb", "3,0": "noun" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-20", name: "Foamy Starfish", theme: "seaside", layout: [".....", "#.###", "#.###", "#...."], anchors: { "0,2": "for", "2,1": "through" }, swaps: 4, seed: 1624750324, draw: 2, hints: { "3,4": "noun", "0,3": "det" }, stars: [26, 31, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-21", name: "Famous Poet", theme: "library", layout: ["....", ".###", "....", ".###", ".###"], anchors: { "2,1": "through", "3,0": "over" }, swaps: 4, seed: 1828484471, draw: 2, hints: { "2,0": "noun", "1,0": "det" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-22", name: "Early Toast", theme: "breakfast", layout: ["....#", "##.##", "##.##", "#....", "##.##"], anchors: { "4,2": "table" }, swaps: 4, seed: 1655562275, draw: 2, hints: { "0,1": "det", "3,2": "det" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-04-23", name: "The Crater", theme: "night-sky", layout: [".#.#", "....", ".#.#", ".#.#", ".###"], anchors: { "2,2": "with" }, swaps: 4, seed: 852850188, draw: 2, hints: { "3,2": "pron", "1,1": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-24", name: "The Tulip", theme: "garden", layout: [".....", "#.##.", "#....", "#.##."], anchors: { "1,4": "with" }, swaps: 4, seed: 538318433, draw: 2, hints: { "1,1": "verb", "0,4": "noun" }, stars: [35, 42, 49], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-04-25", name: "Pirate & Starfish", theme: "seaside", layout: [".####", ".....", ".#.#.", ".#.#.", "##.#."], anchors: { "1,2": "shore" }, swaps: 4, seed: 296003707, draw: 2, hints: { "1,3": "conj", "1,0": "verb", "1,4": "noun" }, stars: [37, 44, 51], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2027-04-26", name: "Chapter & Story", theme: "library", layout: ["#.#.", "....", "#.#.", "...."], anchors: { "3,2": "through", "0,3": "the" }, swaps: 4, seed: 2063914574, draw: 2, hints: { "0,1": "pron", "1,1": "verb" }, stars: [32, 39, 46], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-04-27", name: "Hungry Kitchen", theme: "breakfast", layout: ["....", "###.", "....", "###."], anchors: { "0,1": "of" }, swaps: 4, seed: 2081672600, draw: 2, hints: { "0,0": "verb", "2,2": "verb" }, stars: [20, 24, 28], objectives: [{ kind: "themeWords", count: 3, points: 5 }] }, { id: "daily-2027-04-28", name: "Sparkling Star", theme: "night-sky", layout: ["....", "##.#", "##.#", "...."], anchors: { "0,0": "the" }, swaps: 4, seed: 255194347, draw: 2, hints: { "0,1": "noun", "0,2": "prep" }, stars: [22, 26, 30], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-04-29", name: "Leaf & Daisy", theme: "garden", layout: [".....", ".##.#", ".##.#", ".##.#"], anchors: { "2,0": "through" }, swaps: 4, seed: 1203983525, draw: 2, hints: { "0,2": "det", "0,0": "det" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-30", name: "Breezy Breeze", theme: "seaside", layout: ["#.##.", ".....", "#.##.", "#.##.", "#...."], anchors: { "0,1": "a" }, swaps: 4, seed: 1994118643, draw: 2, hints: { "1,2": "noun", "4,3": "det", "4,4": "noun" }, stars: [35, 42, 49], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-05-01", name: "Famous Dictionary", theme: "library", layout: ["#.##", "#.#.", "....", "#.#.", "###."], anchors: { "3,3": "of" }, swaps: 4, seed: 545773951, draw: 2, hints: { "2,3": "verb", "4,3": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-05-02", name: "Toast & Orange", theme: "breakfast", layout: ["###.#", "#....", "###.#", "....."], anchors: { "1,2": "over" }, swaps: 4, seed: 1761100885, draw: 2, hints: { "1,3": "det", "1,4": "noun" }, stars: [30, 36, 42], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-05-03", name: "The Galaxy", theme: "night-sky", layout: ["....", ".#.#", ".#.#", ".#.#", ".###"], anchors: { "0,1": "through" }, swaps: 4, seed: 1195789845, draw: 2, hints: { "0,0": "noun", "2,2": "det" }, stars: [23, 28, 33], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-05-04", name: "The Garden", theme: "garden", layout: ["##.#", ".#.#", ".#.#", ".#.#", "...."], anchors: { "1,0": "this" }, swaps: 4, seed: 788217064, draw: 2, hints: { "4,1": "prep", "4,0": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-05-05", name: "Pebble & Jellyfish", theme: "seaside", layout: ["....", ".###", ".###", ".###", "...."], anchors: { "4,0": "island" }, swaps: 4, seed: 877244631, draw: 2, hints: { "0,3": "noun", "3,0": "adj" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-05-06", name: "Magical Shelf", theme: "library", layout: [".#.#", "....", ".#.#", "....", "##.#"], anchors: { "3,2": "for", "1,1": "with" }, swaps: 4, seed: 2147102023, draw: 2, hints: { "3,0": "adj", "1,0": "adv" }, stars: [34, 41, 48], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-05-07", name: "The Napkin", theme: "breakfast", layout: [".#.#", ".#.#", ".#.#", "....", ".#.#"], anchors: { "1,0": "in" }, swaps: 4, seed: 907741647, draw: 2, hints: { "4,0": "verb", "3,0": "noun" }, stars: [33, 40, 47], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2027-05-08", name: "Cosmic Alien", theme: "night-sky", layout: [".....", "##.#.", "##.#.", ".....", "##.##"], anchors: { "0,1": "with", "3,2": "of" }, swaps: 4, seed: 1499547819, draw: 2, hints: { "4,2": "pron", "1,4": "prep", "0,4": "noun" }, stars: [38, 46, 54], objectives: [{ kind: "longWord", letters: 7, points: 8 }] }, { id: "daily-2027-05-09", name: "Blooming Butterfly", theme: "garden", layout: ["##.##", ".....", "##.#.", ".....", "##.#."], anchors: { "2,4": "near" }, swaps: 4, seed: 5364002, draw: 2, hints: { "2,2": "det", "3,4": "pron", "1,4": "noun" }, stars: [43, 52, 61], objectives: [{ kind: "swapsLeft", count: 2, points: 9 }] }, { id: "daily-2027-05-10", name: "Harbor & Starfish", theme: "seaside", layout: ["#....", ".#.#.", ".#.#.", ".....", ".####"], anchors: { "2,4": "in", "0,1": "i" }, swaps: 4, seed: 1980690796, draw: 2, hints: { "2,0": "verb", "1,0": "pron", "0,2": "verb" }, stars: [47, 56, 65], objectives: [{ kind: "longWord", letters: 7, points: 9 }] }, { id: "daily-2027-05-11", name: "Atlas & Tale", theme: "library", layout: ["....", "##.#", "##.#", "...."], anchors: { "0,3": "paper", "3,0": "the" }, swaps: 4, seed: 70294365, draw: 2, hints: { "2,2": "noun", "0,2": "det" }, stars: [21, 25, 29], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-05-12", name: "Creamy Toast", theme: "breakfast", layout: ["##.#.", "##.#.", ".....", "##.#.", "####."], anchors: { "0,2": "some" }, swaps: 4, seed: 276501137, draw: 2, hints: { "2,4": "noun", "4,4": "pron" }, stars: [29, 35, 41], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-05-13", name: "Moon & Satellite", theme: "night-sky", layout: ["####.", "#....", "##.#.", "##.#.", "....#"], anchors: { "0,4": "your" }, swaps: 4, seed: 1048397762, draw: 2, hints: { "3,4": "pron", "1,1": "verb" }, stars: [30, 36, 42], objectives: [{ kind: "themeWords", count: 4, points: 6 }] }, { id: "daily-2027-05-14", name: "Thorny Daisy", theme: "garden", layout: ["#.##.", ".....", "#.##.", "#....", "####."], anchors: { "1,2": "with", "2,4": "with" }, swaps: 4, seed: 1517202127, draw: 2, hints: { "0,1": "det", "0,4": "det" }, stars: [36, 43, 50], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-05-15", name: "Stormy Beach", theme: "seaside", layout: ["#....", "#.#.#", ".....", "#.#.#"], anchors: { "2,0": "a" }, swaps: 4, seed: 139077492, draw: 2, hints: { "1,3": "verb", "2,3": "det" }, stars: [37, 44, 51], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-05-16", name: "Magical Secret", theme: "library", layout: ["####.", "#.##.", "#.##.", "#.##.", "....."], anchors: { "1,4": "with" }, swaps: 4, seed: 1414484587, draw: 2, hints: { "4,0": "adv", "0,4": "noun" }, stars: [25, 30, 35], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-05-17", name: "The Butter", theme: "breakfast", layout: [".....", "#.##.", "#.##.", "#.##.", "#.###"], anchors: { "0,0": "this" }, swaps: 4, seed: 1694270778, draw: 2, hints: { "3,4": "verb", "0,2": "prep" }, stars: [33, 40, 47], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-05-18", name: "Endless Crater", theme: "night-sky", layout: ["#.###", ".....", "#.###", "....#", "#.###"], anchors: { "1,0": "your", "3,3": "night" }, swaps: 4, seed: 1305245281, draw: 2, hints: { "1,1": "noun", "3,0": "verb" }, stars: [28, 34, 40], objectives: [{ kind: "themeWords", count: 4, points: 6 }] }, { id: "daily-2027-05-19", name: "Busy Butterfly", theme: "garden", layout: [".####", ".....", ".##.#", ".##.#", "###.#"], anchors: { "2,0": "for" }, swaps: 4, seed: 1064209027, draw: 2, hints: { "2,3": "adj", "3,3": "noun" }, stars: [25, 31, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-05-20", name: "Salty Anchor", theme: "seaside", layout: [".#.##", ".....", ".#.##", ".#.##"], anchors: { "1,0": "captain", "2,2": "over" }, swaps: 4, seed: 825070455, draw: 2, hints: { "3,2": "pron", "2,0": "verb" }, stars: [21, 25, 29], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-05-21", name: "Wise Paper", theme: "library", layout: ["....#", "#.###", "#.###", "....."], anchors: { "3,2": "near", "1,1": "and" }, swaps: 4, seed: 1541290776, draw: 2, hints: { "3,1": "noun", "0,1": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-05-22", name: "Table & Yolk", theme: "breakfast", layout: ["##.#", ".#.#", ".#.#", "....", ".#.#"], anchors: { "3,2": "over", "2,0": "over" }, swaps: 4, seed: 192095191, draw: 2, hints: { "0,2": "verb", "1,0": "noun" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-05-23", name: "Rocket & Universe", theme: "night-sky", layout: ["###.#", ".....", "###.#", "###.#", "....#"], anchors: { "1,1": "through" }, swaps: 4, seed: 2023466899, draw: 2, hints: { "4,1": "prep", "0,3": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-05-24", name: "Wilted Garden", theme: "garden", layout: ["##.#", ".#.#", "....", ".#.#", ".#.#"], anchors: { "2,3": "weed" }, swaps: 4, seed: 1321399611, draw: 2, hints: { "4,0": "noun", "2,2": "adj" }, stars: [31, 37, 43], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-05-25", name: "Stormy Towel", theme: "seaside", layout: [".....", ".####", ".####", "....#"], anchors: { "3,1": "in", "1,0": "near" }, swaps: 4, seed: 89127042, draw: 2, hints: { "0,4": "noun", "3,0": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-05-26", name: "The Book", theme: "library", layout: ["#....", "####.", "####.", "....."], anchors: { "3,2": "under", "1,4": "over" }, swaps: 4, seed: 595192098, draw: 2, hints: { "0,4": "noun", "3,0": "pron" }, stars: [26, 31, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-05-27", name: "Burnt Table", theme: "breakfast", layout: ["#.###", ".....", "#.###", "#....", "#.###"], anchors: { "1,4": "egg" }, swaps: 4, seed: 1485454045, draw: 2, hints: { "0,1": "pron", "1,0": "noun" }, stars: [30, 36, 42], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-05-28", name: "Starry Space", theme: "night-sky", layout: [".....", "#.#.#", "#.#.#", "#.#.#", "#.#.#"], anchors: { "0,0": "some" }, swaps: 4, seed: 892374246, draw: 2, hints: { "3,3": "adj", "4,3": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 6, points: 6 }] }, { id: "daily-2027-05-29", name: "Busy Sprout", theme: "garden", layout: [".....", "##.##", ".....", "##.##", "#...."], anchors: { "0,3": "for", "1,2": "under" }, swaps: 4, seed: 1723691205, draw: 2, hints: { "2,1": "verb", "0,2": "noun", "2,2": "det" }, stars: [39, 47, 55], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2027-05-30", name: "Fish & Puffin", theme: "seaside", layout: ["####.", ".....", "####.", "####.", "....."], anchors: { "2,4": "and" }, swaps: 4, seed: 647068199, draw: 2, hints: { "0,4": "verb", "4,2": "det" }, stars: [30, 36, 42], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-05-31", name: "Forgotten Tale", theme: "library", layout: ["....", "##.#", "##.#", "...."], anchors: { "0,3": "map" }, swaps: 4, seed: 131203777, draw: 2, hints: { "0,0": "noun", "1,2": "noun" }, stars: [21, 25, 29], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-06-01", name: "The Crumb", theme: "breakfast", layout: [".####", ".#.##", ".#.##", ".....", "##.##"], anchors: { "0,0": "we", "4,2": "butter" }, swaps: 4, seed: 432882494, draw: 2, hints: { "3,3": "noun", "3,2": "det" }, stars: [27, 32, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-06-02", name: "Darkness & Dream", theme: "night-sky", layout: ["....#", ".####", ".####", "....."], anchors: { "0,0": "our" }, swaps: 4, seed: 314043094, draw: 2, hints: { "3,1": "pron", "0,1": "adj" }, stars: [29, 35, 41], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-06-03", name: "The Tomato", theme: "garden", layout: ["##.##", ".....", "##.##", "....#"], anchors: { "3,2": "rose" }, swaps: 4, seed: 1025028805, draw: 2, hints: { "3,1": "adj", "2,2": "det" }, stars: [25, 30, 35], objectives: [{ kind: "themeWords", count: 3, points: 5 }] }, { id: "daily-2027-06-04", name: "Ocean & Pirate", theme: "seaside", layout: [".###", ".#.#", "....", ".#.#", "##.#"], anchors: { "3,0": "boat", "2,2": "of" }, swaps: 4, seed: 1543037489, draw: 2, hints: { "1,2": "verb", "2,0": "det" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-06-05", name: "Clever Desk", theme: "library", layout: ["#.#.", "#.#.", "#.#.", "...."], anchors: { "3,2": "of" }, swaps: 4, seed: 757228773, draw: 2, hints: { "2,3": "verb", "3,3": "pron" }, stars: [18, 23, 27], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-06-06", name: "The Waffle", theme: "breakfast", layout: [".#.##", ".#.##", ".....", ".#.##", "##.##"], anchors: { "4,2": "butter", "1,0": "for" }, swaps: 4, seed: 2108085478, draw: 2, hints: { "2,0": "det", "0,0": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "themeWords", count: 6, points: 6 }] }, { id: "daily-2027-06-07", name: "Lunar Astronaut", theme: "night-sky", layout: [".....", "##.##", "##.##", "#....", "##.##"], anchors: { "0,3": "in", "2,2": "over" }, swaps: 4, seed: 1142576876, draw: 2, hints: { "3,2": "det", "1,2": "verb" }, stars: [27, 32, 37], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-06-08", name: "The Vine", theme: "garden", layout: ["....", ".##.", ".##.", ".##.", "###."], anchors: { "0,1": "near" }, swaps: 4, seed: 1472790052, draw: 2, hints: { "0,2": "det", "2,0": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-06-09", name: "The Dolphin", theme: "seaside", layout: [".##.#", ".....", ".##.#", ".##.#"], anchors: { "1,1": "under", "0,0": "i" }, swaps: 4, seed: 492331689, draw: 2, hints: { "2,3": "noun", "1,0": "verb" }, stars: [27, 32, 37], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-06-10", name: "Poet & Library", theme: "library", layout: ["....#", "###.#", "###.#", "###.#", "....."], anchors: { "0,3": "library" }, swaps: 4, seed: 715614742, draw: 2, hints: { "0,2": "det", "4,1": "det" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-06-11", name: "Burnt Muffin", theme: "breakfast", layout: ["###.", "....", "#.#.", "....", "#.##"], anchors: { "2,3": "of" }, swaps: 4, seed: 520193381, draw: 2, hints: { "1,2": "noun", "3,1": "verb" }, stars: [41, 49, 57], objectives: [{ kind: "swapsLeft", count: 2, points: 8 }] }, { id: "daily-2027-06-12", name: "The Astronaut", theme: "night-sky", layout: [".#.##", ".....", ".#.##", ".#.##"], anchors: { "0,2": "the" }, swaps: 4, seed: 2096639888, draw: 2, hints: { "1,0": "det", "1,2": "noun" }, stars: [24, 29, 34], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-06-13", name: "Thorny Tulip", theme: "garden", layout: ["....", ".###", ".###", "...."], anchors: { "0,2": "under" }, swaps: 4, seed: 1534385107, draw: 2, hints: { "3,3": "verb", "0,0": "det" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-06-14", name: "The Captain", theme: "seaside", layout: [".#.##", ".....", ".#.##", "....#", ".####"], anchors: { "3,2": "wave" }, swaps: 4, seed: 1117421614, draw: 2, hints: { "1,2": "verb", "1,0": "adj", "1,3": "det" }, stars: [35, 45, 55], objectives: [{ kind: "themeWords", count: 5, points: 7 }] }, { id: "daily-2027-06-15", name: "Famous Paper", theme: "library", layout: [".##.", "....", ".##.", "....", ".###"], anchors: { "0,0": "this", "2,3": "of" }, swaps: 4, seed: 437073745, draw: 2, hints: { "3,3": "pron", "0,3": "adj" }, stars: [32, 38, 44], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-06-16", name: "Buttery Grandma", theme: "breakfast", layout: ["####.", ".....", "#.##.", "#....", "#.###"], anchors: { "1,2": "in", "2,1": "in" }, swaps: 4, seed: 303701314, draw: 2, hints: { "1,4": "noun", "1,0": "det" }, stars: [35, 42, 49], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-06-17", name: "Cosmic Night", theme: "night-sky", layout: [".####", ".####", ".....", ".####", "....."], anchors: { "4,3": "near", "2,2": "under" }, swaps: 4, seed: 969710999, draw: 2, hints: { "1,0": "prep", "4,0": "adv" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-06-18", name: "Bird & Pond", theme: "garden", layout: ["##.#", "....", "##.#", "...."], anchors: { "1,0": "my" }, swaps: 4, seed: 1769926432, draw: 2, hints: { "3,2": "pron", "3,0": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-06-19", name: "Tropical Sandcastle", theme: "seaside", layout: ["....#", "##.#.", "#....", "##.#.", "####."], anchors: { "2,3": "of" }, swaps: 4, seed: 2060047991, draw: 2, hints: { "2,2": "verb", "4,4": "verb" }, stars: [31, 37, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-06-20", name: "Dictionary & Candle", theme: "library", layout: [".....", ".####", "....#", ".####"], anchors: { "2,1": "in" }, swaps: 4, seed: 1214424001, draw: 2, hints: { "2,3": "noun", "0,0": "det" }, stars: [22, 26, 30], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-06-21", name: "Runny Butter", theme: "breakfast", layout: ["....#", "#.#.#", "#.#.#", ".....", "###.#"], anchors: { "0,0": "every" }, swaps: 4, seed: 159624877, draw: 2, hints: { "3,1": "pron", "0,1": "noun", "3,2": "prep" }, stars: [38, 46, 54], objectives: [{ kind: "themeWords", count: 6, points: 8 }] }, { id: "daily-2027-06-22", name: "Dawn & Wish", theme: "night-sky", layout: ["####.", "####.", ".....", "####.", "....."], anchors: { "4,3": "for" }, swaps: 4, seed: 734583637, draw: 2, hints: { "2,4": "noun", "2,1": "adv" }, stars: [25, 30, 35], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-06-23", name: "The Weed", theme: "garden", layout: ["#.#.", "#.#.", "....", "#.#."], anchors: { "2,3": "seed", "1,1": "for" }, swaps: 4, seed: 1194135995, draw: 2, hints: { "3,1": "noun", "3,3": "verb" }, stars: [30, 36, 42], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-06-24", name: "Deep Lighthouse", theme: "seaside", layout: ["#....", "#.#.#", "#.#.#", "....#"], anchors: { "3,2": "near", "0,1": "i" }, swaps: 4, seed: 962487749, draw: 2, hints: { "3,1": "noun", "0,4": "noun" }, stars: [26, 31, 36], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-06-25", name: "Famous Legend", theme: "library", layout: [".#.#", ".#.#", "....", ".#.#", ".#.#"], anchors: { "1,0": "under", "1,2": "on" }, swaps: 4, seed: 442433526, draw: 2, hints: { "4,0": "verb", "0,2": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-06-26", name: "The Table", theme: "breakfast", layout: ["#....", ".#.##", ".#.##", ".....", ".#.##"], anchors: { "3,4": "butter" }, swaps: 4, seed: 1704730584, draw: 2, hints: { "0,1": "prep", "2,0": "adj", "1,2": "noun" }, stars: [37, 44, 51], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-06-27", name: "Infinite Sky", theme: "night-sky", layout: ["##.##", "##.##", ".....", "##.##", "....."], anchors: { "2,2": "of", "4,0": "every" }, swaps: 4, seed: 1643252237, draw: 2, hints: { "4,2": "verb", "3,2": "pron" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-06-28", name: "Shovel & Pond", theme: "garden", layout: [".....", "###.#", "#....", "###.#"], anchors: { "2,1": "some", "0,1": "and" }, swaps: 4, seed: 1970971137, draw: 2, hints: { "0,3": "noun", "2,4": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-06-29", name: "Fish & Ocean", theme: "seaside", layout: [".....", "####.", "####.", "####.", "....."], anchors: { "4,2": "near", "0,0": "a" }, swaps: 4, seed: 1647977080, draw: 2, hints: { "0,4": "noun", "3,4": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-06-30", name: "Magical Pencil", theme: "library", layout: ["#....", "###.#", "###.#", "....#"], anchors: { "1,3": "with" }, swaps: 4, seed: 546108878, draw: 2, hints: { "0,1": "det", "0,4": "verb" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-07-01", name: "Runny Cinnamon", theme: "breakfast", layout: [".####", ".####", ".....", ".####", "....#"], anchors: { "1,0": "of", "4,1": "for" }, swaps: 4, seed: 1572574702, draw: 2, hints: { "4,2": "pron", "2,1": "adj" }, stars: [31, 37, 43], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-02", name: "The Owl", theme: "night-sky", layout: [".####", ".#.##", ".#.##", ".....", ".#.##"], anchors: { "1,0": "over" }, swaps: 4, seed: 1282268597, draw: 2, hints: { "3,2": "det", "2,0": "det" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-03", name: "Muddy Carrot", theme: "garden", layout: [".....", ".###.", ".###.", ".###.", ".####"], anchors: { "2,0": "under" }, swaps: 4, seed: 1950092166, draw: 2, hints: { "2,4": "det", "0,4": "noun" }, stars: [30, 36, 42], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-04", name: "Deep Shell", theme: "seaside", layout: [".###", "....", ".##.", ".##.", ".##."], anchors: { "3,3": "of" }, swaps: 4, seed: 191033378, draw: 2, hints: { "0,0": "adj", "2,3": "verb" }, stars: [31, 37, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-07-05", name: "Spine & Story", theme: "library", layout: ["#....", "##.##", "....#", "##.##"], anchors: { "0,3": "of" }, swaps: 4, seed: 336838194, draw: 2, hints: { "2,2": "det", "2,0": "pron" }, stars: [20, 25, 29], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-07-06", name: "Porridge & Tea", theme: "breakfast", layout: ["##.##", ".....", "##.##", "#...."], anchors: { "3,2": "plate", "1,0": "a" }, swaps: 4, seed: 1340421571, draw: 2, hints: { "1,1": "noun", "1,4": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-07", name: "Crater & Owl", theme: "night-sky", layout: ["####.", ".....", "####.", "####.", "....."], anchors: { "1,3": "of", "4,4": "planet" }, swaps: 4, seed: 503483071, draw: 2, hints: { "1,0": "pron", "1,2": "adv" }, stars: [28, 35, 42], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-08", name: "Muddy Tulip", theme: "garden", layout: ["#.#.#", "....#", "#.#.#", "#...."], anchors: { "3,1": "gate" }, swaps: 4, seed: 1483577349, draw: 2, hints: { "1,0": "pron", "2,3": "verb" }, stars: [38, 46, 54], objectives: [{ kind: "longWord", letters: 7, points: 8 }] }, { id: "daily-2027-07-09", name: "Sandy Starfish", theme: "seaside", layout: [".##.#", ".##.#", ".....", ".##.#", ".####"], anchors: { "3,0": "and", "3,3": "sand" }, swaps: 4, seed: 1036852131, draw: 2, hints: { "2,3": "adj", "2,0": "noun" }, stars: [27, 33, 38], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-07-10", name: "Reader & Author", theme: "library", layout: ["....", "#.##", "....", "#.##"], anchors: { "2,1": "with" }, swaps: 4, seed: 212857081, draw: 2, hints: { "0,3": "pron", "0,1": "noun" }, stars: [22, 26, 30], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-07-11", name: "Golden Sunrise", theme: "breakfast", layout: [".####", "....#", ".#.##", ".#.##", "#...."], anchors: { "4,1": "this" }, swaps: 4, seed: 460454553, draw: 2, hints: { "4,2": "verb", "1,2": "det" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 6, points: 6 }] }, { id: "daily-2027-07-12", name: "Silver Alien", theme: "night-sky", layout: ["#.##", "....", "#.##", "#.##", "...."], anchors: { "0,1": "they" }, swaps: 4, seed: 1718066300, draw: 2, hints: { "1,0": "pron", "1,1": "verb" }, stars: [23, 28, 33], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-07-13", name: "Ripe Weed", theme: "garden", layout: ["....#", "##.#.", "#....", "##.#.", "####."], anchors: { "2,1": "this", "1,4": "a" }, swaps: 4, seed: 193063871, draw: 2, hints: { "0,2": "det", "0,1": "verb" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-14", name: "Fish & Sand", theme: "seaside", layout: ["#....", "#.###", "#.###", "....."], anchors: { "0,2": "through" }, swaps: 4, seed: 121451942, draw: 2, hints: { "2,1": "adj", "0,1": "verb" }, stars: [29, 35, 41], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-07-15", name: "The Desk", theme: "library", layout: ["#.###", "....#", "#.###", "#...."], anchors: { "1,1": "in" }, swaps: 4, seed: 811191521, draw: 2, hints: { "1,0": "noun", "3,4": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-07-16", name: "Sugary Kettle", theme: "breakfast", layout: [".#.#", "....", ".#.#", "....", "##.#"], anchors: { "1,1": "for" }, swaps: 4, seed: 815537069, draw: 2, hints: { "1,0": "verb", "0,2": "verb" }, stars: [35, 42, 49], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2027-07-17", name: "Infinite Space", theme: "night-sky", layout: ["#.###", "....#", "#.###", "#...."], anchors: { "3,1": "planet" }, swaps: 4, seed: 484787339, draw: 2, hints: { "1,1": "verb", "1,3": "noun" }, stars: [20, 24, 28], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-07-18", name: "Sunny Seed", theme: "garden", layout: ["#.##.", "#.##.", "#.##.", "#.##.", "....."], anchors: { "4,3": "on" }, swaps: 4, seed: 147724951, draw: 2, hints: { "3,1": "adj", "4,0": "det" }, stars: [30, 36, 42], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-19", name: "Breezy Ocean", theme: "seaside", layout: [".##.#", ".....", ".##.#", "....#", ".##.#"], anchors: { "1,1": "of", "2,0": "near" }, swaps: 4, seed: 1393698267, draw: 2, hints: { "3,0": "det", "1,0": "verb", "4,3": "pron" }, stars: [41, 49, 57], objectives: [{ kind: "themeWords", count: 6, points: 8 }] }, { id: "daily-2027-07-20", name: "Book & Secret", theme: "library", layout: [".#.#.", ".#.#.", ".....", ".#.#.", "####."], anchors: { "2,2": "near", "1,0": "of" }, swaps: 4, seed: 1891716197, draw: 2, hints: { "4,4": "pron", "2,0": "adj", "2,1": "noun" }, stars: [38, 46, 54], objectives: [{ kind: "longWord", letters: 7, points: 8 }] }, { id: "daily-2027-07-21", name: "Cereal & Yolk", theme: "breakfast", layout: ["####.", ".###.", ".###.", ".....", ".####"], anchors: { "3,3": "over", "4,0": "cup" }, swaps: 4, seed: 1499873419, draw: 2, hints: { "0,4": "det", "3,4": "pron" }, stars: [23, 29, 34], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-07-22", name: "Planet & Moon", theme: "night-sky", layout: ["....#", "##.#.", ".....", "##.#.", "#...."], anchors: { "0,0": "the" }, swaps: 4, seed: 1177495523, draw: 2, hints: { "2,0": "pron", "2,4": "noun", "1,4": "det" }, stars: [43, 52, 61], objectives: [{ kind: "greatLines", count: 1, points: 9 }] }, { id: "daily-2027-07-23", name: "Fragrant Worm", theme: "garden", layout: [".###", ".#.#", "....", ".#.#", "##.#"], anchors: { "2,2": "under" }, swaps: 4, seed: 112137997, draw: 2, hints: { "4,2": "verb", "2,0": "adj" }, stars: [24, 30, 36], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-07-24", name: "Wet Surf", theme: "seaside", layout: ["#.##", "....", "#.##", "....", "#.##"], anchors: { "1,1": "under", "3,2": "on" }, swaps: 4, seed: 1519568095, draw: 2, hints: { "3,0": "noun", "3,1": "verb" }, stars: [26, 31, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-07-25", name: "The Pencil", theme: "library", layout: ["....#", "##.##", "#....", "##.##"], anchors: { "2,1": "our" }, swaps: 4, seed: 585094133, draw: 2, hints: { "2,2": "noun", "0,1": "verb" }, stars: [21, 25, 29], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-07-26", name: "Toast & Butter", theme: "breakfast", layout: [".###.", ".###.", ".###.", ".###.", "....."], anchors: { "2,4": "of", "4,1": "and" }, swaps: 4, seed: 1695709948, draw: 2, hints: { "4,2": "det", "2,0": "verb" }, stars: [29, 36, 42], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-07-27", name: "Cosmic Crater", theme: "night-sky", layout: ["#.###", "....#", "#.#.#", "#.#.#", "#...."], anchors: { "2,1": "on" }, swaps: 4, seed: 1259638454, draw: 2, hints: { "1,1": "verb", "2,3": "verb" }, stars: [29, 36, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-07-28", name: "Petal & Shovel", theme: "garden", layout: ["##.#", ".#.#", "....", ".#.#", ".###"], anchors: { "2,3": "seed", "1,2": "under" }, swaps: 4, seed: 1509773785, draw: 2, hints: { "2,0": "noun", "4,0": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-29", name: "The Starfish", theme: "seaside", layout: ["....", "##.#", "##.#", "....", "##.#"], anchors: { "3,1": "with", "2,2": "in" }, swaps: 4, seed: 1131013942, draw: 2, hints: { "3,3": "noun", "4,2": "noun" }, stars: [25, 30, 35], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-07-30", name: "Clever Secret", theme: "library", layout: ["###.#", ".....", ".##.#", ".##.#", "....#"], anchors: { "0,3": "our" }, swaps: 4, seed: 546375607, draw: 2, hints: { "4,3": "noun", "1,3": "noun", "1,4": "verb" }, stars: [32, 38, 44], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-07-31", name: "The Plate", theme: "breakfast", layout: ["#....", "##.##", "....#", "##.##", "....#"], anchors: { "2,2": "under" }, swaps: 4, seed: 285613647, draw: 2, hints: { "2,0": "pron", "4,2": "noun", "0,2": "pron" }, stars: [33, 41, 48], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-08-01", name: "Moon & Night", theme: "night-sky", layout: ["###.", ".##.", "....", ".##.", ".##."], anchors: { "0,3": "your", "4,0": "sky" }, swaps: 4, seed: 1008674904, draw: 2, hints: { "1,3": "adj", "2,1": "prep" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-08-02", name: "Shovel & Flower", theme: "garden", layout: ["....#", ".####", ".....", ".####", "....#"], anchors: { "2,2": "and" }, swaps: 4, seed: 677725561, draw: 2, hints: { "4,3": "noun", "4,0": "noun", "3,0": "adj" }, stars: [46, 55, 64], objectives: [{ kind: "rareCrossing", value: 6, points: 9 }] }, { id: "daily-2027-08-03", name: "Wet Starfish", theme: "seaside", layout: [".#.#", ".#.#", "....", ".#.#", "##.#"], anchors: { "0,2": "my" }, swaps: 4, seed: 1608512174, draw: 2, hints: { "2,0": "det", "2,3": "pron" }, stars: [25, 30, 35], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-08-04", name: "Forgotten Shelf", theme: "library", layout: ["....", "#.#.", "#.#.", "#.#.", "#.#."], anchors: { "0,3": "chapter" }, swaps: 4, seed: 1550045423, draw: 2, hints: { "1,1": "det", "1,3": "prep" }, stars: [26, 31, 36], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-08-05", name: "Omelette & Table", theme: "breakfast", layout: ["....", ".#.#", ".#.#", ".#.#", ".###"], anchors: { "2,0": "on" }, swaps: 4, seed: 154060574, draw: 2, hints: { "0,0": "pron", "3,2": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-08-06", name: "Silver Rocket", theme: "night-sky", layout: ["##.##", "##.##", "#....", "##.##", "....."], anchors: { "2,2": "with" }, swaps: 4, seed: 1256777502, draw: 2, hints: { "3,2": "det", "1,2": "noun" }, stars: [26, 31, 36], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-08-07", name: "Muddy Snail", theme: "garden", layout: ["....#", "##.##", "##.##", "....."], anchors: { "3,2": "weed" }, swaps: 4, seed: 182830390, draw: 2, hints: { "0,2": "pron", "3,4": "pron" }, stars: [26, 31, 36], objectives: [{ kind: "themeWords", count: 2, points: 5 }] }, { id: "daily-2027-08-08", name: "Tropical Surf", theme: "seaside", layout: ["#.###", "....#", "#.###", "#....", "#.###"], anchors: { "0,1": "every" }, swaps: 4, seed: 1599019322, draw: 2, hints: { "1,1": "noun", "3,2": "det" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-08-09", name: "Spine & Word", theme: "library", layout: ["#....", "#.###", "#.###", "#.###", "....#"], anchors: { "4,2": "under" }, swaps: 4, seed: 217580408, draw: 2, hints: { "0,1": "noun", "4,0": "det" }, stars: [25, 30, 35], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-08-10", name: "The Syrup", theme: "breakfast", layout: ["##.##", "##.#.", ".....", "##.#.", "####."], anchors: { "2,1": "for", "0,2": "they" }, swaps: 4, seed: 882525184, draw: 2, hints: { "2,4": "noun", "2,0": "verb" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-08-11", name: "Wolf & Telescope", theme: "night-sky", layout: [".##.#", ".##.#", ".##.#", ".##.#", "....."], anchors: { "1,0": "through" }, swaps: 4, seed: 1015373523, draw: 2, hints: { "4,3": "noun", "4,0": "noun" }, stars: [32, 38, 44], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-08-12", name: "Rose & Flower", theme: "garden", layout: ["#.#.#", "....#", "#.#.#", "#....", "#.#.#"], anchors: { "2,3": "in" }, swaps: 4, seed: 156881096, draw: 2, hints: { "1,3": "noun", "0,1": "adv", "3,3": "det" }, stars: [39, 47, 55], objectives: [{ kind: "longWord", letters: 7, points: 8 }] }, { id: "daily-2027-08-13", name: "The Puffin", theme: "seaside", layout: ["##.#", "....", ".#.#", ".#.#", ".###"], anchors: { "2,2": "of" }, swaps: 4, seed: 1174242016, draw: 2, hints: { "1,1": "noun", "1,2": "verb" }, stars: [25, 30, 35], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-08-14", name: "Hushed Lamp", theme: "library", layout: ["####.", "#....", "####.", "####.", "....."], anchors: { "1,1": "i" }, swaps: 4, seed: 732809163, draw: 2, hints: { "1,2": "verb", "4,4": "noun" }, stars: [21, 25, 29], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-08-15", name: "Fresh Muffin", theme: "breakfast", layout: ["#.#.", "#.#.", "....", "#.#."], anchors: { "2,0": "a" }, swaps: 4, seed: 1548606649, draw: 2, hints: { "2,3": "pron", "2,1": "noun" }, stars: [26, 31, 36], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-08-16", name: "Endless Telescope", theme: "night-sky", layout: [".#.##", ".#.##", ".....", ".#.##"], anchors: { "2,1": "under" }, swaps: 4, seed: 1795195885, draw: 2, hints: { "1,2": "verb", "0,2": "pron" }, stars: [31, 37, 43], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-08-17", name: "Hose & Carrot", theme: "garden", layout: ["###.", "....", ".##.", ".##.", "...."], anchors: { "0,3": "some" }, swaps: 4, seed: 1803265605, draw: 2, hints: { "1,0": "pron", "4,0": "noun" }, stars: [32, 38, 44], objectives: [{ kind: "themeWords", count: 4, points: 6 }] }, { id: "daily-2027-08-18", name: "Shiny Boat", theme: "seaside", layout: ["#.##", "#.#.", "....", "#.#.", "###."], anchors: { "2,1": "under" }, swaps: 4, seed: 2111802561, draw: 2, hints: { "4,3": "pron", "2,2": "det" }, stars: [25, 30, 35], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-08-19", name: "Overdue Candle", theme: "library", layout: [".#.##", ".....", ".#.##", ".#.##", ".####"], anchors: { "0,0": "some" }, swaps: 4, seed: 1559857655, draw: 2, hints: { "2,2": "verb", "1,0": "adj" }, stars: [21, 25, 29], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-08-20", name: "Porridge & Toaster", theme: "breakfast", layout: [".....", ".##.#", ".##.#", "....#", ".####"], anchors: { "1,3": "with" }, swaps: 4, seed: 1810462983, draw: 2, hints: { "3,0": "det", "3,1": "noun", "0,3": "noun" }, stars: [39, 47, 55], objectives: [{ kind: "swapsLeft", count: 2, points: 8 }] }, { id: "daily-2027-08-21", name: "The Alien", theme: "night-sky", layout: ["#.##", "....", "#.##", "...."], anchors: { "3,2": "with" }, swaps: 4, seed: 1801354364, draw: 2, hints: { "1,3": "noun", "1,1": "adj" }, stars: [20, 28, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-08-22", name: "Green Rose", theme: "garden", layout: ["#.###", "....#", "#.###", "#.###", "....."], anchors: { "4,0": "i" }, swaps: 4, seed: 1900830851, draw: 2, hints: { "4,4": "noun", "4,3": "det" }, stars: [30, 36, 42], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-08-23", name: "Sunburnt Sand", theme: "seaside", layout: [".....", "##.#.", "##.#.", "##.#."], anchors: { "2,4": "under" }, swaps: 4, seed: 149225089, draw: 2, hints: { "1,2": "pron", "0,4": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-08-24", name: "The Tale", theme: "library", layout: ["....", "#.##", "....", "#.##"], anchors: { "3,1": "author" }, swaps: 4, seed: 1579064466, draw: 2, hints: { "2,3": "verb", "2,1": "det" }, stars: [24, 29, 34], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-08-25", name: "Cereal & Apple", theme: "breakfast", layout: [".....", "##.#.", "##.#.", "##.#."], anchors: { "0,3": "under" }, swaps: 4, seed: 1453226115, draw: 2, hints: { "0,4": "pron", "3,2": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-08-26", name: "The Horizon", theme: "night-sky", layout: ["#.##.", "#.##.", "#.##.", "....."], anchors: { "0,4": "our", "3,2": "under" }, swaps: 4, seed: 2107608725, draw: 2, hints: { "3,1": "noun", "0,1": "pron" }, stars: [28, 34, 40], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-08-27", name: "The Gnome", theme: "garden", layout: ["#....", "##.##", ".....", "##.##"], anchors: { "2,1": "in" }, swaps: 4, seed: 1051132729, draw: 2, hints: { "0,2": "verb", "0,4": "noun" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-08-28", name: "Foamy Bucket", theme: "seaside", layout: ["###.#", ".....", ".##.#", ".##.#", "....#"], anchors: { "4,1": "of", "1,1": "and" }, swaps: 4, seed: 1550280603, draw: 2, hints: { "3,0": "det", "4,0": "noun" }, stars: [32, 38, 44], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-08-29", name: "Story & Legend", theme: "library", layout: [".##.", "....", ".##.", ".##.", "###."], anchors: { "0,3": "the" }, swaps: 4, seed: 2113050317, draw: 2, hints: { "1,3": "adv", "1,0": "det" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-08-30", name: "Honey & Kettle", theme: "breakfast", layout: ["#.###", "#....", "#.###", "....."], anchors: { "0,1": "my", "3,2": "in" }, swaps: 4, seed: 1792764916, draw: 2, hints: { "3,1": "pron", "1,4": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-08-31", name: "Ancient Lantern", theme: "night-sky", layout: ["##.##", ".....", ".#.##", "....#", ".#.##"], anchors: { "2,0": "under" }, swaps: 4, seed: 1888360448, draw: 2, hints: { "3,2": "prep", "3,0": "det", "1,1": "verb" }, stars: [33, 41, 48], objectives: [{ kind: "themeWords", count: 5, points: 7 }] }, { id: "daily-2027-09-01", name: "Tree & Nest", theme: "garden", layout: [".....", "##.##", "##.##", "....#", "##.##"], anchors: { "0,2": "flower" }, swaps: 4, seed: 124999311, draw: 2, hints: { "3,2": "adj", "1,2": "verb" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-09-02", name: "Breezy Puffin", theme: "seaside", layout: [".##.", ".##.", "....", ".##.", ".###"], anchors: { "0,0": "they" }, swaps: 4, seed: 32892713, draw: 2, hints: { "1,0": "verb", "2,0": "det" }, stars: [22, 26, 30], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-09-03", name: "Candle & Atlas", theme: "library", layout: ["....", "#.#.", "#.#.", "#.#.", "###."], anchors: { "1,1": "through", "0,0": "my" }, swaps: 4, seed: 1030981820, draw: 2, hints: { "0,3": "adv", "0,1": "noun" }, stars: [26, 32, 38], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-09-04", name: "Creamy Kettle", theme: "breakfast", layout: [".#.##", ".#.##", "....#", ".#.##", "#...."], anchors: { "0,2": "some" }, swaps: 4, seed: 345154237, draw: 2, hints: { "2,2": "verb", "2,3": "pron", "4,1": "adj" }, stars: [43, 52, 61], objectives: [{ kind: "themeWords", count: 6, points: 9 }] }, { id: "daily-2027-09-05", name: "Celestial Nebula", theme: "night-sky", layout: [".###", ".#.#", "....", ".#.#", "##.#"], anchors: { "1,2": "our" }, swaps: 4, seed: 1786175511, draw: 2, hints: { "2,2": "noun", "0,0": "pron" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-09-06", name: "Muddy Fence", theme: "garden", layout: [".####", ".##.#", "....#", ".##.#", "#...."], anchors: { "0,0": "they", "4,3": "sun" }, swaps: 4, seed: 134138682, draw: 2, hints: { "4,2": "adj", "2,1": "noun" }, stars: [30, 36, 42], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-09-07", name: "Wet Shore", theme: "seaside", layout: ["#.##", "....", "#.##", "...."], anchors: { "1,2": "under", "3,0": "this" }, swaps: 4, seed: 1583727126, draw: 2, hints: { "3,3": "pron", "2,1": "det" }, stars: [22, 26, 30], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-09-08", name: "Dusty Desk", theme: "library", layout: [".....", ".##.#", ".##.#", ".##.#"], anchors: { "0,1": "on", "3,3": "book" }, swaps: 4, seed: 119934993, draw: 2, hints: { "0,3": "noun", "2,3": "det" }, stars: [27, 32, 37], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-09-09", name: "Mug & Crumb", theme: "breakfast", layout: ["#.#.", "#.#.", "#.#.", "....", "#.#."], anchors: { "0,1": "some" }, swaps: 4, seed: 1830732467, draw: 2, hints: { "4,3": "verb", "0,3": "noun" }, stars: [34, 41, 48], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-09-10", name: "Celestial Firefly", theme: "night-sky", layout: [".....", "##.##", "....#", "##.##"], anchors: { "0,3": "through" }, swaps: 4, seed: 647190572, draw: 2, hints: { "0,0": "verb", "0,1": "det" }, stars: [26, 31, 36], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-09-11", name: "The Tree", theme: "garden", layout: ["....", ".##.", ".##.", ".##.", ".###"], anchors: { "0,2": "on", "2,0": "of" }, swaps: 4, seed: 419174446, draw: 2, hints: { "0,0": "noun", "1,0": "verb" }, stars: [25, 30, 35], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-09-12", name: "Sunburnt Tide", theme: "seaside", layout: ["....", ".#.#", ".#.#", "....", ".###"], anchors: { "1,2": "in" }, swaps: 4, seed: 466413647, draw: 2, hints: { "0,3": "verb", "2,0": "prep" }, stars: [42, 50, 58], objectives: [{ kind: "longWord", letters: 7, points: 8 }] }, { id: "daily-2027-09-13", name: "The Mystery", theme: "library", layout: [".....", "#.##.", ".....", "#.##."], anchors: { "1,1": "with" }, swaps: 4, seed: 2075579820, draw: 2, hints: { "2,4": "pron", "2,0": "adv", "0,4": "pron" }, stars: [36, 43, 50], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-09-14", name: "Apple & Cereal", theme: "breakfast", layout: ["#....", ".##.#", ".....", ".##.#", ".##.#"], anchors: { "2,4": "table" }, swaps: 4, seed: 1217444553, draw: 2, hints: { "0,2": "adj", "0,1": "det", "3,0": "verb" }, stars: [40, 48, 56], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2027-09-15", name: "Shadow & Satellite", theme: "night-sky", layout: ["###.#", ".##.#", ".##.#", ".....", ".####"], anchors: { "2,3": "and", "3,2": "of" }, swaps: 4, seed: 112289318, draw: 2, hints: { "3,3": "pron", "3,1": "noun" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-09-16", name: "Gate & Nest", theme: "garden", layout: [".####", ".#.#.", ".....", ".#.#.", "##.#."], anchors: { "3,0": "bird" }, swaps: 4, seed: 380401610, draw: 2, hints: { "2,2": "noun", "4,4": "noun", "2,0": "det" }, stars: [35, 42, 49], objectives: [{ kind: "greatLines", count: 1, points: 7 }] }, { id: "daily-2027-09-17", name: "Wet Tide", theme: "seaside", layout: ["#....", "#.###", "....#", "#.###", "#...."], anchors: { "2,0": "a", "4,4": "sand" }, swaps: 4, seed: 1055332382, draw: 2, hints: { "2,1": "noun", "0,2": "adj" }, stars: [36, 43, 50], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2027-09-18", name: "Lamp & Story", theme: "library", layout: ["###.#", "#....", "###.#", "....."], anchors: { "3,2": "on" }, swaps: 4, seed: 1188313347, draw: 2, hints: { "3,0": "det", "3,3": "pron" }, stars: [20, 24, 28], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-09-19", name: "Toasted Jam", theme: "breakfast", layout: ["#.##.", ".....", "#.##.", "#.##."], anchors: { "1,0": "my" }, swaps: 4, seed: 1755580015, draw: 2, hints: { "1,4": "noun", "3,1": "adv" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 3, points: 6 }] }, { id: "daily-2027-09-20", name: "Lantern & Telescope", theme: "night-sky", layout: [".##.", ".##.", ".##.", "....", ".###"], anchors: { "0,0": "some", "0,3": "we" }, swaps: 4, seed: 1029937244, draw: 2, hints: { "3,2": "prep", "2,0": "verb" }, stars: [24, 29, 34], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-09-21", name: "The Rain", theme: "garden", layout: ["#.###", ".....", "#.###", "....#"], anchors: { "3,2": "through", "1,2": "and" }, swaps: 4, seed: 227864028, draw: 2, hints: { "3,1": "pron", "0,1": "det" }, stars: [23, 28, 33], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-09-22", name: "Calm Crab", theme: "seaside", layout: ["....", "#.##", "....", "#.##"], anchors: { "2,0": "your" }, swaps: 4, seed: 1328464327, draw: 2, hints: { "0,0": "noun", "0,2": "verb" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-09-23", name: "Forgotten Legend", theme: "library", layout: [".....", "###.#", "###.#", "....#"], anchors: { "0,1": "over" }, swaps: 4, seed: 1174327922, draw: 2, hints: { "3,3": "noun", "3,2": "det" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-09-24", name: "Toaster & Juice", theme: "breakfast", layout: ["###.#", ".....", "###.#", "###.#", "#...."], anchors: { "1,2": "of", "4,1": "every" }, swaps: 4, seed: 1354726923, draw: 2, hints: { "0,3": "adv", "4,3": "verb" }, stars: [31, 37, 43], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-09-25", name: "Infinite Satellite", theme: "night-sky", layout: ["....", ".##.", ".##.", "...."], anchors: { "0,1": "near" }, swaps: 4, seed: 2076819177, draw: 2, hints: { "1,3": "verb", "0,2": "det" }, stars: [34, 41, 48], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-09-26", name: "The Fence", theme: "garden", layout: [".#.#", ".#.#", "....", ".#.#"], anchors: { "0,0": "i" }, swaps: 4, seed: 114425112, draw: 2, hints: { "3,0": "verb", "2,0": "pron" }, stars: [22, 26, 30], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-09-27", name: "Sunlit Jellyfish", theme: "seaside", layout: [".###.", ".###.", ".###.", "....."], anchors: { "3,3": "of" }, swaps: 4, seed: 1066557994, draw: 2, hints: { "2,0": "det", "1,0": "verb" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-09-28", name: "Dictionary & Bookmark", theme: "library", layout: [".##.", "....", ".##.", ".##."], anchors: { "1,2": "with", "0,0": "my" }, swaps: 4, seed: 1700758679, draw: 2, hints: { "1,3": "pron", "1,0": "noun" }, stars: [19, 23, 27], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-09-29", name: "Toaster & Croissant", theme: "breakfast", layout: ["##.##", ".....", ".#.#.", ".#.#.", ".###."], anchors: { "3,4": "through", "3,2": "table" }, swaps: 4, seed: 1720382879, draw: 2, hints: { "4,0": "noun", "4,4": "pron" }, stars: [32, 38, 44], objectives: [{ kind: "themeWords", count: 4, points: 6 }] }, { id: "daily-2027-09-30", name: "Lunar Crater", theme: "night-sky", layout: [".....", "##.##", "#....", "##.##"], anchors: { "1,2": "under" }, swaps: 4, seed: 92152766, draw: 2, hints: { "0,2": "noun", "2,3": "adj" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-10-01", name: "Green Root", theme: "garden", layout: ["##.##", "....#", "##.##", "#...."], anchors: { "3,3": "under" }, swaps: 4, seed: 1321634016, draw: 2, hints: { "3,2": "noun", "1,2": "prep" }, stars: [29, 35, 41], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-10-02", name: "Foamy Captain", theme: "seaside", layout: [".####", ".###.", ".###.", ".###.", "....."], anchors: { "3,4": "of" }, swaps: 4, seed: 1466726836, draw: 2, hints: { "0,0": "adj", "4,2": "prep" }, stars: [27, 35, 42], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-10-03", name: "Curious Desk", theme: "library", layout: ["#.###", "#....", "#.#.#", "#.#.#", "....#"], anchors: { "2,1": "in" }, swaps: 4, seed: 1951059033, draw: 2, hints: { "1,2": "verb", "4,1": "noun" }, stars: [32, 38, 44], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-10-04", name: "Yolk & Bacon", theme: "breakfast", layout: ["##.##", ".....", "##.##", "#...."], anchors: { "1,3": "of" }, swaps: 4, seed: 2011068987, draw: 2, hints: { "1,2": "verb", "3,1": "det" }, stars: [22, 27, 32], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-10-05", name: "Orbit & Wolf", theme: "night-sky", layout: ["....", "###.", "###.", "###.", "...."], anchors: { "0,1": "through", "2,3": "near" }, swaps: 4, seed: 2099364902, draw: 2, hints: { "4,3": "noun", "3,3": "det" }, stars: [31, 37, 43], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-10-06", name: "Vine & Leaf", theme: "garden", layout: ["#.###", "....#", "#.#.#", "#....", "###.#"], anchors: { "2,3": "near" }, swaps: 4, seed: 432237762, draw: 2, hints: { "1,2": "det", "1,1": "prep" }, stars: [40, 48, 56], objectives: [{ kind: "longWord", letters: 7, points: 8 }] }, { id: "daily-2027-10-07", name: "The Seaweed", theme: "seaside", layout: ["#....", "##.##", ".....", "##.##", "....."], anchors: { "4,2": "island" }, swaps: 4, seed: 953653798, draw: 2, hints: { "0,2": "noun", "1,2": "verb", "2,2": "det" }, stars: [33, 40, 47], objectives: [{ kind: "themeWords", count: 5, points: 7 }] }, { id: "daily-2027-10-08", name: "Dusty Story", theme: "library", layout: ["#.##.", ".....", "#.##.", "#...."], anchors: { "2,4": "of" }, swaps: 4, seed: 1389810576, draw: 2, hints: { "1,1": "prep", "3,4": "noun" }, stars: [38, 46, 54], objectives: [{ kind: "swapsLeft", count: 2, points: 8 }] }, { id: "daily-2027-10-09", name: "Cinnamon & Grandma", theme: "breakfast", layout: ["####.", "#....", "####.", "....."], anchors: { "3,1": "over", "1,2": "and" }, swaps: 4, seed: 1852236105, draw: 2, hints: { "1,4": "verb", "2,4": "adv" }, stars: [27, 32, 37], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-10-10", name: "Distant Meteor", theme: "night-sky", layout: [".###", ".##.", ".##.", "....", "###."], anchors: { "1,3": "some" }, swaps: 4, seed: 1199600610, draw: 2, hints: { "4,3": "pron", "3,3": "verb" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-10-11", name: "Rose & Hose", theme: "garden", layout: [".####", ".....", ".####", ".####", "....#"], anchors: { "1,3": "through", "4,1": "and" }, swaps: 4, seed: 680562589, draw: 2, hints: { "1,1": "det", "4,0": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-10-12", name: "The Treasure", theme: "seaside", layout: ["#.###", "....#", "#.#.#", ".....", "#.#.#"], anchors: { "1,3": "shell" }, swaps: 4, seed: 610604662, draw: 2, hints: { "3,1": "adj", "3,4": "pron", "3,2": "noun" }, stars: [39, 47, 55], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2027-10-13", name: "Cover & Poem", theme: "library", layout: ["##.##", ".....", "##.#.", "#....", "####."], anchors: { "2,4": "over" }, swaps: 4, seed: 1061126235, draw: 2, hints: { "3,4": "pron", "1,0": "pron" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-10-14", name: "Sleepy Croissant", theme: "breakfast", layout: ["###.#", "###.#", "#....", "###.#", "....."], anchors: { "4,0": "we", "3,3": "of" }, swaps: 4, seed: 2134045612, draw: 2, hints: { "2,1": "det", "1,3": "det" }, stars: [27, 32, 37], objectives: [{ kind: "themeWords", count: 3, points: 5 }] }, { id: "daily-2027-10-15", name: "The Midnight", theme: "night-sky", layout: ["....", "#.##", "#.##", "#.##", "...."], anchors: { "4,0": "the", "0,0": "we" }, swaps: 4, seed: 1180132468, draw: 2, hints: { "4,3": "adv", "4,1": "noun" }, stars: [21, 25, 29], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-10-16", name: "The Carrot", theme: "garden", layout: ["####.", "####.", ".....", "####.", "....."], anchors: { "0,4": "some" }, swaps: 4, seed: 486298006, draw: 2, hints: { "4,4": "pron", "2,4": "noun" }, stars: [29, 37, 44], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-10-17", name: "Deep Pier", theme: "seaside", layout: [".##.", ".##.", ".##.", ".##.", "...."], anchors: { "3,0": "of", "0,3": "my" }, swaps: 4, seed: 904307299, draw: 2, hints: { "1,3": "noun", "4,0": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 4, points: 6 }] }, { id: "daily-2027-10-18", name: "Letter & Librarian", theme: "library", layout: ["....#", "##.##", "#....", "##.##", "#...."], anchors: { "0,0": "we", "4,1": "my" }, swaps: 4, seed: 1851141504, draw: 2, hints: { "4,2": "noun", "2,1": "pron" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 6, points: 6 }] }, { id: "daily-2027-10-19", name: "Sugary Butter", theme: "breakfast", layout: [".####", ".##.#", ".....", ".##.#", "....#"], anchors: { "1,0": "over" }, swaps: 4, seed: 1366800761, draw: 2, hints: { "2,4": "pron", "2,2": "pron", "2,3": "verb" }, stars: [35, 42, 49], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }] };
+var dailies_generated_default = { generatedBy: "scripts/generate-dailies.ts", start: "2026-10-19", levels: [{ id: "daily-2026-10-19", name: "Honey & Kitchen", theme: "breakfast", layout: [".###", ".##.", ".##.", ".##.", "...."], anchors: { "2,0": "through", "4,1": "for" }, swaps: 4, seed: 1844232109, hints: { "1,0": "verb", "4,0": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2026-10-20", name: "Dream & Sky", theme: "night-sky", layout: ["##.##", "#....", "##.#.", ".....", "##.#."], anchors: { "2,4": "with", "1,1": "i" }, swaps: 4, seed: 1419436208, hints: { "1,2": "verb", "3,1": "prep" }, stars: [38, 46, 54], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2026-10-21", name: "Sunny Rain", theme: "garden", layout: ["###.", "#.#.", "#.#.", "....", "#.##"], anchors: { "4,1": "flower" }, swaps: 4, seed: 38474032, draw: 2, hints: { "3,3": "noun", "3,0": "verb" }, stars: [28, 34, 40], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2026-10-22", name: "Sandcastle & Wave", theme: "seaside", layout: [".####", ".####", ".....", ".####", "....#"], anchors: { "1,0": "of", "4,2": "under" }, swaps: 4, seed: 1798829757, draw: 2, hints: { "4,0": "noun", "2,0": "det" }, stars: [31, 37, 43], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2026-10-23", name: "Dictionary & Cover", theme: "library", layout: ["##.#.", "##.#.", "##.#.", "##.#.", "....."], anchors: { "2,4": "under" }, swaps: 4, seed: 634173987, draw: 2, hints: { "4,2": "adj", "0,2": "noun" }, stars: [35, 42, 49], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2026-10-24", name: "Delicious Honey", theme: "breakfast", layout: ["#.##", "#.#.", "....", "#.#.", "###."], anchors: { "3,3": "near" }, swaps: 4, seed: 1201806818, draw: 2, hints: { "1,1": "noun", "1,3": "det" }, stars: [27, 32, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-10-25", name: "Horizon & Wish", theme: "night-sky", layout: ["#....", "##.##", "....#", "##.##"], anchors: { "2,1": "in", "0,1": "my" }, swaps: 4, seed: 929973291, draw: 2, hints: { "2,2": "det", "0,2": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-10-26", name: "Blooming Pumpkin", theme: "garden", layout: ["#....", ".##.#", ".....", ".##.#", ".####"], anchors: { "1,0": "this", "0,2": "under" }, swaps: 4, seed: 1535512859, draw: 2, hints: { "1,3": "verb", "2,0": "noun" }, stars: [34, 41, 48], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2026-10-27", name: "Foamy Fish", theme: "seaside", layout: [".....", ".##.#", ".##.#", "....."], anchors: { "0,2": "in" }, swaps: 4, seed: 1466567954, draw: 2, hints: { "3,3": "verb", "3,1": "prep", "0,3": "det" }, stars: [34, 41, 48], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2026-10-28", name: "The Tale", theme: "library", layout: ["#.#.#", ".....", "#.#.#", "#...."], anchors: { "1,1": "of" }, swaps: 4, seed: 597916683, draw: 2, hints: { "1,0": "noun", "2,3": "noun" }, stars: [34, 41, 48], objectives: [{ kind: "greatLines", count: 1, points: 7 }] }, { id: "daily-2026-10-29", name: "Yolk & Toaster", theme: "breakfast", layout: [".####", ".....", ".###.", ".###.", "#...."], anchors: { "1,1": "under", "0,0": "our" }, swaps: 4, seed: 521748223, draw: 2, hints: { "4,2": "verb", "4,4": "noun" }, stars: [39, 47, 55], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2026-10-30", name: "Endless Cloud", theme: "night-sky", layout: ["##.##", "....#", "##.##", "#...."], anchors: { "1,2": "of", "3,1": "i" }, swaps: 4, seed: 1317513856, draw: 2, hints: { "1,1": "det", "3,2": "verb" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-10-31", name: "Blooming Leaf", theme: "garden", layout: [".....", "##.##", "#....", "##.##", "#...."], anchors: { "3,2": "near", "4,3": "under" }, swaps: 4, seed: 183371892, draw: 2, hints: { "1,2": "noun", "0,4": "noun", "4,2": "pron" }, stars: [33, 40, 47], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2026-11-01", name: "Deep Coral", theme: "seaside", layout: [".##.#", ".##.#", ".##.#", ".##.#", "....."], anchors: { "2,3": "in" }, swaps: 4, seed: 478649091, draw: 2, hints: { "4,0": "noun", "4,3": "noun" }, stars: [34, 41, 48], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2026-11-02", name: "The Word", theme: "library", layout: [".##.", ".##.", "....", ".##.", ".##."], anchors: { "2,0": "library" }, swaps: 4, seed: 724079726, draw: 2, hints: { "1,3": "adj", "0,0": "det" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2026-11-03", name: "Hungry Orange", theme: "breakfast", layout: [".#.#", ".#.#", "....", ".#.#", "##.#"], anchors: { "2,2": "under", "3,0": "apple" }, swaps: 4, seed: 1856695138, draw: 2, hints: { "0,0": "det", "2,0": "adj" }, stars: [24, 30, 35], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2026-11-04", name: "Silent Firefly", theme: "night-sky", layout: ["....", "###.", "###.", "...."], anchors: { "0,0": "i" }, swaps: 4, seed: 512859702, draw: 2, hints: { "2,3": "noun", "0,3": "adv" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-11-05", name: "The Worm", theme: "garden", layout: ["##.#.", ".....", ".#.#.", ".#.#.", ".####"], anchors: { "1,2": "near" }, swaps: 4, seed: 699815186, draw: 2, hints: { "1,4": "noun", "1,1": "verb", "3,2": "noun" }, stars: [37, 44, 51], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2026-11-06", name: "Crab & Surf", theme: "seaside", layout: ["....#", ".####", ".####", "....."], anchors: { "3,4": "island" }, swaps: 4, seed: 1148013740, draw: 2, hints: { "3,0": "pron", "0,0": "det" }, stars: [26, 31, 36], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2026-11-07", name: "Famous Shelf", theme: "library", layout: ["#....", "#.##.", "#.##.", "....."], anchors: { "3,0": "a" }, swaps: 4, seed: 1650254232, draw: 2, hints: { "3,4": "noun", "0,1": "pron" }, stars: [26, 36, 46], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2026-11-08", name: "Burnt Croissant", theme: "breakfast", layout: ["#.###", "#.###", "....#", "#.###", "....."], anchors: { "4,0": "every", "2,2": "near" }, swaps: 4, seed: 1703951660, draw: 2, hints: { "2,3": "pron", "2,0": "verb" }, stars: [28, 34, 40], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2026-11-09", name: "Lunar Orbit", theme: "night-sky", layout: ["###.#", "#....", "###.#", "....."], anchors: { "1,1": "they", "3,1": "near" }, swaps: 4, seed: 1792194828, draw: 2, hints: { "1,3": "prep", "3,3": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2026-11-10", name: "Petal & Pond", theme: "garden", layout: [".#.##", ".....", ".#.#.", ".#.#.", "####."], anchors: { "2,0": "in", "1,1": "near" }, swaps: 4, seed: 1300136170, draw: 2, hints: { "2,2": "adj", "1,2": "det" }, stars: [31, 37, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2026-11-11", name: "Shiny Captain", theme: "seaside", layout: ["###.#", ".....", "#.#.#", "#.#.#", "#.#.#"], anchors: { "0,3": "i" }, swaps: 4, seed: 1815332729, draw: 2, hints: { "1,1": "prep", "1,3": "verb" }, stars: [28, 34, 40], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2026-11-12", name: "The Shelf", theme: "library", layout: ["####.", "#....", "##.#.", "##.#.", "....#"], anchors: { "2,2": "near", "0,4": "my" }, swaps: 4, seed: 1330885936, draw: 2, hints: { "4,2": "noun", "3,4": "pron" }, stars: [30, 36, 42], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2026-11-13", name: "Early Croissant", theme: "breakfast", layout: [".....", ".###.", ".###.", ".###.", ".####"], anchors: { "1,0": "for", "0,1": "with" }, swaps: 4, seed: 1969921043, draw: 2, hints: { "4,0": "verb", "1,4": "prep" }, stars: [28, 35, 42], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2026-11-14", name: "The Dawn", theme: "night-sky", layout: ["#.###", "....#", "#.###", "....."], anchors: { "3,2": "under", "0,1": "our" }, swaps: 4, seed: 1558872994, draw: 2, hints: { "1,1": "adj", "3,0": "pron" }, stars: [26, 31, 36], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2026-11-15", name: "Thorny Pond", theme: "garden", layout: ["#....", ".##.#", ".##.#", "....#", ".####"], anchors: { "1,0": "this" }, swaps: 4, seed: 1420437089, draw: 2, hints: { "3,0": "prep", "0,3": "noun" }, stars: [32, 38, 44], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2026-11-16", name: "Sandy Surf", theme: "seaside", layout: [".#.#", ".#.#", ".#.#", "...."], anchors: { "3,1": "in", "0,0": "this" }, swaps: 4, seed: 217187420, draw: 2, hints: { "3,2": "pron", "3,0": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2026-11-17", name: "Bookish Reader", theme: "library", layout: ["#....", "###.#", "###.#", "###.#", "....#"], anchors: { "0,4": "word" }, swaps: 4, seed: 1612300369, draw: 2, hints: { "1,3": "adj", "4,3": "pron" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-11-18", name: "Fluffy Yolk", theme: "breakfast", layout: ["###.", "....", "#.#.", "....", "#.##"], anchors: { "1,3": "milk" }, swaps: 4, seed: 1791519799, draw: 2, hints: { "1,2": "adj", "1,1": "det" }, stars: [31, 37, 43], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2026-11-19", name: "Infinite Midnight", theme: "night-sky", layout: ["###.", "#.#.", "#.#.", "....", "#.#."], anchors: { "2,3": "for" }, swaps: 4, seed: 508979399, draw: 2, hints: { "2,1": "adj", "1,1": "det" }, stars: [23, 28, 33], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-11-20", name: "Tomato & Carrot", theme: "garden", layout: ["###.", "....", ".##.", ".##.", "...."], anchors: { "3,3": "through", "1,1": "in" }, swaps: 4, seed: 1591721030, draw: 2, hints: { "1,3": "noun", "2,0": "verb" }, stars: [34, 41, 48], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2026-11-21", name: "Pebble & Lighthouse", theme: "seaside", layout: ["##.#.", ".....", ".#.#.", ".#.#.", ".####"], anchors: { "4,0": "treasure" }, swaps: 4, seed: 2068642142, draw: 2, hints: { "3,0": "det", "1,2": "prep", "2,0": "verb" }, stars: [36, 45, 53], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2026-11-22", name: "Hushed Cover", theme: "library", layout: ["....#", "##.##", "##.##", "##.##", "#...."], anchors: { "0,1": "for" }, swaps: 4, seed: 650706553, draw: 2, hints: { "4,3": "prep", "4,2": "noun" }, stars: [20, 25, 30], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2026-11-23", name: "The Jam", theme: "breakfast", layout: ["##.##", "#....", "##.##", ".....", "##.##"], anchors: { "0,2": "the" }, swaps: 4, seed: 630373726, draw: 2, hints: { "4,2": "pron", "1,3": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2026-11-24", name: "Distant Firefly", theme: "night-sky", layout: ["#.###", "#.#.#", "#....", "#.#.#", "....#"], anchors: { "0,1": "this" }, swaps: 4, seed: 2126942457, draw: 2, hints: { "4,1": "pron", "2,4": "noun" }, stars: [32, 38, 44], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2026-11-25", name: "The Rose", theme: "garden", layout: ["....", ".#.#", ".#.#", ".#.#", ".#.#"], anchors: { "0,0": "the", "1,2": "through" }, swaps: 4, seed: 2132768443, draw: 2, hints: { "0,2": "noun", "0,3": "verb" }, stars: [31, 37, 43], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2026-11-26", name: "Shiny Shore", theme: "seaside", layout: ["#.##.", ".....", "#.##.", "#.##.", "#.###"], anchors: { "1,2": "on", "4,1": "beach" }, swaps: 4, seed: 1052549284, draw: 2, hints: { "2,1": "verb", "1,1": "pron" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2026-11-27", name: "Mystery & Spine", theme: "library", layout: ["##.##", "....#", "##.##", "##.##", "#...."], anchors: { "0,2": "my" }, swaps: 4, seed: 2078965933, draw: 2, hints: { "4,2": "noun", "4,4": "pron" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-11-28", name: "The Kitchen", theme: "breakfast", layout: ["###.", "....", "#.#.", "#.#.", "#.#."], anchors: { "3,1": "for" }, swaps: 4, seed: 1229189840, draw: 2, hints: { "1,3": "verb", "1,0": "adv" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-11-29", name: "Mysterious Shadow", theme: "night-sky", layout: [".####", ".....", ".###.", ".###.", "####."], anchors: { "1,0": "planet" }, swaps: 4, seed: 1620633452, draw: 2, hints: { "3,0": "verb", "4,4": "noun" }, stars: [27, 33, 39], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2026-11-30", name: "Lush Bird", theme: "garden", layout: ["###.", ".##.", "....", ".##.", ".###"], anchors: { "3,0": "under" }, swaps: 4, seed: 1003401303, draw: 2, hints: { "4,0": "pron", "1,0": "det" }, stars: [26, 31, 36], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2026-12-01", name: "Sunlit Dolphin", theme: "seaside", layout: [".####", ".#.#.", ".....", ".#.#.", "#...."], anchors: { "2,3": "under", "0,0": "our" }, swaps: 4, seed: 1832968130, draw: 2, hints: { "2,0": "noun", "4,4": "pron", "1,0": "adj" }, stars: [37, 44, 51], objectives: [{ kind: "themeWords", count: 4, points: 7 }] }, { id: "daily-2026-12-02", name: "The Cover", theme: "library", layout: [".#.#", ".#.#", "....", ".#.#"], anchors: { "2,1": "near", "3,2": "secret" }, swaps: 4, seed: 1522940653, draw: 2, hints: { "2,0": "adv", "0,2": "noun" }, stars: [21, 25, 29], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2026-12-03", name: "The Banana", theme: "breakfast", layout: [".##.", "....", ".##.", ".##.", "...."], anchors: { "4,3": "tea", "2,0": "through" }, swaps: 4, seed: 1247923916, draw: 2, hints: { "3,3": "det", "2,3": "prep" }, stars: [35, 42, 49], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2026-12-04", name: "The Satellite", theme: "night-sky", layout: ["#....", "#.###", "....#", "#.###"], anchors: { "2,1": "over" }, swaps: 4, seed: 1186181077, draw: 2, hints: { "2,2": "det", "0,4": "verb" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-12-05", name: "Vine & Butterfly", theme: "garden", layout: ["....", "##.#", "##.#", "##.#", "...."], anchors: { "0,1": "through" }, swaps: 4, seed: 1801732301, draw: 2, hints: { "0,2": "det", "1,2": "verb" }, stars: [29, 35, 41], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2026-12-06", name: "Blue Jellyfish", theme: "seaside", layout: [".....", ".###.", ".###.", ".###."], anchors: { "0,2": "in", "3,4": "boat" }, swaps: 4, seed: 1255265843, draw: 2, hints: { "2,4": "det", "0,4": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2026-12-07", name: "Dusty Riddle", theme: "library", layout: ["#....", ".##.#", ".....", ".##.#", ".####"], anchors: { "3,3": "paper" }, swaps: 4, seed: 232314125, draw: 2, hints: { "1,3": "verb", "2,0": "det", "2,3": "det" }, stars: [31, 37, 43], objectives: [{ kind: "themeWords", count: 6, points: 6 }] }, { id: "daily-2026-12-08", name: "The Spoon", theme: "breakfast", layout: [".....", "##.#.", "##.#.", "##.#.", "##.##"], anchors: { "3,2": "of" }, swaps: 4, seed: 453361085, draw: 2, hints: { "3,4": "noun", "1,4": "prep" }, stars: [27, 32, 37], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2026-12-09", name: "The Sky", theme: "night-sky", layout: ["##.#", "....", ".#.#", "....", ".###"], anchors: { "1,3": "cloud" }, swaps: 4, seed: 795932534, draw: 2, hints: { "2,2": "adj", "3,2": "noun" }, stars: [38, 46, 54], objectives: [{ kind: "swapsLeft", count: 2, points: 8 }] }, { id: "daily-2026-12-10", name: "Damp Fence", theme: "garden", layout: [".###", "....", ".###", "...."], anchors: { "3,3": "rain", "1,1": "of" }, swaps: 4, seed: 189293849, draw: 2, hints: { "1,2": "noun", "2,0": "verb" }, stars: [25, 30, 35], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-12-11", name: "Sandy Seagull", theme: "seaside", layout: [".#.#", ".#.#", "....", ".#.#", "##.#"], anchors: { "2,1": "in" }, swaps: 4, seed: 448139405, draw: 2, hints: { "2,2": "det", "0,0": "det" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2026-12-12", name: "Famous Pencil", theme: "library", layout: ["##.##", "....#", ".#.##", ".....", ".####"], anchors: { "3,3": "under" }, swaps: 4, seed: 767638327, draw: 2, hints: { "3,2": "noun", "2,0": "verb" }, stars: [26, 31, 36], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2026-12-13", name: "Kitchen & Jam", theme: "breakfast", layout: ["#.#.#", "#.#.#", ".....", "#.#.#"], anchors: { "3,3": "table", "1,1": "on" }, swaps: 4, seed: 1667799301, draw: 2, hints: { "0,3": "pron", "2,0": "verb" }, stars: [23, 28, 33], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-12-14", name: "The Nebula", theme: "night-sky", layout: [".##.#", ".....", ".##.#", ".##.#", ".####"], anchors: { "1,2": "for" }, swaps: 4, seed: 1393538029, draw: 2, hints: { "3,3": "noun", "1,0": "adj" }, stars: [26, 31, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2026-12-15", name: "Blooming Root", theme: "garden", layout: ["....", ".#.#", "....", ".#.#"], anchors: { "2,2": "near" }, swaps: 4, seed: 1692837956, draw: 2, hints: { "2,0": "det", "1,2": "verb" }, stars: [31, 37, 43], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2026-12-16", name: "Dolphin & Seaweed", theme: "seaside", layout: [".....", "#.#.#", "#.#.#", "#.#.#", "#.#.#"], anchors: { "0,2": "through" }, swaps: 4, seed: 1597250495, draw: 2, hints: { "0,1": "noun", "1,3": "noun" }, stars: [35, 42, 49], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2026-12-17", name: "Dusty Shelf", theme: "library", layout: ["#.###", "#....", "#.###", ".....", "#.###"], anchors: { "2,1": "near", "1,3": "near" }, swaps: 4, seed: 241404214, draw: 2, hints: { "1,2": "verb", "1,1": "noun" }, stars: [25, 30, 35], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2026-12-18", name: "Hungry Table", theme: "breakfast", layout: ["....#", "###.#", "#....", "###.#"], anchors: { "2,2": "under", "0,1": "through" }, swaps: 4, seed: 815131721, draw: 2, hints: { "2,3": "det", "2,4": "noun" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-12-19", name: "Cosmic Telescope", theme: "night-sky", layout: ["....", ".###", "....", ".###"], anchors: { "2,2": "near", "1,0": "near" }, swaps: 4, seed: 441143394, draw: 2, hints: { "2,3": "pron", "2,0": "det" }, stars: [26, 31, 36], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2026-12-20", name: "Sunny Worm", theme: "garden", layout: ["####.", ".###.", ".###.", ".###.", "....."], anchors: { "1,0": "i", "1,4": "under" }, swaps: 4, seed: 792041313, draw: 2, hints: { "4,3": "prep", "3,4": "adj" }, stars: [34, 41, 48], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2026-12-21", name: "Towel & Sunset", theme: "seaside", layout: ["....", "#.##", "#.##", "....", "#.##"], anchors: { "0,2": "through" }, swaps: 4, seed: 815826644, draw: 2, hints: { "3,0": "det", "3,1": "adj" }, stars: [26, 32, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-12-22", name: "Famous Author", theme: "library", layout: [".##.#", ".##.#", ".....", ".##.#", ".##.#"], anchors: { "2,4": "page" }, swaps: 4, seed: 78798497, draw: 2, hints: { "2,1": "noun", "0,0": "pron" }, stars: [29, 35, 41], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2026-12-23", name: "Croissant & Butter", theme: "breakfast", layout: [".....", ".#.##", ".#.##", "....."], anchors: { "0,1": "with" }, swaps: 4, seed: 1142191990, draw: 2, hints: { "3,0": "noun", "0,3": "noun", "3,2": "verb" }, stars: [44, 53, 62], objectives: [{ kind: "rareCrossing", value: 6, points: 9 }] }, { id: "daily-2026-12-24", name: "Comet & Astronaut", theme: "night-sky", layout: [".####", "....#", ".#.##", ".#.##", "#...."], anchors: { "1,3": "cloud" }, swaps: 4, seed: 511174746, draw: 2, hints: { "4,1": "pron", "4,2": "verb" }, stars: [35, 42, 49], objectives: [{ kind: "greatLines", count: 1, points: 7 }] }, { id: "daily-2026-12-25", name: "Fragrant Pond", theme: "garden", layout: ["....", "#.##", "#.##", "...."], anchors: { "0,2": "in", "3,0": "the" }, swaps: 4, seed: 936700060, draw: 2, hints: { "3,1": "noun", "0,0": "verb" }, stars: [26, 31, 36], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2026-12-26", name: "Sunlit Sand", theme: "seaside", layout: ["####.", "##.#.", "##.#.", ".....", "##.#."], anchors: { "3,0": "some" }, swaps: 4, seed: 1225712927, draw: 2, hints: { "1,2": "det", "0,4": "det" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-12-27", name: "Famous Page", theme: "library", layout: ["#.##", "....", "#.##", "....", "#.##"], anchors: { "3,1": "for", "1,0": "my" }, swaps: 4, seed: 1740795110, draw: 2, hints: { "1,1": "noun", "2,1": "verb" }, stars: [21, 25, 29], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-12-28", name: "Butter & Milk", theme: "breakfast", layout: ["#....", "#.###", "....#", "#.###", "#.###"], anchors: { "2,1": "on", "0,2": "for" }, swaps: 4, seed: 1422607314, draw: 2, hints: { "0,4": "noun", "2,2": "det" }, stars: [27, 32, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-12-29", name: "Cosmic Star", theme: "night-sky", layout: ["#.#.", "....", "#.#.", "#.#.", "#.##"], anchors: { "0,1": "every" }, swaps: 4, seed: 1155032004, draw: 2, hints: { "1,1": "adj", "3,3": "pron" }, stars: [20, 25, 29], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2026-12-30", name: "Colorful Flower", theme: "garden", layout: ["##.#", "....", "##.#", "...."], anchors: { "0,2": "your" }, swaps: 4, seed: 45783402, draw: 2, hints: { "3,2": "verb", "1,1": "det" }, stars: [30, 36, 42], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2026-12-31", name: "Salty Whale", theme: "seaside", layout: [".....", ".###.", ".###.", ".###.", "....#"], anchors: { "0,2": "over" }, swaps: 4, seed: 196520299, draw: 2, hints: { "0,4": "noun", "1,0": "det", "4,3": "noun" }, stars: [33, 40, 47], objectives: [{ kind: "themeWords", count: 5, points: 7 }] }, { id: "daily-2027-01-01", name: "Hushed Scroll", theme: "library", layout: ["###.#", "#....", "#.#.#", "#.#.#", "....#"], anchors: { "4,1": "page" }, swaps: 4, seed: 1356587272, draw: 2, hints: { "0,3": "verb", "3,3": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-01-02", name: "Sleepy Omelette", theme: "breakfast", layout: ["....#", ".###.", ".###.", ".....", "####."], anchors: { "3,1": "of", "0,0": "this" }, swaps: 4, seed: 467433499, draw: 2, hints: { "3,0": "noun", "0,1": "verb" }, stars: [38, 46, 54], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2027-01-03", name: "Starry Nebula", theme: "night-sky", layout: [".###", "....", ".##.", ".##.", ".##."], anchors: { "0,0": "this" }, swaps: 4, seed: 37367627, draw: 2, hints: { "1,0": "adv", "1,1": "verb" }, stars: [28, 34, 40], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-01-04", name: "The Bee", theme: "garden", layout: ["####.", ".....", "####.", "####.", "#...."], anchors: { "4,1": "this" }, swaps: 4, seed: 131624387, draw: 2, hints: { "4,2": "noun", "1,4": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-01-05", name: "Tropical Umbrella", theme: "seaside", layout: ["#.###", "#.##.", ".....", "#.##.", "####."], anchors: { "2,2": "over" }, swaps: 4, seed: 1728756664, draw: 2, hints: { "2,4": "noun", "2,1": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-01-06", name: "The Author", theme: "library", layout: [".....", ".#.##", "....#", ".#.##", ".#.##"], anchors: { "1,0": "for", "4,2": "library" }, swaps: 4, seed: 1666501491, draw: 2, hints: { "0,2": "det", "2,3": "pron", "0,4": "pron" }, stars: [38, 46, 54], objectives: [{ kind: "swapsLeft", count: 2, points: 8 }] }, { id: "daily-2027-01-07", name: "Burnt Morning", theme: "breakfast", layout: [".##.#", ".##.#", ".....", ".##.#"], anchors: { "0,0": "our" }, swaps: 4, seed: 167356303, draw: 2, hints: { "2,2": "det", "2,3": "adj" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 4, points: 6 }] }, { id: "daily-2027-01-08", name: "Endless Comet", theme: "night-sky", layout: [".#.#.", ".....", ".#.#.", ".#.#."], anchors: { "1,4": "night" }, swaps: 4, seed: 1721830924, draw: 2, hints: { "1,2": "verb", "0,2": "det", "3,0": "verb" }, stars: [27, 33, 38], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-01-09", name: "The Seed", theme: "garden", layout: ["####.", "#.##.", ".....", "#.##.", "#...."], anchors: { "4,3": "over" }, swaps: 4, seed: 1743598970, draw: 2, hints: { "4,1": "noun", "4,2": "verb", "2,4": "noun" }, stars: [43, 52, 61], objectives: [{ kind: "themeWords", count: 6, points: 9 }] }, { id: "daily-2027-01-10", name: "Lighthouse & Breeze", theme: "seaside", layout: ["#.##", "....", "#.#.", "#.#.", "...."], anchors: { "4,0": "your", "1,0": "some" }, swaps: 4, seed: 1136097833, draw: 2, hints: { "1,1": "noun", "4,1": "noun" }, stars: [38, 46, 54], objectives: [{ kind: "swapsLeft", count: 2, points: 8 }] }, { id: "daily-2027-01-11", name: "The Secret", theme: "library", layout: ["##.##", "#....", "##.#.", "##.#.", "....."], anchors: { "4,1": "with", "3,2": "on" }, swaps: 4, seed: 1927195929, draw: 2, hints: { "4,2": "pron", "1,4": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-01-12", name: "Pancake & Morning", theme: "breakfast", layout: [".....", ".###.", ".###.", ".###.", "....#"], anchors: { "0,2": "for", "4,2": "near" }, swaps: 4, seed: 338319008, draw: 2, hints: { "1,0": "det", "3,4": "noun", "0,0": "verb" }, stars: [35, 42, 49], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-01-13", name: "Glowing Astronaut", theme: "night-sky", layout: ["####.", ".....", "####.", "....."], anchors: { "3,0": "the", "0,4": "every" }, swaps: 4, seed: 1980203640, draw: 2, hints: { "3,3": "det", "1,2": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-01-14", name: "Fragrant Garden", theme: "garden", layout: ["....", ".###", ".###", "...."], anchors: { "0,1": "for", "1,0": "under" }, swaps: 4, seed: 242445070, draw: 2, hints: { "0,0": "verb", "3,0": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-01-15", name: "Sail & Wave", theme: "seaside", layout: ["#.##", "#.#.", "#.#.", "....", "#.#."], anchors: { "0,1": "this", "1,3": "a" }, swaps: 4, seed: 1123159084, draw: 2, hints: { "3,3": "noun", "4,3": "verb" }, stars: [27, 32, 37], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-01-16", name: "Curious Librarian", theme: "library", layout: ["#.#.#", "#....", "#.#.#", "....#", "#.###"], anchors: { "1,3": "on", "3,1": "of" }, swaps: 4, seed: 957282131, draw: 2, hints: { "3,0": "noun", "3,3": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-01-17", name: "Creamy Waffle", theme: "breakfast", layout: [".####", ".#.##", "....#", ".#.##", "#...."], anchors: { "0,0": "they" }, swaps: 4, seed: 2131159420, draw: 2, hints: { "2,3": "verb", "2,1": "adj" }, stars: [31, 37, 43], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-01-18", name: "Lunar Lantern", theme: "night-sky", layout: ["....#", "#.#.#", ".....", "#.#.#"], anchors: { "1,1": "over", "2,2": "and" }, swaps: 4, seed: 229281023, draw: 2, hints: { "0,3": "pron", "2,3": "verb" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-01-19", name: "Busy Petal", theme: "garden", layout: ["....", ".###", ".###", "...."], anchors: { "3,0": "sun", "0,1": "and" }, swaps: 4, seed: 263449472, draw: 2, hints: { "0,2": "pron", "0,0": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-01-20", name: "Deep Sand", theme: "seaside", layout: ["....", "#.#.", "#.#.", "#.#.", "###."], anchors: { "3,3": "on" }, swaps: 4, seed: 235192044, draw: 2, hints: { "2,3": "det", "0,1": "prep" }, stars: [16, 23, 29], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-01-21", name: "The Bookmark", theme: "library", layout: [".....", ".####", "....#", ".####", ".####"], anchors: { "2,0": "story" }, swaps: 4, seed: 384892032, draw: 2, hints: { "0,0": "det", "0,2": "verb" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-01-22", name: "Toast & Bacon", theme: "breakfast", layout: ["....#", "#.###", "#.###", "#.###", "....."], anchors: { "4,0": "our" }, swaps: 4, seed: 1564760033, draw: 2, hints: { "4,1": "noun", "3,1": "adj" }, stars: [28, 34, 40], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-01-23", name: "Astronaut & Midnight", theme: "night-sky", layout: ["....#", "#.##.", "#....", "#.##.", "####."], anchors: { "1,4": "the" }, swaps: 4, seed: 2013867221, draw: 2, hints: { "0,1": "noun", "0,0": "det" }, stars: [38, 46, 54], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2027-01-24", name: "Butterfly & Frog", theme: "garden", layout: [".....", "##.#.", "##.#.", "....."], anchors: { "2,2": "under" }, swaps: 4, seed: 1563744090, draw: 2, hints: { "3,2": "pron", "0,4": "noun", "3,4": "pron" }, stars: [37, 44, 51], objectives: [{ kind: "themeWords", count: 4, points: 7 }] }, { id: "daily-2027-01-25", name: "Breezy Umbrella", theme: "seaside", layout: ["##.##", ".....", ".#.#.", ".#.#.", ".#.#."], anchors: { "2,2": "for", "2,0": "on" }, swaps: 4, seed: 17700026, draw: 2, hints: { "3,0": "det", "1,0": "verb", "0,2": "adj" }, stars: [36, 43, 50], objectives: [{ kind: "themeWords", count: 6, points: 7 }] }, { id: "daily-2027-01-26", name: "Overdue Bookmark", theme: "library", layout: ["#.##", "....", "#.#.", "#.#.", "###."], anchors: { "1,0": "a" }, swaps: 4, seed: 369692647, draw: 2, hints: { "3,1": "pron", "3,3": "det" }, stars: [20, 24, 28], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-01-27", name: "Delicious Waffle", theme: "breakfast", layout: [".###.", ".#.#.", ".#.#.", ".....", ".#.#."], anchors: { "3,4": "coffee", "0,0": "some" }, swaps: 4, seed: 695998771, draw: 2, hints: { "4,0": "noun", "3,0": "det", "3,1": "noun" }, stars: [35, 42, 49], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-01-28", name: "Celestial Dream", theme: "night-sky", layout: ["....#", ".####", ".####", "....."], anchors: { "0,2": "near", "3,3": "with" }, swaps: 4, seed: 130697767, draw: 2, hints: { "0,0": "det", "0,3": "pron" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-01-29", name: "Blooming Vine", theme: "garden", layout: ["#.###", "....#", "#.#.#", "#....", "###.#"], anchors: { "1,0": "this" }, swaps: 4, seed: 678070606, draw: 2, hints: { "1,3": "noun", "3,1": "noun" }, stars: [39, 47, 55], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2027-01-30", name: "Sandy Pier", theme: "seaside", layout: [".....", "#.#.#", "#.#.#", "#.#.#"], anchors: { "2,3": "under" }, swaps: 4, seed: 129264399, draw: 2, hints: { "3,3": "pron", "1,3": "noun" }, stars: [25, 30, 35], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-01-31", name: "Forgotten Candle", theme: "library", layout: ["#.#.", "....", "#.#.", "#.#.", "...."], anchors: { "2,3": "under" }, swaps: 4, seed: 194545478, draw: 2, hints: { "4,1": "verb", "4,3": "noun", "3,1": "noun" }, stars: [41, 49, 57], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2027-02-01", name: "Honey & Waffle", theme: "breakfast", layout: [".###.", ".###.", ".....", ".###.", "#...."], anchors: { "3,0": "table" }, swaps: 4, seed: 1120845739, draw: 2, hints: { "4,1": "noun", "2,4": "noun", "4,4": "pron" }, stars: [37, 44, 51], objectives: [{ kind: "greatLines", count: 1, points: 7 }] }, { id: "daily-2027-02-02", name: "Infinite Lantern", theme: "night-sky", layout: ["###.", "###.", "....", "###.", "...."], anchors: { "3,3": "with", "4,0": "this" }, swaps: 4, seed: 363779796, draw: 2, hints: { "2,3": "noun", "4,3": "pron" }, stars: [23, 28, 33], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-02-03", name: "Tomato & Seed", theme: "garden", layout: ["....", "#.##", "....", "#.##", "...."], anchors: { "2,1": "for" }, swaps: 4, seed: 324970308, draw: 2, hints: { "3,1": "det", "0,3": "pron", "4,3": "pron" }, stars: [35, 42, 49], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-02-04", name: "Lighthouse & Jellyfish", theme: "seaside", layout: [".....", "#.#.#", "#.#.#", "#....", "#.###"], anchors: { "0,0": "they" }, swaps: 4, seed: 1619348397, draw: 2, hints: { "3,4": "noun", "1,3": "noun", "0,2": "det" }, stars: [32, 38, 44], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-02-05", name: "Wise Desk", theme: "library", layout: [".....", "#.#.#", "#....", "#.#.#"], anchors: { "3,1": "letter", "0,0": "our" }, swaps: 4, seed: 1683117885, draw: 2, hints: { "0,1": "noun", "2,1": "det" }, stars: [29, 35, 41], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-02-06", name: "Fluffy Sunrise", theme: "breakfast", layout: ["##.#", "....", "##.#", "##.#", "...."], anchors: { "1,0": "they", "4,2": "coffee" }, swaps: 4, seed: 465624202, draw: 2, hints: { "1,3": "pron", "1,1": "verb" }, stars: [26, 31, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-07", name: "Silent Lantern", theme: "night-sky", layout: [".....", "###.#", "###.#", "###.#", "#...."], anchors: { "0,0": "every" }, swaps: 4, seed: 653641728, draw: 2, hints: { "4,2": "noun", "0,3": "det" }, stars: [28, 34, 40], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-02-08", name: "Snail & Worm", theme: "garden", layout: ["....#", "#.###", "#....", "#.###"], anchors: { "0,2": "over" }, swaps: 4, seed: 34729320, draw: 2, hints: { "1,1": "verb", "2,2": "noun" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-09", name: "Pebble & Anchor", theme: "seaside", layout: [".....", ".####", ".####", "....#"], anchors: { "3,3": "treasure" }, swaps: 4, seed: 920528135, draw: 2, hints: { "0,1": "verb", "0,0": "pron" }, stars: [22, 30, 37], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-02-10", name: "The Story", theme: "library", layout: ["###.", "#.#.", "....", "#.#.", "...."], anchors: { "2,1": "for", "0,3": "a" }, swaps: 4, seed: 2086675749, draw: 2, hints: { "4,3": "noun", "1,1": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-02-11", name: "Crispy Juice", theme: "breakfast", layout: [".....", "#.###", "#.###", "#.###", "#...."], anchors: { "0,0": "i", "2,1": "with" }, swaps: 4, seed: 874932680, draw: 2, hints: { "1,1": "verb", "4,1": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-02-12", name: "Sparkling Wish", theme: "night-sky", layout: [".####", ".#.##", ".....", ".#.##", ".#.##"], anchors: { "2,3": "on", "1,2": "our" }, swaps: 4, seed: 197542509, draw: 2, hints: { "2,0": "det", "2,4": "pron" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-13", name: "Ripe Fence", theme: "garden", layout: [".##.#", ".##.#", ".....", ".##.#", ".####"], anchors: { "2,3": "through" }, swaps: 4, seed: 1831547556, draw: 2, hints: { "2,2": "verb", "0,3": "adj" }, stars: [26, 31, 36], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-02-14", name: "Deep Boat", theme: "seaside", layout: [".#.##", ".....", ".#.##", "....#", ".#.##"], anchors: { "0,0": "the", "1,3": "under" }, swaps: 4, seed: 998066023, draw: 2, hints: { "1,2": "verb", "2,0": "adj", "3,1": "verb" }, stars: [47, 56, 65], objectives: [{ kind: "swapsLeft", count: 2, points: 9 }] }, { id: "daily-2027-02-15", name: "Famous Spine", theme: "library", layout: ["....#", "##.##", "##.##", "#....", "##.##"], anchors: { "3,2": "under", "0,3": "library" }, swaps: 4, seed: 1288247646, draw: 2, hints: { "1,2": "adj", "2,2": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-16", name: "Hungry Sunrise", theme: "breakfast", layout: ["##.#", "....", "##.#", "....", "##.#"], anchors: { "4,2": "table" }, swaps: 4, seed: 2042776737, draw: 2, hints: { "1,2": "noun", "3,1": "det" }, stars: [26, 31, 36], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-02-17", name: "The Rocket", theme: "night-sky", layout: ["....", "#.#.", "#.#.", "#.#.", "#.##"], anchors: { "1,3": "for", "2,1": "over" }, swaps: 4, seed: 365196327, draw: 2, hints: { "0,3": "noun", "2,3": "det" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-18", name: "Bird & Weed", theme: "garden", layout: ["....", ".###", ".###", "...."], anchors: { "1,0": "in" }, swaps: 4, seed: 1138520810, draw: 2, hints: { "3,0": "noun", "0,0": "adv" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-02-19", name: "Sunlit Treasure", theme: "seaside", layout: ["#.#.", "#.#.", "#.#.", "....", "#.##"], anchors: { "0,1": "some", "2,3": "with" }, swaps: 4, seed: 1834571200, draw: 2, hints: { "4,1": "verb", "1,1": "adj" }, stars: [21, 25, 29], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-20", name: "Hushed Novel", theme: "library", layout: ["#.#.#", "#.#.#", "#.#.#", "....."], anchors: { "1,3": "under" }, swaps: 4, seed: 440968676, draw: 2, hints: { "3,3": "noun", "2,3": "det" }, stars: [26, 31, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-02-21", name: "Hungry Cinnamon", theme: "breakfast", layout: [".####", "....#", ".#.##", ".#.##", "#...."], anchors: { "1,0": "morning", "4,3": "on" }, swaps: 4, seed: 308002122, draw: 2, hints: { "1,3": "noun", "1,1": "verb" }, stars: [32, 38, 44], objectives: [{ kind: "themeWords", count: 4, points: 6 }] }, { id: "daily-2027-02-22", name: "The Owl", theme: "night-sky", layout: ["###.", ".##.", "....", ".##.", ".###"], anchors: { "2,3": "wolf" }, swaps: 4, seed: 810453805, draw: 2, hints: { "1,3": "det", "3,3": "verb" }, stars: [24, 29, 34], objectives: [{ kind: "themeWords", count: 3, points: 5 }] }, { id: "daily-2027-02-23", name: "Damp Garden", theme: "garden", layout: [".###", ".##.", "....", ".##.", "...."], anchors: { "4,0": "sun" }, swaps: 4, seed: 2015583940, draw: 2, hints: { "0,0": "verb", "2,0": "noun" }, stars: [39, 47, 55], objectives: [{ kind: "themeWords", count: 5, points: 8 }] }, { id: "daily-2027-02-24", name: "Sunburnt Pirate", theme: "seaside", layout: ["##.##", "#....", "##.##", "....#"], anchors: { "3,0": "the", "1,2": "in" }, swaps: 4, seed: 118213630, draw: 2, hints: { "3,3": "verb", "3,2": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-02-25", name: "Dusty Library", theme: "library", layout: [".#.#", "....", ".#.#", ".#.#", ".#.#"], anchors: { "0,0": "your", "1,2": "over" }, swaps: 4, seed: 807366933, draw: 2, hints: { "1,0": "adj", "1,1": "noun" }, stars: [20, 24, 28], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-02-26", name: "Fresh Yolk", theme: "breakfast", layout: ["##.##", "....#", "##.##", "#....", "##.##"], anchors: { "1,1": "in" }, swaps: 4, seed: 1450434180, draw: 2, hints: { "1,3": "noun", "0,2": "verb" }, stars: [28, 34, 40], objectives: [{ kind: "themeWords", count: 6, points: 6 }] }, { id: "daily-2027-02-27", name: "The Telescope", theme: "night-sky", layout: ["....#", ".####", ".####", ".####", "....."], anchors: { "0,0": "a" }, swaps: 4, seed: 309718447, draw: 2, hints: { "4,3": "adj", "4,0": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-02-28", name: "Wilted Bird", theme: "garden", layout: [".###", ".###", "....", ".###", "...."], anchors: { "4,1": "over" }, swaps: 4, seed: 1370267802, draw: 2, hints: { "2,0": "pron", "2,2": "det" }, stars: [24, 29, 34], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-03-01", name: "Shiny Sunset", theme: "seaside", layout: [".#.#", ".#.#", ".#.#", "....", "##.#"], anchors: { "1,2": "and" }, swaps: 4, seed: 923643533, draw: 2, hints: { "3,3": "noun", "3,2": "det" }, stars: [32, 38, 44], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-03-02", name: "Curious Page", theme: "library", layout: ["#....", "###.#", "....#", "###.#"], anchors: { "1,3": "through" }, swaps: 4, seed: 1844239567, draw: 2, hints: { "0,3": "noun", "2,3": "pron" }, stars: [23, 29, 34], objectives: [{ kind: "themeWords", count: 6, points: 5 }] }, { id: "daily-2027-03-03", name: "Early Butter", theme: "breakfast", layout: ["##.#", ".#.#", "....", ".#.#", ".###"], anchors: { "1,0": "a" }, swaps: 4, seed: 213929264, draw: 2, hints: { "2,0": "noun", "2,2": "det" }, stars: [23, 29, 34], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-03-04", name: "Glowing Night", theme: "night-sky", layout: [".....", ".###.", ".###.", ".###.", ".####"], anchors: { "2,0": "under", "3,4": "cloud" }, swaps: 4, seed: 340357300, draw: 2, hints: { "0,2": "pron", "0,0": "pron" }, stars: [24, 29, 34], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-03-05", name: "Blossom & Seed", theme: "garden", layout: ["....#", "##.##", "#....", "##.##", "....#"], anchors: { "3,2": "of" }, swaps: 4, seed: 1862118546, draw: 2, hints: { "0,1": "pron", "2,2": "noun", "4,0": "det" }, stars: [35, 42, 49], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-03-06", name: "Salty Surf", theme: "seaside", layout: ["#.#.", "#.#.", "#.#.", "#.#.", "...."], anchors: { "0,1": "a", "1,3": "through" }, swaps: 4, seed: 782257504, draw: 2, hints: { "3,3": "verb", "4,3": "pron" }, stars: [29, 35, 41], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-03-07", name: "The Reader", theme: "library", layout: ["....", ".#.#", ".#.#", ".#.#", ".###"], anchors: { "0,0": "every", "1,2": "on" }, swaps: 4, seed: 488866867, draw: 2, hints: { "0,2": "adv", "1,0": "adj" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-03-08", name: "Fluffy Omelette", theme: "breakfast", layout: ["##.#", "....", ".#.#", ".#.#", ".###"], anchors: { "1,3": "kitchen" }, swaps: 4, seed: 36763828, draw: 2, hints: { "2,0": "det", "1,2": "adj" }, stars: [30, 36, 42], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-03-09", name: "Shadow & Galaxy", theme: "night-sky", layout: [".####", ".###.", ".###.", ".###.", "....."], anchors: { "1,0": "and", "1,4": "i" }, swaps: 4, seed: 1517880033, draw: 2, hints: { "4,4": "noun", "4,1": "adv" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-03-10", name: "Pond & Root", theme: "garden", layout: ["####.", "#....", "##.#.", "##.#.", "....#"], anchors: { "4,0": "some" }, swaps: 4, seed: 1259762390, draw: 2, hints: { "4,3": "pron", "4,2": "verb" }, stars: [36, 43, 50], objectives: [{ kind: "themeWords", count: 5, points: 7 }] }, { id: "daily-2027-03-11", name: "Deep Tide", theme: "seaside", layout: ["#....", "##.##", "##.##", "....#"], anchors: { "0,3": "near", "1,2": "over" }, swaps: 4, seed: 1061128081, draw: 2, hints: { "0,1": "adj", "0,2": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-03-12", name: "The Candle", theme: "library", layout: ["....", ".###", ".###", "...."], anchors: { "0,1": "near" }, swaps: 4, seed: 833185566, draw: 2, hints: { "3,3": "noun", "2,0": "det" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-03-13", name: "The Fork", theme: "breakfast", layout: [".....", "###.#", "###.#", "....."], anchors: { "3,2": "over", "2,3": "under" }, swaps: 4, seed: 1393664971, draw: 2, hints: { "0,4": "noun", "3,1": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-03-14", name: "Infinite Crater", theme: "night-sky", layout: ["###.#", ".....", "###.#", "....#", "###.#"], anchors: { "1,2": "under" }, swaps: 4, seed: 404237547, draw: 2, hints: { "1,1": "pron", "1,3": "det" }, stars: [29, 35, 41], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-03-15", name: "Wilted Bee", theme: "garden", layout: [".....", ".#.##", ".#.##", "....#", ".#.##"], anchors: { "3,2": "on" }, swaps: 4, seed: 2096425756, draw: 2, hints: { "2,0": "verb", "1,0": "pron" }, stars: [35, 42, 49], objectives: [{ kind: "themeWords", count: 5, points: 7 }] }, { id: "daily-2027-03-16", name: "Foamy Jellyfish", theme: "seaside", layout: ["#....", "##.##", "....#", "##.##"], anchors: { "0,1": "we" }, swaps: 4, seed: 852325431, draw: 2, hints: { "2,2": "noun", "2,1": "det" }, stars: [27, 32, 37], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-03-17", name: "Tale & Librarian", theme: "library", layout: [".....", "#.###", "#.###", "....#"], anchors: { "1,1": "under" }, swaps: 4, seed: 732886757, draw: 2, hints: { "0,4": "noun", "3,0": "det" }, stars: [22, 26, 30], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-03-18", name: "Berry & Chef", theme: "breakfast", layout: ["##.#.", ".....", "##.#.", "##.#.", "####."], anchors: { "1,1": "with" }, swaps: 4, seed: 1868036919, draw: 2, hints: { "2,4": "prep", "3,2": "pron" }, stars: [31, 37, 43], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-03-19", name: "Mysterious Meteor", theme: "night-sky", layout: [".####", ".####", ".....", ".####", "....."], anchors: { "2,2": "of", "4,2": "over" }, swaps: 4, seed: 753423956, draw: 2, hints: { "4,0": "adv", "4,3": "det" }, stars: [27, 32, 37], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-03-20", name: "The Hose", theme: "garden", layout: ["###.", "#.#.", "#.#.", "....", "#.##"], anchors: { "3,2": "in" }, swaps: 4, seed: 1299676710, draw: 2, hints: { "3,1": "noun", "1,1": "det" }, stars: [22, 26, 30], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-03-21", name: "The Sunset", theme: "seaside", layout: [".###", "....", ".###", "...."], anchors: { "1,0": "sea" }, swaps: 4, seed: 1075950062, draw: 2, hints: { "1,2": "det", "3,3": "noun" }, stars: [21, 26, 30], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-03-22", name: "Overdue Librarian", theme: "library", layout: ["####.", ".....", ".###.", ".###.", "....#"], anchors: { "4,2": "under" }, swaps: 4, seed: 966235046, draw: 2, hints: { "4,0": "noun", "2,0": "verb", "1,3": "adj" }, stars: [35, 42, 49], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-03-23", name: "Crispy Orange", theme: "breakfast", layout: [".....", "#.#.#", "#.#.#", "....#", "#.###"], anchors: { "0,2": "and" }, swaps: 4, seed: 1321313731, draw: 2, hints: { "0,3": "det", "3,2": "pron", "3,3": "verb" }, stars: [35, 42, 49], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-03-24", name: "The Wish", theme: "night-sky", layout: ["....", "#.#.", "#.#.", "#.#.", "###."], anchors: { "0,0": "we", "1,3": "on" }, swaps: 4, seed: 1678805675, draw: 2, hints: { "0,3": "noun", "0,1": "verb" }, stars: [24, 29, 34], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-03-25", name: "Fragrant Rose", theme: "garden", layout: [".....", "#.###", "....#", "#.###"], anchors: { "1,1": "near", "0,0": "your" }, swaps: 4, seed: 2078356203, draw: 2, hints: { "0,1": "noun", "0,3": "pron" }, stars: [28, 34, 40], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-03-26", name: "Sand & Bucket", theme: "seaside", layout: ["....#", ".####", ".....", ".####"], anchors: { "0,2": "through" }, swaps: 4, seed: 269097205, draw: 2, hints: { "2,0": "verb", "2,4": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-03-27", name: "Ink & Chapter", theme: "library", layout: ["#....", "#.###", "#.###", ".....", "#.###"], anchors: { "3,0": "some" }, swaps: 4, seed: 705348621, draw: 2, hints: { "0,3": "det", "3,2": "verb" }, stars: [29, 35, 41], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-03-28", name: "Golden Pancake", theme: "breakfast", layout: [".##.#", ".##.#", ".##.#", "....."], anchors: { "1,0": "over", "1,3": "for" }, swaps: 4, seed: 248043821, draw: 2, hints: { "3,2": "det", "3,3": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-03-29", name: "Ancient Telescope", theme: "night-sky", layout: ["....#", "#.###", "#....", "#.###"], anchors: { "0,2": "with" }, swaps: 4, seed: 1359349369, draw: 2, hints: { "2,1": "det", "2,3": "verb" }, stars: [25, 31, 36], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-03-30", name: "Leafy Flower", theme: "garden", layout: ["....", ".##.", ".##.", "...."], anchors: { "1,0": "on", "0,1": "on" }, swaps: 4, seed: 989157533, draw: 2, hints: { "0,3": "noun", "3,2": "det" }, stars: [37, 44, 51], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2027-03-31", name: "Blue Coral", theme: "seaside", layout: [".#.#", ".#.#", "....", ".#.#"], anchors: { "2,2": "under", "0,0": "they" }, swaps: 4, seed: 1029238191, draw: 2, hints: { "2,3": "pron", "1,0": "verb" }, stars: [20, 24, 28], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-01", name: "Bookish Chapter", theme: "library", layout: ["###.", "#.#.", "....", "#.#.", "#.##"], anchors: { "1,1": "this" }, swaps: 4, seed: 1941753287, draw: 2, hints: { "2,3": "pron", "3,3": "verb" }, stars: [25, 30, 35], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-04-02", name: "Milk & Banana", theme: "breakfast", layout: ["##.##", "##.#.", "##.#.", "##.#.", "....."], anchors: { "1,2": "near", "4,3": "under" }, swaps: 4, seed: 1638637982, draw: 2, hints: { "4,4": "pron", "4,2": "adv" }, stars: [26, 32, 38], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-04-03", name: "Silent Astronaut", theme: "night-sky", layout: ["##.#", ".#.#", "....", ".#.#", ".#.#"], anchors: { "2,2": "over" }, swaps: 4, seed: 205477550, draw: 2, hints: { "3,2": "det", "2,3": "pron" }, stars: [20, 24, 28], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-04-04", name: "Leafy Tulip", theme: "garden", layout: ["#.#.", "....", "#.#.", "#.#."], anchors: { "0,1": "every" }, swaps: 4, seed: 983591340, draw: 2, hints: { "1,1": "noun", "2,3": "adj" }, stars: [25, 30, 35], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-04-05", name: "Island & Tide", theme: "seaside", layout: [".####", ".#.##", ".....", ".#.##", "#...."], anchors: { "4,1": "every" }, swaps: 4, seed: 217101785, draw: 2, hints: { "4,3": "verb", "4,2": "noun", "2,3": "det" }, stars: [36, 43, 50], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-04-06", name: "The Atlas", theme: "library", layout: ["###.#", ".....", "###.#", "....#"], anchors: { "1,2": "for" }, swaps: 4, seed: 1208489954, draw: 2, hints: { "3,3": "noun", "1,3": "det" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-07", name: "Fluffy Honey", theme: "breakfast", layout: [".#.#", "....", ".#.#", ".#.#"], anchors: { "0,2": "my" }, swaps: 4, seed: 589726273, draw: 2, hints: { "1,2": "adj", "1,0": "verb" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-08", name: "Pale Lantern", theme: "night-sky", layout: ["#....", "#.###", "#.###", "....."], anchors: { "0,4": "space" }, swaps: 4, seed: 747155846, draw: 2, hints: { "3,1": "pron", "3,2": "prep" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-04-09", name: "Lush Tulip", theme: "garden", layout: ["##.##", "##.#.", ".....", "##.#.", "####."], anchors: { "1,4": "our", "2,0": "we" }, swaps: 4, seed: 1998765722, draw: 2, hints: { "2,4": "noun", "2,2": "det" }, stars: [24, 29, 34], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-04-10", name: "Shell & Seagull", theme: "seaside", layout: ["....", ".#.#", ".#.#", ".#.#", "##.#"], anchors: { "2,0": "under" }, swaps: 4, seed: 749695302, draw: 2, hints: { "0,0": "det", "3,2": "det" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-04-11", name: "Forgotten Scroll", theme: "library", layout: ["#....", "##.##", "##.##", "....#", "##.##"], anchors: { "3,1": "under" }, swaps: 4, seed: 184140543, draw: 2, hints: { "3,2": "det", "0,4": "noun" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-04-12", name: "Spoon & Mug", theme: "breakfast", layout: ["##.#", ".#.#", "....", ".#.#", ".###"], anchors: { "2,3": "egg" }, swaps: 4, seed: 1269464754, draw: 2, hints: { "2,1": "verb", "1,0": "det" }, stars: [23, 29, 34], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-04-13", name: "Ancient Space", theme: "night-sky", layout: ["....", ".###", "....", ".###", ".###"], anchors: { "2,1": "for" }, swaps: 4, seed: 1864354596, draw: 2, hints: { "0,3": "noun", "0,0": "noun" }, stars: [26, 31, 36], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-04-14", name: "Busy Shovel", theme: "garden", layout: [".###.", ".###.", ".###.", "....."], anchors: { "1,4": "on" }, swaps: 4, seed: 1816576350, draw: 2, hints: { "0,0": "det", "3,4": "noun" }, stars: [25, 30, 35], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-04-15", name: "Harbor & Umbrella", theme: "seaside", layout: ["#.###", ".....", "#.###", "#...."], anchors: { "0,1": "i" }, swaps: 4, seed: 2045336759, draw: 2, hints: { "3,1": "noun", "1,2": "conj" }, stars: [24, 29, 34], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-04-16", name: "Scroll & Lamp", theme: "library", layout: ["####.", ".###.", ".....", ".###.", ".###."], anchors: { "2,2": "with", "3,4": "and" }, swaps: 4, seed: 1160317619, draw: 2, hints: { "2,0": "adj", "2,4": "noun" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-04-17", name: "Kitchen & Grandma", theme: "breakfast", layout: [".#.##", ".....", ".#.##", ".#.##"], anchors: { "0,0": "the" }, swaps: 4, seed: 883736089, draw: 2, hints: { "2,0": "prep", "1,2": "det" }, stars: [31, 37, 43], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-04-18", name: "The Orbit", theme: "night-sky", layout: ["##.##", "#....", "##.#.", ".....", "####."], anchors: { "3,3": "with" }, swaps: 4, seed: 2035662339, draw: 2, hints: { "1,1": "pron", "1,3": "det" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-04-19", name: "Nest & Gnome", theme: "garden", layout: [".##.", ".##.", "....", ".##."], anchors: { "0,3": "our" }, swaps: 4, seed: 1414475981, draw: 2, hints: { "2,3": "verb", "3,0": "noun" }, stars: [25, 30, 35], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-20", name: "Foamy Starfish", theme: "seaside", layout: [".....", "#.###", "#.###", "#...."], anchors: { "0,2": "for", "2,1": "through" }, swaps: 4, seed: 1624750324, draw: 2, hints: { "3,4": "noun", "0,3": "det" }, stars: [26, 31, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-21", name: "Famous Poet", theme: "library", layout: ["....", ".###", "....", ".###", ".###"], anchors: { "2,1": "through", "3,0": "over" }, swaps: 4, seed: 1828484471, draw: 2, hints: { "2,0": "noun", "1,0": "det" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-22", name: "Early Toast", theme: "breakfast", layout: ["....#", "##.##", "##.##", "#....", "##.##"], anchors: { "4,2": "table" }, swaps: 4, seed: 1655562275, draw: 2, hints: { "0,1": "det", "3,2": "det" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-04-23", name: "The Crater", theme: "night-sky", layout: [".#.#", "....", ".#.#", ".#.#", ".###"], anchors: { "2,2": "with" }, swaps: 4, seed: 852850188, draw: 2, hints: { "3,2": "pron", "1,1": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-24", name: "The Tulip", theme: "garden", layout: [".....", "#.##.", "#....", "#.##."], anchors: { "1,4": "with" }, swaps: 4, seed: 538318433, draw: 2, hints: { "1,1": "verb", "0,4": "noun" }, stars: [35, 42, 49], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-04-25", name: "Pirate & Starfish", theme: "seaside", layout: [".####", ".....", ".#.#.", ".#.#.", "##.#."], anchors: { "1,2": "shore" }, swaps: 4, seed: 296003707, draw: 2, hints: { "1,3": "conj", "1,0": "verb", "1,4": "noun" }, stars: [37, 44, 51], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2027-04-26", name: "Chapter & Story", theme: "library", layout: ["#.#.", "....", "#.#.", "...."], anchors: { "3,2": "through", "0,3": "the" }, swaps: 4, seed: 2063914574, draw: 2, hints: { "0,1": "pron", "1,1": "verb" }, stars: [32, 39, 46], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-04-27", name: "Buttery Egg", theme: "breakfast", layout: [".....", "#.##.", "#.##.", ".....", "#.##."], anchors: { "1,1": "in" }, swaps: 4, seed: 679515689, draw: 2, hints: { "0,4": "noun", "0,2": "verb", "3,4": "noun" }, stars: [36, 43, 50], objectives: [{ kind: "themeWords", count: 5, points: 7 }] }, { id: "daily-2027-04-28", name: "Sparkling Star", theme: "night-sky", layout: ["....", "##.#", "##.#", "...."], anchors: { "0,0": "the" }, swaps: 4, seed: 255194347, draw: 2, hints: { "0,1": "noun", "0,2": "prep" }, stars: [25, 30, 35], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-04-29", name: "Leaf & Daisy", theme: "garden", layout: [".....", ".##.#", ".##.#", ".##.#"], anchors: { "2,0": "through" }, swaps: 4, seed: 1203983525, draw: 2, hints: { "0,2": "det", "0,0": "det" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-04-30", name: "Sunburnt Sea", theme: "seaside", layout: ["#.##.", "#....", "#.##.", "#.##.", "....#"], anchors: { "4,2": "near", "1,2": "with" }, swaps: 4, seed: 350820892, draw: 2, hints: { "1,3": "pron", "4,1": "verb" }, stars: [33, 40, 47], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2027-05-01", name: "Overdue Poem", theme: "library", layout: ["#.#.#", ".....", "#.#.#", "#.#.#", "###.#"], anchors: { "1,1": "with", "3,3": "in" }, swaps: 4, seed: 1813495649, draw: 2, hints: { "0,3": "det", "2,1": "det" }, stars: [24, 29, 34], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-05-02", name: "Toast & Orange", theme: "breakfast", layout: ["###.#", "#....", "###.#", "....."], anchors: { "1,2": "over" }, swaps: 4, seed: 1761100885, draw: 2, hints: { "1,3": "det", "1,4": "noun" }, stars: [30, 36, 42], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-05-03", name: "The Galaxy", theme: "night-sky", layout: ["....", ".#.#", ".#.#", ".#.#", ".###"], anchors: { "0,1": "through" }, swaps: 4, seed: 1195789845, draw: 2, hints: { "0,0": "noun", "2,2": "det" }, stars: [23, 28, 33], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-05-04", name: "The Garden", theme: "garden", layout: ["##.#", ".#.#", ".#.#", ".#.#", "...."], anchors: { "1,0": "this" }, swaps: 4, seed: 788217064, draw: 2, hints: { "4,1": "prep", "4,0": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-05-05", name: "Pebble & Jellyfish", theme: "seaside", layout: ["....", ".###", ".###", ".###", "...."], anchors: { "4,0": "island" }, swaps: 4, seed: 877244631, draw: 2, hints: { "0,3": "noun", "3,0": "adj" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-05-06", name: "Magical Shelf", theme: "library", layout: [".#.#", "....", ".#.#", "....", "##.#"], anchors: { "3,2": "for", "1,1": "with" }, swaps: 4, seed: 2147102023, draw: 2, hints: { "3,0": "adj", "1,0": "adv" }, stars: [34, 41, 48], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-05-07", name: "The Napkin", theme: "breakfast", layout: [".#.#", ".#.#", ".#.#", "....", ".#.#"], anchors: { "1,0": "in" }, swaps: 4, seed: 907741647, draw: 2, hints: { "4,0": "verb", "3,0": "noun" }, stars: [33, 40, 47], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2027-05-08", name: "Silver Dream", theme: "night-sky", layout: ["#....", "#.#.#", "....#", "#.#.#", "#.###"], anchors: { "0,2": "of" }, swaps: 4, seed: 430014037, draw: 2, hints: { "0,3": "det", "1,1": "verb" }, stars: [38, 46, 54], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2027-05-09", name: "Tangled Gnome", theme: "garden", layout: [".###.", ".#.#.", ".#.#.", ".....", ".#.#."], anchors: { "1,4": "with" }, swaps: 4, seed: 2146594468, draw: 2, hints: { "3,1": "noun", "0,0": "pron", "3,2": "prep" }, stars: [41, 49, 57], objectives: [{ kind: "greatLines", count: 1, points: 8 }] }, { id: "daily-2027-05-10", name: "Harbor & Starfish", theme: "seaside", layout: ["#....", ".#.#.", ".#.#.", ".....", ".####"], anchors: { "2,4": "in", "0,1": "i" }, swaps: 4, seed: 1980690796, draw: 2, hints: { "2,0": "verb", "1,0": "pron", "0,2": "verb" }, stars: [47, 56, 65], objectives: [{ kind: "longWord", letters: 7, points: 9 }] }, { id: "daily-2027-05-11", name: "Atlas & Tale", theme: "library", layout: ["....", "##.#", "##.#", "...."], anchors: { "0,3": "paper", "3,0": "the" }, swaps: 4, seed: 70294365, draw: 2, hints: { "2,2": "noun", "0,2": "det" }, stars: [21, 25, 29], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-05-12", name: "Creamy Toast", theme: "breakfast", layout: ["##.#.", "##.#.", ".....", "##.#.", "####."], anchors: { "0,2": "some" }, swaps: 4, seed: 276501137, draw: 2, hints: { "2,4": "noun", "4,4": "pron" }, stars: [29, 35, 41], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-05-13", name: "Moon & Satellite", theme: "night-sky", layout: ["####.", "#....", "##.#.", "##.#.", "....#"], anchors: { "0,4": "your" }, swaps: 4, seed: 1048397762, draw: 2, hints: { "3,4": "pron", "1,1": "verb" }, stars: [30, 36, 42], objectives: [{ kind: "themeWords", count: 4, points: 6 }] }, { id: "daily-2027-05-14", name: "Thorny Daisy", theme: "garden", layout: ["#.##.", ".....", "#.##.", "#....", "####."], anchors: { "1,2": "with", "2,4": "with" }, swaps: 4, seed: 1517202127, draw: 2, hints: { "0,1": "det", "0,4": "det" }, stars: [36, 43, 50], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-05-15", name: "Stormy Beach", theme: "seaside", layout: ["#....", "#.#.#", ".....", "#.#.#"], anchors: { "2,0": "a" }, swaps: 4, seed: 139077492, draw: 2, hints: { "1,3": "verb", "2,3": "det" }, stars: [37, 44, 51], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-05-16", name: "Magical Secret", theme: "library", layout: ["####.", "#.##.", "#.##.", "#.##.", "....."], anchors: { "1,4": "with" }, swaps: 4, seed: 1414484587, draw: 2, hints: { "4,0": "adv", "0,4": "noun" }, stars: [25, 30, 35], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-05-17", name: "The Butter", theme: "breakfast", layout: [".....", "#.##.", "#.##.", "#.##.", "#.###"], anchors: { "0,0": "this" }, swaps: 4, seed: 1694270778, draw: 2, hints: { "3,4": "verb", "0,2": "prep" }, stars: [31, 37, 43], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-05-18", name: "Endless Crater", theme: "night-sky", layout: ["#.###", ".....", "#.###", "....#", "#.###"], anchors: { "1,0": "your", "3,3": "night" }, swaps: 4, seed: 1305245281, draw: 2, hints: { "1,1": "noun", "3,0": "verb" }, stars: [28, 34, 40], objectives: [{ kind: "themeWords", count: 4, points: 6 }] }, { id: "daily-2027-05-19", name: "Busy Butterfly", theme: "garden", layout: [".####", ".....", ".##.#", ".##.#", "###.#"], anchors: { "2,0": "for" }, swaps: 4, seed: 1064209027, draw: 2, hints: { "2,3": "adj", "3,3": "noun" }, stars: [25, 31, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-05-20", name: "Salty Anchor", theme: "seaside", layout: [".#.##", ".....", ".#.##", ".#.##"], anchors: { "1,0": "captain", "2,2": "over" }, swaps: 4, seed: 825070455, draw: 2, hints: { "3,2": "pron", "2,0": "verb" }, stars: [21, 25, 29], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-05-21", name: "The Poet", theme: "library", layout: ["....#", "#.###", "#.###", "....."], anchors: { "3,2": "near", "1,1": "and" }, swaps: 4, seed: 1541290776, draw: 2, hints: { "0,3": "adv", "0,2": "verb" }, stars: [27, 32, 37], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-05-22", name: "Table & Yolk", theme: "breakfast", layout: ["##.#", ".#.#", ".#.#", "....", ".#.#"], anchors: { "3,2": "over", "2,0": "over" }, swaps: 4, seed: 192095191, draw: 2, hints: { "0,2": "verb", "1,0": "noun" }, stars: [24, 29, 34], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-05-23", name: "Rocket & Universe", theme: "night-sky", layout: ["###.#", ".....", "###.#", "###.#", "....#"], anchors: { "1,1": "through" }, swaps: 4, seed: 2023466899, draw: 2, hints: { "4,1": "prep", "0,3": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-05-24", name: "Wilted Garden", theme: "garden", layout: ["##.#", ".#.#", "....", ".#.#", ".#.#"], anchors: { "2,3": "weed" }, swaps: 4, seed: 1321399611, draw: 2, hints: { "4,0": "noun", "2,2": "adj" }, stars: [31, 37, 43], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-05-25", name: "Stormy Towel", theme: "seaside", layout: [".....", ".####", ".####", "....#"], anchors: { "3,1": "in", "1,0": "near" }, swaps: 4, seed: 89127042, draw: 2, hints: { "0,4": "noun", "3,0": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-05-26", name: "The Book", theme: "library", layout: ["#....", "####.", "####.", "....."], anchors: { "3,2": "under", "1,4": "over" }, swaps: 4, seed: 595192098, draw: 2, hints: { "0,4": "noun", "3,0": "pron" }, stars: [26, 31, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-05-27", name: "Burnt Table", theme: "breakfast", layout: ["#.###", ".....", "#.###", "#....", "#.###"], anchors: { "1,4": "egg" }, swaps: 4, seed: 1485454045, draw: 2, hints: { "0,1": "pron", "1,0": "noun" }, stars: [30, 36, 42], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-05-28", name: "Starry Space", theme: "night-sky", layout: [".....", "#.#.#", "#.#.#", "#.#.#", "#.#.#"], anchors: { "0,0": "some" }, swaps: 4, seed: 892374246, draw: 2, hints: { "3,3": "adj", "4,3": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 6, points: 6 }] }, { id: "daily-2027-05-29", name: "Busy Sprout", theme: "garden", layout: [".....", "##.##", ".....", "##.##", "#...."], anchors: { "0,3": "for", "1,2": "under" }, swaps: 4, seed: 1723691205, draw: 2, hints: { "2,1": "verb", "0,2": "noun", "2,2": "det" }, stars: [37, 44, 51], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-05-30", name: "Fish & Puffin", theme: "seaside", layout: ["####.", ".....", "####.", "####.", "....."], anchors: { "2,4": "and" }, swaps: 4, seed: 647068199, draw: 2, hints: { "0,4": "verb", "4,2": "det" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-05-31", name: "Forgotten Tale", theme: "library", layout: ["....", "##.#", "##.#", "...."], anchors: { "0,3": "map" }, swaps: 4, seed: 131203777, draw: 2, hints: { "0,0": "noun", "1,2": "noun" }, stars: [21, 25, 29], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-06-01", name: "The Crumb", theme: "breakfast", layout: [".####", ".#.##", ".#.##", ".....", "##.##"], anchors: { "0,0": "we", "4,2": "butter" }, swaps: 4, seed: 432882494, draw: 2, hints: { "3,3": "noun", "3,2": "det" }, stars: [27, 32, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-06-02", name: "Darkness & Dream", theme: "night-sky", layout: ["....#", ".####", ".####", "....."], anchors: { "0,0": "our" }, swaps: 4, seed: 314043094, draw: 2, hints: { "3,1": "pron", "0,1": "adj" }, stars: [29, 35, 41], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-06-03", name: "The Tomato", theme: "garden", layout: ["##.##", ".....", "##.##", "....#"], anchors: { "3,2": "rose" }, swaps: 4, seed: 1025028805, draw: 2, hints: { "3,1": "adj", "2,2": "det" }, stars: [25, 30, 35], objectives: [{ kind: "themeWords", count: 3, points: 5 }] }, { id: "daily-2027-06-04", name: "Salty Seagull", theme: "seaside", layout: ["#.###", ".....", "#.#.#", "#.#.#", "#.#.#"], anchors: { "2,1": "and" }, swaps: 4, seed: 1096086398, draw: 2, hints: { "1,1": "noun", "1,3": "pron" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-06-05", name: "Clever Desk", theme: "library", layout: ["#.#.", "#.#.", "#.#.", "...."], anchors: { "3,2": "of" }, swaps: 4, seed: 757228773, draw: 2, hints: { "2,3": "det", "3,3": "noun" }, stars: [19, 24, 28], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-06-06", name: "The Waffle", theme: "breakfast", layout: [".#.##", ".#.##", ".....", ".#.##", "##.##"], anchors: { "4,2": "butter", "1,0": "for" }, swaps: 4, seed: 2108085478, draw: 2, hints: { "2,0": "det", "0,0": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "themeWords", count: 6, points: 6 }] }, { id: "daily-2027-06-07", name: "Lunar Astronaut", theme: "night-sky", layout: [".....", "##.##", "##.##", "#....", "##.##"], anchors: { "0,3": "in", "2,2": "over" }, swaps: 4, seed: 1142576876, draw: 2, hints: { "3,2": "det", "1,2": "verb" }, stars: [27, 32, 37], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-06-08", name: "The Vine", theme: "garden", layout: ["....", ".##.", ".##.", ".##.", "###."], anchors: { "0,1": "near" }, swaps: 4, seed: 1472790052, draw: 2, hints: { "0,2": "det", "2,0": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-06-09", name: "The Dolphin", theme: "seaside", layout: [".##.#", ".....", ".##.#", ".##.#"], anchors: { "1,1": "under", "0,0": "i" }, swaps: 4, seed: 492331689, draw: 2, hints: { "2,3": "noun", "1,0": "verb" }, stars: [27, 32, 37], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-06-10", name: "Poet & Library", theme: "library", layout: ["....#", "###.#", "###.#", "###.#", "....."], anchors: { "0,3": "library" }, swaps: 4, seed: 715614742, draw: 2, hints: { "0,2": "det", "4,1": "det" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-06-11", name: "Burnt Muffin", theme: "breakfast", layout: ["###.", "....", "#.#.", "....", "#.##"], anchors: { "2,3": "of" }, swaps: 4, seed: 520193381, draw: 2, hints: { "1,2": "adj", "3,1": "verb" }, stars: [35, 42, 49], objectives: [{ kind: "themeWords", count: 6, points: 7 }] }, { id: "daily-2027-06-12", name: "The Astronaut", theme: "night-sky", layout: [".#.##", ".....", ".#.##", ".#.##"], anchors: { "0,2": "the" }, swaps: 4, seed: 2096639888, draw: 2, hints: { "1,0": "det", "1,2": "noun" }, stars: [24, 29, 34], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-06-13", name: "Thorny Tulip", theme: "garden", layout: ["....", ".###", ".###", "...."], anchors: { "0,2": "under" }, swaps: 4, seed: 1534385107, draw: 2, hints: { "3,3": "noun", "0,0": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-06-14", name: "The Captain", theme: "seaside", layout: [".#.##", ".....", ".#.##", "....#", ".####"], anchors: { "3,2": "wave" }, swaps: 4, seed: 1117421614, draw: 2, hints: { "1,2": "verb", "1,0": "adj", "1,3": "det" }, stars: [35, 45, 55], objectives: [{ kind: "themeWords", count: 5, points: 7 }] }, { id: "daily-2027-06-15", name: "The Mystery", theme: "library", layout: ["#.##", "....", "#.##", "...."], anchors: { "0,1": "some", "3,2": "near" }, swaps: 4, seed: 626497452, draw: 2, hints: { "1,0": "det", "1,2": "adj" }, stars: [24, 30, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-06-16", name: "Buttery Grandma", theme: "breakfast", layout: ["####.", ".....", "#.##.", "#....", "#.###"], anchors: { "1,2": "in", "2,1": "in" }, swaps: 4, seed: 303701314, draw: 2, hints: { "1,4": "noun", "1,0": "det" }, stars: [35, 42, 49], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-06-17", name: "Cosmic Night", theme: "night-sky", layout: [".####", ".####", ".....", ".####", "....."], anchors: { "4,3": "near", "2,2": "under" }, swaps: 4, seed: 969710999, draw: 2, hints: { "1,0": "prep", "4,0": "adv" }, stars: [27, 32, 37], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-06-18", name: "Bird & Pond", theme: "garden", layout: ["##.#", "....", "##.#", "...."], anchors: { "1,0": "my" }, swaps: 4, seed: 1769926432, draw: 2, hints: { "3,2": "pron", "3,0": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-06-19", name: "The Ocean", theme: "seaside", layout: [".###", ".#.#", ".#.#", "....", ".#.#"], anchors: { "4,2": "wave" }, swaps: 4, seed: 938194450, draw: 2, hints: { "1,2": "det", "3,0": "prep" }, stars: [25, 30, 35], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-06-20", name: "Dictionary & Candle", theme: "library", layout: [".....", ".####", "....#", ".####"], anchors: { "2,1": "in" }, swaps: 4, seed: 1214424001, draw: 2, hints: { "2,3": "noun", "0,0": "det" }, stars: [22, 26, 30], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-06-21", name: "Runny Butter", theme: "breakfast", layout: ["....#", "#.#.#", "#.#.#", ".....", "###.#"], anchors: { "0,0": "every" }, swaps: 4, seed: 159624877, draw: 2, hints: { "3,1": "pron", "0,1": "noun", "3,2": "prep" }, stars: [38, 46, 54], objectives: [{ kind: "themeWords", count: 6, points: 8 }] }, { id: "daily-2027-06-22", name: "Dawn & Wish", theme: "night-sky", layout: ["####.", "####.", ".....", "####.", "....."], anchors: { "4,3": "for" }, swaps: 4, seed: 734583637, draw: 2, hints: { "2,4": "noun", "2,1": "adv" }, stars: [25, 30, 35], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-06-23", name: "The Weed", theme: "garden", layout: ["#.#.", "#.#.", "....", "#.#."], anchors: { "2,3": "seed", "1,1": "for" }, swaps: 4, seed: 1194135995, draw: 2, hints: { "3,1": "noun", "3,3": "verb" }, stars: [30, 36, 42], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-06-24", name: "Deep Lighthouse", theme: "seaside", layout: ["#....", "#.#.#", "#.#.#", "....#"], anchors: { "3,2": "near", "0,1": "i" }, swaps: 4, seed: 962487749, draw: 2, hints: { "3,1": "noun", "0,4": "noun" }, stars: [26, 31, 36], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-06-25", name: "Wise Novel", theme: "library", layout: [".####", ".....", ".#.##", ".#.##", ".#.##"], anchors: { "0,0": "i" }, swaps: 4, seed: 289682117, draw: 2, hints: { "1,3": "verb", "1,0": "adv" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-06-26", name: "The Table", theme: "breakfast", layout: ["#....", ".#.##", ".#.##", ".....", ".#.##"], anchors: { "3,4": "butter" }, swaps: 4, seed: 1704730584, draw: 2, hints: { "0,1": "det", "2,0": "adj", "1,2": "verb" }, stars: [37, 44, 51], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-06-27", name: "Infinite Sky", theme: "night-sky", layout: ["##.##", "##.##", ".....", "##.##", "....."], anchors: { "2,2": "of", "4,0": "every" }, swaps: 4, seed: 1643252237, draw: 2, hints: { "4,2": "noun", "3,2": "det" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-06-28", name: "Shovel & Pond", theme: "garden", layout: [".....", "###.#", "#....", "###.#"], anchors: { "2,1": "some", "0,1": "and" }, swaps: 4, seed: 1970971137, draw: 2, hints: { "0,3": "noun", "2,4": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-06-29", name: "Fish & Ocean", theme: "seaside", layout: [".....", "####.", "####.", "####.", "....."], anchors: { "4,2": "near", "0,0": "a" }, swaps: 4, seed: 1647977080, draw: 2, hints: { "0,4": "noun", "3,4": "noun" }, stars: [31, 37, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-06-30", name: "Magical Pencil", theme: "library", layout: ["#....", "###.#", "###.#", "....#"], anchors: { "1,3": "with" }, swaps: 4, seed: 546108878, draw: 2, hints: { "0,1": "det", "0,4": "verb" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-07-01", name: "Creamy Tea", theme: "breakfast", layout: ["##.#.", ".....", "##.#.", "##.#.", "####."], anchors: { "0,2": "the" }, swaps: 4, seed: 844529795, draw: 2, hints: { "3,2": "verb", "1,2": "adj" }, stars: [31, 37, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-07-02", name: "Dawn & Comet", theme: "night-sky", layout: [".####", ".#.##", ".#.##", ".....", ".#.##"], anchors: { "1,0": "over" }, swaps: 4, seed: 1282268597, draw: 2, hints: { "3,4": "verb", "3,0": "noun" }, stars: [29, 35, 41], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-07-03", name: "Muddy Carrot", theme: "garden", layout: [".....", ".###.", ".###.", ".###.", ".####"], anchors: { "2,0": "under" }, swaps: 4, seed: 1950092166, draw: 2, hints: { "2,4": "det", "0,4": "noun" }, stars: [30, 36, 42], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-04", name: "Anchor & Boat", theme: "seaside", layout: [".....", "#.##.", "#.##.", "#.##."], anchors: { "0,0": "my", "3,1": "captain" }, swaps: 4, seed: 344967934, draw: 2, hints: { "0,2": "verb", "2,4": "det" }, stars: [31, 37, 43], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-07-05", name: "The Desk", theme: "library", layout: ["#....", "##.##", ".....", "##.##", "#...."], anchors: { "2,1": "over" }, swaps: 4, seed: 1256508887, draw: 2, hints: { "4,2": "pron", "2,4": "adj", "0,4": "pron" }, stars: [30, 36, 42], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-06", name: "Porridge & Tea", theme: "breakfast", layout: ["##.##", ".....", "##.##", "#...."], anchors: { "3,2": "plate", "1,0": "a" }, swaps: 4, seed: 1340421571, draw: 2, hints: { "1,1": "noun", "1,4": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-07", name: "Sparkling Darkness", theme: "night-sky", layout: [".....", ".###.", ".###.", ".###.", ".###."], anchors: { "1,0": "under", "1,4": "through" }, swaps: 4, seed: 61904031, draw: 2, hints: { "4,0": "verb", "0,4": "noun" }, stars: [34, 41, 48], objectives: [{ kind: "themeWords", count: 5, points: 7 }] }, { id: "daily-2027-07-08", name: "Colorful Leaf", theme: "garden", layout: [".....", ".#.##", "....#", ".#.##"], anchors: { "0,1": "and" }, swaps: 4, seed: 2115539193, draw: 2, hints: { "0,0": "noun", "1,0": "verb" }, stars: [34, 41, 48], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-07-09", name: "Sandy Starfish", theme: "seaside", layout: [".##.#", ".##.#", ".....", ".##.#", ".####"], anchors: { "3,0": "and", "3,3": "sand" }, swaps: 4, seed: 1036852131, draw: 2, hints: { "2,3": "adj", "2,0": "noun" }, stars: [27, 33, 38], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-07-10", name: "Reader & Author", theme: "library", layout: ["....", "#.##", "....", "#.##"], anchors: { "2,1": "with" }, swaps: 4, seed: 212857081, draw: 2, hints: { "0,3": "pron", "0,1": "noun" }, stars: [22, 26, 30], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-07-11", name: "Golden Sunrise", theme: "breakfast", layout: [".####", "....#", ".#.##", ".#.##", "#...."], anchors: { "4,1": "this" }, swaps: 4, seed: 460454553, draw: 2, hints: { "4,2": "verb", "1,2": "det" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 6, points: 6 }] }, { id: "daily-2027-07-12", name: "Silver Alien", theme: "night-sky", layout: ["#.##", "....", "#.##", "#.##", "...."], anchors: { "0,1": "they" }, swaps: 4, seed: 1718066300, draw: 2, hints: { "1,0": "pron", "1,1": "verb" }, stars: [23, 28, 33], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-07-13", name: "Ripe Weed", theme: "garden", layout: ["....#", "##.#.", "#....", "##.#.", "####."], anchors: { "2,1": "this", "1,4": "a" }, swaps: 4, seed: 193063871, draw: 2, hints: { "0,2": "det", "0,1": "verb" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-14", name: "The Sand", theme: "seaside", layout: ["#....", "#.###", "#.###", "....."], anchors: { "0,2": "through" }, swaps: 4, seed: 121451942, draw: 2, hints: { "3,1": "noun", "0,1": "verb" }, stars: [30, 36, 42], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-15", name: "Wise Cover", theme: "library", layout: ["#.###", "....#", "#.###", "#...."], anchors: { "1,1": "in" }, swaps: 4, seed: 811191521, draw: 2, hints: { "3,3": "det", "3,4": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-07-16", name: "Sugary Kettle", theme: "breakfast", layout: [".#.#", "....", ".#.#", "....", "##.#"], anchors: { "1,1": "for" }, swaps: 4, seed: 815537069, draw: 2, hints: { "1,0": "verb", "0,2": "verb" }, stars: [38, 46, 54], objectives: [{ kind: "longWord", letters: 7, points: 8 }] }, { id: "daily-2027-07-17", name: "Infinite Space", theme: "night-sky", layout: ["#.###", "....#", "#.###", "#...."], anchors: { "3,1": "planet" }, swaps: 4, seed: 484787339, draw: 2, hints: { "1,1": "verb", "1,3": "noun" }, stars: [20, 24, 28], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-07-18", name: "Sunny Seed", theme: "garden", layout: ["#.##.", "#.##.", "#.##.", "#.##.", "....."], anchors: { "4,3": "on" }, swaps: 4, seed: 147724951, draw: 2, hints: { "3,1": "adj", "4,0": "det" }, stars: [30, 36, 42], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-19", name: "The Jellyfish", theme: "seaside", layout: ["##.##", "#....", "##.##", "##.##", "....#"], anchors: { "4,2": "sand" }, swaps: 4, seed: 397573190, draw: 2, hints: { "1,4": "pron", "2,2": "verb" }, stars: [29, 35, 41], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-07-20", name: "Famous Dictionary", theme: "library", layout: [".#.#.", ".#.#.", ".....", ".#.#.", "####."], anchors: { "2,2": "near", "1,0": "of" }, swaps: 4, seed: 1891716197, draw: 2, hints: { "2,4": "verb", "0,2": "det", "3,2": "pron" }, stars: [38, 46, 54], objectives: [{ kind: "swapsLeft", count: 2, points: 8 }] }, { id: "daily-2027-07-21", name: "Cereal & Yolk", theme: "breakfast", layout: ["####.", ".###.", ".###.", ".....", ".####"], anchors: { "3,3": "over", "4,0": "cup" }, swaps: 4, seed: 1499873419, draw: 2, hints: { "0,4": "det", "3,4": "pron" }, stars: [24, 29, 34], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-07-22", name: "Mysterious Wish", theme: "night-sky", layout: ["....", "#.##", "#.##", "...."], anchors: { "3,2": "over", "1,1": "in" }, swaps: 4, seed: 1784987446, draw: 2, hints: { "0,1": "verb", "0,3": "noun" }, stars: [24, 29, 34], objectives: [{ kind: "themeWords", count: 3, points: 5 }] }, { id: "daily-2027-07-23", name: "Fragrant Worm", theme: "garden", layout: [".###", ".#.#", "....", ".#.#", "##.#"], anchors: { "2,2": "under" }, swaps: 4, seed: 112137997, draw: 2, hints: { "4,2": "verb", "2,0": "adj" }, stars: [24, 30, 36], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-07-24", name: "Wet Surf", theme: "seaside", layout: ["#.##", "....", "#.##", "....", "#.##"], anchors: { "1,1": "under", "3,2": "on" }, swaps: 4, seed: 1519568095, draw: 2, hints: { "3,0": "noun", "3,1": "verb" }, stars: [26, 31, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-07-25", name: "The Pencil", theme: "library", layout: ["....#", "##.##", "#....", "##.##"], anchors: { "2,1": "our" }, swaps: 4, seed: 585094133, draw: 2, hints: { "2,2": "noun", "0,1": "verb" }, stars: [21, 25, 29], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-07-26", name: "Toast & Butter", theme: "breakfast", layout: [".###.", ".###.", ".###.", ".###.", "....."], anchors: { "2,4": "of", "4,1": "and" }, swaps: 4, seed: 1695709948, draw: 2, hints: { "4,2": "det", "2,0": "verb" }, stars: [26, 33, 40], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-07-27", name: "Planet & Orbit", theme: "night-sky", layout: [".....", ".##.#", ".....", ".##.#", ".####"], anchors: { "2,1": "for" }, swaps: 4, seed: 1449066373, draw: 2, hints: { "0,3": "det", "1,0": "adj", "0,2": "verb" }, stars: [36, 43, 50], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-07-28", name: "Petal & Shovel", theme: "garden", layout: ["##.#", ".#.#", "....", ".#.#", ".###"], anchors: { "2,3": "seed", "1,2": "under" }, swaps: 4, seed: 1509773785, draw: 2, hints: { "2,0": "noun", "4,0": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-07-29", name: "The Starfish", theme: "seaside", layout: ["....", "##.#", "##.#", "....", "##.#"], anchors: { "3,1": "with", "2,2": "in" }, swaps: 4, seed: 1131013942, draw: 2, hints: { "3,3": "noun", "4,2": "noun" }, stars: [25, 30, 35], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-07-30", name: "Clever Secret", theme: "library", layout: ["###.#", ".....", ".##.#", ".##.#", "....#"], anchors: { "0,3": "our" }, swaps: 4, seed: 546375607, draw: 2, hints: { "4,3": "noun", "1,3": "noun", "1,4": "verb" }, stars: [32, 38, 44], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-07-31", name: "The Plate", theme: "breakfast", layout: ["#....", "##.##", "....#", "##.##", "....#"], anchors: { "2,2": "under" }, swaps: 4, seed: 285613647, draw: 2, hints: { "2,0": "pron", "4,2": "noun", "0,2": "pron" }, stars: [33, 41, 48], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-08-01", name: "Moon & Night", theme: "night-sky", layout: ["###.", ".##.", "....", ".##.", ".##."], anchors: { "0,3": "your", "4,0": "sky" }, swaps: 4, seed: 1008674904, draw: 2, hints: { "1,3": "adj", "2,1": "prep" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-08-02", name: "The Sun", theme: "garden", layout: ["....#", "#.#.#", "#....", "#.#.#"], anchors: { "1,1": "near", "3,3": "bird" }, swaps: 4, seed: 990971524, draw: 2, hints: { "2,2": "verb", "3,1": "verb" }, stars: [35, 42, 49], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-08-03", name: "Wet Starfish", theme: "seaside", layout: [".#.#", ".#.#", "....", ".#.#", "##.#"], anchors: { "0,2": "my" }, swaps: 4, seed: 1608512174, draw: 2, hints: { "2,0": "adj", "2,3": "pron" }, stars: [25, 30, 35], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-08-04", name: "Forgotten Shelf", theme: "library", layout: ["....", "#.#.", "#.#.", "#.#.", "#.#."], anchors: { "0,3": "chapter" }, swaps: 4, seed: 1550045423, draw: 2, hints: { "1,1": "det", "1,3": "prep" }, stars: [26, 31, 36], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-08-05", name: "Omelette & Table", theme: "breakfast", layout: ["....", ".#.#", ".#.#", ".#.#", ".###"], anchors: { "2,0": "on" }, swaps: 4, seed: 154060574, draw: 2, hints: { "0,0": "pron", "3,2": "noun" }, stars: [23, 28, 33], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-08-06", name: "Silver Rocket", theme: "night-sky", layout: ["##.##", "##.##", "#....", "##.##", "....."], anchors: { "2,2": "with" }, swaps: 4, seed: 1256777502, draw: 2, hints: { "3,2": "det", "1,2": "noun" }, stars: [26, 31, 36], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-08-07", name: "Muddy Snail", theme: "garden", layout: ["....#", "##.##", "##.##", "....."], anchors: { "3,2": "weed" }, swaps: 4, seed: 182830390, draw: 2, hints: { "0,2": "pron", "3,4": "pron" }, stars: [26, 31, 36], objectives: [{ kind: "themeWords", count: 2, points: 5 }] }, { id: "daily-2027-08-08", name: "Tropical Surf", theme: "seaside", layout: ["#.###", "....#", "#.###", "#....", "#.###"], anchors: { "0,1": "every" }, swaps: 4, seed: 1599019322, draw: 2, hints: { "1,1": "noun", "3,2": "det" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-08-09", name: "Spine & Word", theme: "library", layout: ["#....", "#.###", "#.###", "#.###", "....#"], anchors: { "4,2": "under" }, swaps: 4, seed: 217580408, draw: 2, hints: { "0,1": "noun", "4,0": "det" }, stars: [26, 31, 36], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-08-10", name: "The Syrup", theme: "breakfast", layout: ["##.##", "##.#.", ".....", "##.#.", "####."], anchors: { "2,1": "for", "0,2": "they" }, swaps: 4, seed: 882525184, draw: 2, hints: { "2,4": "noun", "2,0": "verb" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-08-11", name: "Wolf & Telescope", theme: "night-sky", layout: [".##.#", ".##.#", ".##.#", ".##.#", "....."], anchors: { "1,0": "through" }, swaps: 4, seed: 1015373523, draw: 2, hints: { "4,3": "noun", "4,0": "noun" }, stars: [32, 38, 44], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-08-12", name: "Rose & Flower", theme: "garden", layout: ["#.#.#", "....#", "#.#.#", "#....", "#.#.#"], anchors: { "2,3": "in" }, swaps: 4, seed: 156881096, draw: 2, hints: { "1,3": "noun", "0,1": "adv", "3,3": "det" }, stars: [39, 47, 55], objectives: [{ kind: "longWord", letters: 7, points: 8 }] }, { id: "daily-2027-08-13", name: "Sand & Whale", theme: "seaside", layout: ["###.", "....", ".##.", "....", ".###"], anchors: { "1,1": "on" }, swaps: 4, seed: 2068288846, draw: 2, hints: { "4,0": "noun", "3,0": "det" }, stars: [36, 43, 50], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-08-14", name: "Hushed Lamp", theme: "library", layout: ["####.", "#....", "####.", "####.", "....."], anchors: { "1,1": "i" }, swaps: 4, seed: 732809163, draw: 2, hints: { "1,2": "verb", "4,4": "noun" }, stars: [21, 25, 29], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-08-15", name: "Fresh Muffin", theme: "breakfast", layout: ["#.#.", "#.#.", "....", "#.#."], anchors: { "2,0": "a" }, swaps: 4, seed: 1548606649, draw: 2, hints: { "2,3": "pron", "2,1": "noun" }, stars: [26, 31, 36], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-08-16", name: "Endless Telescope", theme: "night-sky", layout: [".#.##", ".#.##", ".....", ".#.##"], anchors: { "2,1": "under" }, swaps: 4, seed: 1795195885, draw: 2, hints: { "1,2": "verb", "0,2": "pron" }, stars: [31, 37, 43], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-08-17", name: "Hose & Carrot", theme: "garden", layout: ["###.", "....", ".##.", ".##.", "...."], anchors: { "0,3": "some" }, swaps: 4, seed: 1803265605, draw: 2, hints: { "1,0": "pron", "4,0": "noun" }, stars: [32, 38, 44], objectives: [{ kind: "themeWords", count: 4, points: 6 }] }, { id: "daily-2027-08-18", name: "Shiny Boat", theme: "seaside", layout: ["#.##", "#.#.", "....", "#.#.", "###."], anchors: { "2,1": "under" }, swaps: 4, seed: 2111802561, draw: 2, hints: { "4,3": "pron", "2,2": "det" }, stars: [25, 30, 35], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-08-19", name: "Thick Poet", theme: "library", layout: ["####.", "##.#.", "##.#.", ".....", "##.##"], anchors: { "3,2": "of", "1,4": "near" }, swaps: 4, seed: 1651802623, draw: 2, hints: { "3,0": "prep", "0,4": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-08-20", name: "Porridge & Toaster", theme: "breakfast", layout: [".....", ".##.#", ".##.#", "....#", ".####"], anchors: { "1,3": "with" }, swaps: 4, seed: 1810462983, draw: 2, hints: { "3,0": "det", "3,1": "noun", "0,3": "noun" }, stars: [44, 53, 62], objectives: [{ kind: "themeWords", count: 5, points: 9 }] }, { id: "daily-2027-08-21", name: "The Alien", theme: "night-sky", layout: ["#.##", "....", "#.##", "...."], anchors: { "3,2": "with" }, swaps: 4, seed: 1801354364, draw: 2, hints: { "1,3": "noun", "1,1": "adj" }, stars: [20, 28, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-08-22", name: "Green Rose", theme: "garden", layout: ["#.###", "....#", "#.###", "#.###", "....."], anchors: { "4,0": "i" }, swaps: 4, seed: 1900830851, draw: 2, hints: { "4,4": "noun", "4,3": "det" }, stars: [28, 34, 40], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-08-23", name: "Sunburnt Sand", theme: "seaside", layout: [".....", "##.#.", "##.#.", "##.#."], anchors: { "2,4": "under" }, swaps: 4, seed: 149225089, draw: 2, hints: { "1,2": "pron", "0,4": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-08-24", name: "Overdue Paper", theme: "library", layout: ["....", "#.##", "....", "#.##"], anchors: { "3,1": "author" }, swaps: 4, seed: 1579064466, draw: 2, hints: { "2,2": "noun", "2,3": "verb" }, stars: [24, 29, 34], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-08-25", name: "Cereal & Apple", theme: "breakfast", layout: [".....", "##.#.", "##.#.", "##.#."], anchors: { "0,3": "under" }, swaps: 4, seed: 1453226115, draw: 2, hints: { "0,4": "pron", "3,2": "noun" }, stars: [28, 34, 40], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-08-26", name: "The Horizon", theme: "night-sky", layout: ["#.##.", "#.##.", "#.##.", "....."], anchors: { "0,4": "our", "3,2": "under" }, swaps: 4, seed: 2107608725, draw: 2, hints: { "3,1": "noun", "0,1": "pron" }, stars: [28, 34, 40], objectives: [{ kind: "longWord", letters: 7, points: 6 }] }, { id: "daily-2027-08-27", name: "The Gnome", theme: "garden", layout: ["#....", "##.##", ".....", "##.##"], anchors: { "2,1": "in" }, swaps: 4, seed: 1051132729, draw: 2, hints: { "0,2": "verb", "0,4": "noun" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-08-28", name: "Foamy Bucket", theme: "seaside", layout: ["###.#", ".....", ".##.#", ".##.#", "....#"], anchors: { "4,1": "of", "1,1": "and" }, swaps: 4, seed: 1550280603, draw: 2, hints: { "3,0": "det", "4,0": "noun" }, stars: [34, 41, 48], objectives: [{ kind: "themeWords", count: 5, points: 7 }] }, { id: "daily-2027-08-29", name: "Thick Mystery", theme: "library", layout: ["####.", ".....", "####.", "#....", "####."], anchors: { "1,0": "they", "3,1": "your" }, swaps: 4, seed: 1266793329, draw: 2, hints: { "1,4": "noun", "2,4": "adv" }, stars: [24, 29, 34], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-08-30", name: "Honey & Kettle", theme: "breakfast", layout: ["#.###", "#....", "#.###", "....."], anchors: { "0,1": "my", "3,2": "in" }, swaps: 4, seed: 1792764916, draw: 2, hints: { "3,1": "pron", "1,4": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-08-31", name: "Ancient Lantern", theme: "night-sky", layout: ["##.##", ".....", ".#.##", "....#", ".#.##"], anchors: { "2,0": "under" }, swaps: 4, seed: 1888360448, draw: 2, hints: { "3,2": "prep", "3,0": "det", "1,1": "verb" }, stars: [32, 38, 44], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-09-01", name: "Tree & Nest", theme: "garden", layout: [".....", "##.##", "##.##", "....#", "##.##"], anchors: { "0,2": "flower" }, swaps: 4, seed: 124999311, draw: 2, hints: { "3,2": "adj", "1,2": "verb" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-09-02", name: "Breezy Puffin", theme: "seaside", layout: [".##.", ".##.", "....", ".##.", ".###"], anchors: { "0,0": "they" }, swaps: 4, seed: 32892713, draw: 2, hints: { "1,0": "verb", "2,0": "det" }, stars: [22, 26, 30], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-09-03", name: "Dusty Story", theme: "library", layout: ["#.##", "....", "#.##", "#.##", "...."], anchors: { "1,2": "for" }, swaps: 4, seed: 1015237706, draw: 2, hints: { "4,1": "noun", "4,2": "verb" }, stars: [26, 31, 36], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-09-04", name: "Creamy Kettle", theme: "breakfast", layout: [".#.##", ".#.##", "....#", ".#.##", "#...."], anchors: { "0,2": "some" }, swaps: 4, seed: 345154237, draw: 2, hints: { "2,2": "verb", "2,3": "pron", "4,1": "adj" }, stars: [43, 52, 61], objectives: [{ kind: "themeWords", count: 6, points: 9 }] }, { id: "daily-2027-09-05", name: "Celestial Nebula", theme: "night-sky", layout: [".###", ".#.#", "....", ".#.#", "##.#"], anchors: { "1,2": "our" }, swaps: 4, seed: 1786175511, draw: 2, hints: { "2,2": "noun", "0,0": "pron" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-09-06", name: "Muddy Fence", theme: "garden", layout: [".####", ".##.#", "....#", ".##.#", "#...."], anchors: { "0,0": "they", "4,3": "sun" }, swaps: 4, seed: 134138682, draw: 2, hints: { "4,2": "adj", "2,1": "noun" }, stars: [30, 37, 43], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-09-07", name: "Wet Shore", theme: "seaside", layout: ["#.##", "....", "#.##", "...."], anchors: { "1,2": "under", "3,0": "this" }, swaps: 4, seed: 1583727126, draw: 2, hints: { "3,3": "pron", "2,1": "det" }, stars: [22, 26, 30], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-09-08", name: "Dusty Desk", theme: "library", layout: [".....", ".##.#", ".##.#", ".##.#"], anchors: { "0,1": "on", "3,3": "book" }, swaps: 4, seed: 119934993, draw: 2, hints: { "0,3": "noun", "2,3": "det" }, stars: [27, 32, 37], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-09-09", name: "Mug & Crumb", theme: "breakfast", layout: ["#.#.", "#.#.", "#.#.", "....", "#.#."], anchors: { "0,1": "some" }, swaps: 4, seed: 1830732467, draw: 2, hints: { "4,3": "verb", "0,3": "noun" }, stars: [34, 41, 48], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-09-10", name: "Celestial Firefly", theme: "night-sky", layout: [".....", "##.##", "....#", "##.##"], anchors: { "0,3": "through" }, swaps: 4, seed: 647190572, draw: 2, hints: { "0,0": "verb", "0,1": "det" }, stars: [26, 31, 36], objectives: [{ kind: "rareCrossing", value: 6, points: 5 }] }, { id: "daily-2027-09-11", name: "The Tree", theme: "garden", layout: ["....", ".##.", ".##.", ".##.", ".###"], anchors: { "0,2": "on", "2,0": "of" }, swaps: 4, seed: 419174446, draw: 2, hints: { "0,0": "det", "1,0": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-09-12", name: "Sunlit Anchor", theme: "seaside", layout: ["###.#", "....#", "###.#", "###.#", "....."], anchors: { "4,1": "in" }, swaps: 4, seed: 2073942147, draw: 2, hints: { "1,3": "noun", "0,3": "adj" }, stars: [26, 32, 37], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-09-13", name: "The Paper", theme: "library", layout: [".....", "#.##.", ".....", "#.##."], anchors: { "1,1": "with" }, swaps: 4, seed: 2075579820, draw: 2, hints: { "0,4": "pron", "0,1": "noun", "2,4": "pron" }, stars: [36, 43, 50], objectives: [{ kind: "themeWords", count: 6, points: 7 }] }, { id: "daily-2027-09-14", name: "Chef & Orange", theme: "breakfast", layout: ["#....", "#.#.#", "#.#.#", ".....", "###.#"], anchors: { "3,2": "on", "0,4": "egg" }, swaps: 4, seed: 1493853545, draw: 2, hints: { "0,1": "det", "1,1": "noun" }, stars: [35, 42, 49], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2027-09-15", name: "The Cloud", theme: "night-sky", layout: ["....", "#.#.", "#.#.", "#.#.", "#.#."], anchors: { "0,3": "cloud" }, swaps: 4, seed: 1848431298, draw: 2, hints: { "1,1": "verb", "1,3": "prep" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-09-16", name: "Gate & Nest", theme: "garden", layout: [".####", ".#.#.", ".....", ".#.#.", "##.#."], anchors: { "3,0": "bird" }, swaps: 4, seed: 380401610, draw: 2, hints: { "2,2": "noun", "4,4": "noun", "2,0": "det" }, stars: [35, 42, 49], objectives: [{ kind: "greatLines", count: 1, points: 7 }] }, { id: "daily-2027-09-17", name: "Wet Tide", theme: "seaside", layout: ["#....", "#.###", "....#", "#.###", "#...."], anchors: { "2,0": "a", "4,4": "sand" }, swaps: 4, seed: 1055332382, draw: 2, hints: { "2,1": "noun", "0,2": "adj" }, stars: [36, 43, 50], objectives: [{ kind: "longWord", letters: 7, points: 7 }] }, { id: "daily-2027-09-18", name: "Lamp & Story", theme: "library", layout: ["###.#", "#....", "###.#", "....."], anchors: { "3,2": "on" }, swaps: 4, seed: 1188313347, draw: 2, hints: { "3,0": "det", "3,3": "pron" }, stars: [20, 24, 28], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-09-19", name: "Toasted Jam", theme: "breakfast", layout: ["#.##.", ".....", "#.##.", "#.##."], anchors: { "1,0": "my" }, swaps: 4, seed: 1755580015, draw: 2, hints: { "1,4": "noun", "3,1": "adv" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 3, points: 6 }] }, { id: "daily-2027-09-20", name: "Lantern & Telescope", theme: "night-sky", layout: [".##.", ".##.", ".##.", "....", ".###"], anchors: { "0,0": "some", "0,3": "we" }, swaps: 4, seed: 1029937244, draw: 2, hints: { "3,2": "prep", "2,0": "verb" }, stars: [24, 29, 34], objectives: [{ kind: "themeWords", count: 5, points: 5 }] }, { id: "daily-2027-09-21", name: "The Rain", theme: "garden", layout: ["#.###", ".....", "#.###", "....#"], anchors: { "3,2": "through", "1,2": "and" }, swaps: 4, seed: 227864028, draw: 2, hints: { "3,1": "pron", "0,1": "det" }, stars: [23, 28, 33], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-09-22", name: "Calm Crab", theme: "seaside", layout: ["....", "#.##", "....", "#.##"], anchors: { "2,0": "your" }, swaps: 4, seed: 1328464327, draw: 2, hints: { "0,0": "noun", "0,2": "verb" }, stars: [24, 29, 34], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-09-23", name: "Forgotten Legend", theme: "library", layout: [".....", "###.#", "###.#", "....#"], anchors: { "0,1": "over" }, swaps: 4, seed: 1174327922, draw: 2, hints: { "3,3": "noun", "3,2": "det" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-09-24", name: "Toaster & Juice", theme: "breakfast", layout: ["###.#", ".....", "###.#", "###.#", "#...."], anchors: { "1,2": "of", "4,1": "every" }, swaps: 4, seed: 1354726923, draw: 2, hints: { "0,3": "adv", "4,3": "adv" }, stars: [33, 40, 47], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }, { id: "daily-2027-09-25", name: "Infinite Satellite", theme: "night-sky", layout: ["....", ".##.", ".##.", "...."], anchors: { "0,1": "near" }, swaps: 4, seed: 2076819177, draw: 2, hints: { "1,3": "verb", "0,2": "det" }, stars: [34, 41, 48], objectives: [{ kind: "rareCrossing", value: 6, points: 7 }] }, { id: "daily-2027-09-26", name: "The Fence", theme: "garden", layout: [".#.#", ".#.#", "....", ".#.#"], anchors: { "0,0": "i" }, swaps: 4, seed: 114425112, draw: 2, hints: { "3,0": "verb", "2,0": "pron" }, stars: [22, 26, 30], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-09-27", name: "Shiny Coral", theme: "seaside", layout: ["#....", "#.###", "#.###", "....#"], anchors: { "0,1": "our" }, swaps: 4, seed: 1187231012, draw: 2, hints: { "1,1": "adj", "0,4": "pron" }, stars: [23, 28, 33], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-09-28", name: "Dictionary & Bookmark", theme: "library", layout: [".##.", "....", ".##.", ".##."], anchors: { "1,2": "with", "0,0": "my" }, swaps: 4, seed: 1700758679, draw: 2, hints: { "1,3": "pron", "1,0": "noun" }, stars: [19, 23, 27], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-09-29", name: "Spoon & Cereal", theme: "breakfast", layout: [".....", "#.###", ".....", "#.###", "#...."], anchors: { "4,2": "through" }, swaps: 4, seed: 1529192329, draw: 2, hints: { "0,3": "det", "2,4": "noun", "3,1": "verb" }, stars: [41, 49, 57], objectives: [{ kind: "themeWords", count: 7, points: 8 }] }, { id: "daily-2027-09-30", name: "Lunar Crater", theme: "night-sky", layout: [".....", "##.##", "#....", "##.##"], anchors: { "1,2": "under" }, swaps: 4, seed: 92152766, draw: 2, hints: { "0,2": "noun", "2,3": "adj" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-10-01", name: "Green Root", theme: "garden", layout: ["##.##", "....#", "##.##", "#...."], anchors: { "3,3": "under" }, swaps: 4, seed: 1321634016, draw: 2, hints: { "3,2": "noun", "1,2": "prep" }, stars: [29, 35, 41], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-10-02", name: "Foamy Captain", theme: "seaside", layout: [".####", ".###.", ".###.", ".###.", "....."], anchors: { "3,4": "of" }, swaps: 4, seed: 1466726836, draw: 2, hints: { "0,0": "pron", "4,2": "verb" }, stars: [26, 31, 36], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-10-03", name: "Curious Desk", theme: "library", layout: ["#.###", "#....", "#.#.#", "#.#.#", "....#"], anchors: { "2,1": "in" }, swaps: 4, seed: 1951059033, draw: 2, hints: { "1,2": "verb", "4,1": "noun" }, stars: [32, 38, 44], objectives: [{ kind: "themeWords", count: 5, points: 6 }] }, { id: "daily-2027-10-04", name: "The Toast", theme: "breakfast", layout: ["#.###", "#....", "#.###", "....#"], anchors: { "1,3": "in" }, swaps: 4, seed: 1912619364, draw: 2, hints: { "0,1": "det", "3,0": "noun" }, stars: [20, 25, 30], objectives: [{ kind: "greatLines", count: 1, points: 5 }] }, { id: "daily-2027-10-05", name: "Orbit & Wolf", theme: "night-sky", layout: ["....", "###.", "###.", "###.", "...."], anchors: { "0,1": "through", "2,3": "near" }, swaps: 4, seed: 2099364902, draw: 2, hints: { "4,3": "noun", "3,3": "det" }, stars: [31, 37, 43], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-10-06", name: "Vine & Leaf", theme: "garden", layout: ["#.###", "....#", "#.#.#", "#....", "###.#"], anchors: { "2,3": "near" }, swaps: 4, seed: 432237762, draw: 2, hints: { "1,2": "det", "1,1": "verb" }, stars: [40, 48, 56], objectives: [{ kind: "longWord", letters: 7, points: 8 }] }, { id: "daily-2027-10-07", name: "The Seaweed", theme: "seaside", layout: ["#....", "##.##", ".....", "##.##", "....."], anchors: { "4,2": "island" }, swaps: 4, seed: 953653798, draw: 2, hints: { "0,2": "noun", "1,2": "verb", "2,2": "det" }, stars: [33, 40, 47], objectives: [{ kind: "themeWords", count: 5, points: 7 }] }, { id: "daily-2027-10-08", name: "Pencil & Ink", theme: "library", layout: ["#.#.#", ".....", "#.#.#", "#.#.#", "#.###"], anchors: { "1,1": "near", "2,3": "of" }, swaps: 4, seed: 559870452, draw: 2, hints: { "1,3": "noun", "4,1": "pron" }, stars: [28, 34, 40], objectives: [{ kind: "greatLines", count: 1, points: 6 }] }, { id: "daily-2027-10-09", name: "Cinnamon & Grandma", theme: "breakfast", layout: ["####.", "#....", "####.", "....."], anchors: { "3,1": "over", "1,2": "and" }, swaps: 4, seed: 1852236105, draw: 2, hints: { "1,4": "verb", "2,4": "adv" }, stars: [29, 35, 41], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-10-10", name: "Distant Meteor", theme: "night-sky", layout: [".###", ".##.", ".##.", "....", "###."], anchors: { "1,3": "some" }, swaps: 4, seed: 1199600610, draw: 2, hints: { "4,3": "pron", "3,3": "verb" }, stars: [26, 33, 39], objectives: [{ kind: "swapsLeft", count: 2, points: 5 }] }, { id: "daily-2027-10-11", name: "Rose & Hose", theme: "garden", layout: [".####", ".....", ".####", ".####", "....#"], anchors: { "1,3": "through", "4,1": "and" }, swaps: 4, seed: 680562589, draw: 2, hints: { "1,1": "det", "4,0": "noun" }, stars: [27, 32, 37], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-10-12", name: "The Treasure", theme: "seaside", layout: ["#.###", "....#", "#.#.#", ".....", "#.#.#"], anchors: { "1,3": "shell" }, swaps: 4, seed: 610604662, draw: 2, hints: { "3,1": "adj", "3,4": "pron", "3,2": "noun" }, stars: [39, 47, 55], objectives: [{ kind: "rareCrossing", value: 6, points: 8 }] }, { id: "daily-2027-10-13", name: "Cover & Poem", theme: "library", layout: ["##.##", ".....", "##.#.", "#....", "####."], anchors: { "2,4": "over" }, swaps: 4, seed: 1061126235, draw: 2, hints: { "3,4": "pron", "1,0": "pron" }, stars: [28, 34, 40], objectives: [{ kind: "swapsLeft", count: 2, points: 6 }] }, { id: "daily-2027-10-14", name: "Kitchen & Chef", theme: "breakfast", layout: ["....#", "#.#.#", "#....", "#.#.#"], anchors: { "2,2": "near" }, swaps: 4, seed: 205723366, draw: 2, hints: { "2,3": "det", "1,1": "det" }, stars: [38, 46, 54], objectives: [{ kind: "themeWords", count: 5, points: 8 }] }, { id: "daily-2027-10-15", name: "The Midnight", theme: "night-sky", layout: ["....", "#.##", "#.##", "#.##", "...."], anchors: { "4,0": "the", "0,0": "we" }, swaps: 4, seed: 1180132468, draw: 2, hints: { "4,3": "adv", "4,1": "noun" }, stars: [21, 25, 29], objectives: [{ kind: "longWord", letters: 7, points: 5 }] }, { id: "daily-2027-10-16", name: "The Carrot", theme: "garden", layout: ["####.", "####.", ".....", "####.", "....."], anchors: { "0,4": "some" }, swaps: 4, seed: 486298006, draw: 2, hints: { "4,4": "pron", "2,4": "noun" }, stars: [29, 37, 44], objectives: [{ kind: "rareCrossing", value: 6, points: 6 }] }, { id: "daily-2027-10-17", name: "Pirate & Breeze", theme: "seaside", layout: ["##.#", ".#.#", "....", ".#.#", ".###"], anchors: { "2,2": "on" }, swaps: 4, seed: 699895893, draw: 2, hints: { "2,0": "adj", "1,0": "det" }, stars: [22, 26, 30], objectives: [{ kind: "themeWords", count: 4, points: 5 }] }, { id: "daily-2027-10-18", name: "Letter & Librarian", theme: "library", layout: ["....#", "##.##", "#....", "##.##", "#...."], anchors: { "0,0": "we", "4,1": "my" }, swaps: 4, seed: 1851141504, draw: 2, hints: { "4,2": "noun", "2,1": "pron" }, stars: [29, 35, 41], objectives: [{ kind: "themeWords", count: 6, points: 6 }] }, { id: "daily-2027-10-19", name: "Sugary Butter", theme: "breakfast", layout: [".####", ".##.#", ".....", ".##.#", "....#"], anchors: { "1,0": "over" }, swaps: 4, seed: 1366800761, draw: 2, hints: { "2,4": "pron", "2,2": "pron", "2,3": "verb" }, stars: [35, 42, 49], objectives: [{ kind: "swapsLeft", count: 2, points: 7 }] }] };
 
 // src/data/dailies.ts
 var START = dailies_generated_default.start;
@@ -2524,29 +2530,31 @@ var levels_generated_default = {
     },
     {
       id: "level-12",
-      name: "Banana & Egg",
+      name: "Grandma & Plate",
       theme: "breakfast",
       layout: [
+        "#.##",
         "....",
-        ".###",
-        ".###",
-        ".###"
+        "#.##",
+        "...."
       ],
       anchors: {
-        "0,0": "a"
+        "1,1": "through"
       },
       swaps: 5,
-      seed: 1504843650,
+      seed: 1339501900,
       draw: 2,
       hints: {
-        "0,1": "noun",
-        "1,0": "adj",
-        "0,3": "pron"
+        "3,2": "prep",
+        "3,1": "noun",
+        "2,1": "det",
+        "3,0": "adj",
+        "3,3": "pron"
       },
       stars: [
-        17,
-        20,
-        23
+        26,
+        31,
+        36
       ]
     },
     {
@@ -2653,14 +2661,14 @@ var levels_generated_default = {
       seed: 244177659,
       draw: 2,
       hints: {
-        "3,2": "verb",
-        "0,2": "noun",
-        "2,2": "pron"
+        "3,2": "adv",
+        "0,2": "verb",
+        "2,2": "noun"
       },
       stars: [
-        19,
-        23,
-        27
+        18,
+        22,
+        26
       ]
     },
     {
@@ -2741,9 +2749,9 @@ var levels_generated_default = {
         "0,1": "prep"
       },
       stars: [
-        13,
-        16,
-        19
+        10,
+        12,
+        14
       ]
     },
     {
@@ -3167,37 +3175,38 @@ var levels_generated_default = {
     },
     {
       id: "level-32",
-      name: "Tree & Blossom",
+      name: "Leafy Soil",
       theme: "garden",
       layout: [
-        "###.",
-        ".##.",
-        ".##.",
-        ".##.",
-        "...."
+        "....#",
+        "#.###",
+        "....#",
+        "#.###",
+        "#...."
       ],
       anchors: {
-        "3,0": "of"
+        "0,2": "through"
       },
       swaps: 4,
-      seed: 232901834,
+      seed: 445848466,
       draw: 2,
       hints: {
-        "0,3": "adj",
-        "4,3": "pron",
-        "3,3": "prep",
-        "4,0": "pron"
+        "4,1": "noun",
+        "3,1": "adj",
+        "4,3": "det",
+        "0,1": "noun",
+        "0,3": "pron"
       },
       stars: [
-        27,
-        32,
-        37
+        39,
+        47,
+        55
       ],
       objectives: [
         {
-          kind: "greatLines",
-          count: 1,
-          points: 5
+          kind: "swapsLeft",
+          count: 2,
+          points: 8
         }
       ]
     },
@@ -3237,27 +3246,28 @@ var levels_generated_default = {
     },
     {
       id: "level-34",
-      name: "Colorful Rose",
+      name: "Blooming Weed",
       theme: "garden",
       layout: [
-        "....",
-        ".#.#",
-        ".#.#",
-        "....",
-        ".#.#"
+        ".###.",
+        ".#.#.",
+        ".#.#.",
+        ".....",
+        ".#.##"
       ],
       anchors: {
-        "1,0": "and",
-        "3,3": "soil"
+        "2,4": "on",
+        "2,2": "through"
       },
       swaps: 4,
-      seed: 962304717,
+      seed: 2009171861,
       draw: 2,
       hints: {
-        "0,2": "det",
-        "0,1": "verb",
-        "4,0": "verb",
-        "2,2": "verb"
+        "3,0": "noun",
+        "4,2": "noun",
+        "1,2": "adv",
+        "3,4": "pron",
+        "0,4": "det"
       },
       stars: [
         36,
@@ -3266,8 +3276,8 @@ var levels_generated_default = {
       ],
       objectives: [
         {
-          kind: "swapsLeft",
-          count: 2,
+          kind: "greatLines",
+          count: 1,
           points: 7
         }
       ]
@@ -3475,9 +3485,9 @@ var levels_generated_default = {
         "1,1": "verb"
       },
       stars: [
+        22,
         26,
-        31,
-        36
+        30
       ],
       objectives: [
         {
@@ -3489,35 +3499,36 @@ var levels_generated_default = {
     },
     {
       id: "level-41",
-      name: "Shiny Captain",
+      name: "Breezy Sand",
       theme: "seaside",
       layout: [
+        "##.##",
+        "....#",
         ".#.##",
         ".....",
-        ".#.#.",
-        ".#.#.",
-        "####."
+        ".#.##"
       ],
       anchors: {
-        "0,0": "this"
+        "1,1": "over",
+        "2,0": "over"
       },
       swaps: 4,
-      seed: 1434735754,
+      seed: 1529694535,
       draw: 2,
       hints: {
-        "3,2": "noun",
-        "2,4": "prep",
-        "0,2": "verb"
+        "3,1": "adj",
+        "1,2": "det",
+        "3,2": "adj"
       },
       stars: [
-        40,
-        48,
-        56
+        42,
+        50,
+        58
       ],
       objectives: [
         {
-          kind: "swapsLeft",
-          count: 2,
+          kind: "rareCrossing",
+          value: 6,
           points: 8
         }
       ]
@@ -3576,15 +3587,15 @@ var levels_generated_default = {
       seed: 1002042719,
       draw: 2,
       hints: {
-        "2,0": "pron",
-        "3,0": "prep",
-        "2,1": "verb",
-        "1,0": "noun"
+        "2,0": "prep",
+        "3,0": "det",
+        "2,1": "pron",
+        "1,0": "verb"
       },
       stars: [
-        39,
-        47,
-        55
+        40,
+        48,
+        56
       ],
       objectives: [
         {
@@ -3668,24 +3679,24 @@ var levels_generated_default = {
     },
     {
       id: "level-46",
-      name: "Foamy Ocean",
+      name: "Breezy Harbor",
       theme: "seaside",
       layout: [
-        ".....",
         "#.#.#",
+        "....#",
         "#.#.#",
-        "....."
+        "#...."
       ],
       anchors: {
-        "0,2": "and"
+        "2,1": "of"
       },
       swaps: 4,
-      seed: 1444974756,
+      seed: 783178754,
       draw: 2,
       hints: {
-        "3,3": "noun",
-        "2,1": "det",
-        "0,4": "verb"
+        "3,4": "verb",
+        "0,1": "noun",
+        "3,1": "noun"
       },
       stars: [
         43,
@@ -3694,8 +3705,8 @@ var levels_generated_default = {
       ],
       objectives: [
         {
-          kind: "swapsLeft",
-          count: 2,
+          kind: "themeWords",
+          count: 5,
           points: 9
         }
       ]
@@ -3759,15 +3770,15 @@ var levels_generated_default = {
         "0,1": "verb"
       },
       stars: [
-        37,
-        44,
-        51
+        38,
+        46,
+        54
       ],
       objectives: [
         {
           kind: "themeWords",
           count: 5,
-          points: 7
+          points: 8
         }
       ]
     },
@@ -3795,14 +3806,14 @@ var levels_generated_default = {
         "1,3": "prep"
       },
       stars: [
-        46,
-        55,
-        64
+        45,
+        54,
+        63
       ],
       objectives: [
         {
-          kind: "swapsLeft",
-          count: 2,
+          kind: "rareCrossing",
+          value: 6,
           points: 9
         }
       ]
@@ -3866,15 +3877,15 @@ var levels_generated_default = {
         "0,2": "noun"
       },
       stars: [
-        37,
-        44,
-        51
+        43,
+        52,
+        61
       ],
       objectives: [
         {
           kind: "swapsLeft",
           count: 2,
-          points: 7
+          points: 9
         }
       ]
     },
@@ -3938,15 +3949,15 @@ var levels_generated_default = {
         "0,0": "det"
       },
       stars: [
-        40,
-        49,
-        58
+        45,
+        54,
+        63
       ],
       objectives: [
         {
           kind: "rareCrossing",
           value: 6,
-          points: 8
+          points: 9
         }
       ]
     },
@@ -4003,8 +4014,8 @@ var levels_generated_default = {
       seed: 1277946081,
       draw: 2,
       hints: {
-        "1,1": "pron",
-        "4,2": "pron",
+        "1,1": "verb",
+        "4,2": "noun",
         "1,4": "noun"
       },
       stars: [
@@ -4091,71 +4102,70 @@ var levels_generated_default = {
     },
     {
       id: "level-58",
-      name: "Bookish Spine",
+      name: "Forgotten Lamp",
       theme: "library",
       layout: [
-        "##.##",
-        ".....",
-        "##.#.",
+        "#.##.",
         "#....",
-        "####."
+        "#.##.",
+        "#.##.",
+        "....#"
       ],
       anchors: {
-        "3,1": "a"
+        "2,1": "and"
       },
       swaps: 4,
-      seed: 1088720337,
+      seed: 1411304095,
       draw: 2,
       hints: {
-        "3,3": "verb",
-        "3,2": "noun",
-        "2,2": "det"
+        "1,4": "noun",
+        "4,1": "verb",
+        "4,2": "det"
       },
       stars: [
-        30,
-        36,
-        42
+        29,
+        35,
+        41
       ],
       objectives: [
         {
-          kind: "swapsLeft",
-          count: 2,
+          kind: "longWord",
+          letters: 7,
           points: 6
         }
       ]
     },
     {
       id: "level-59",
-      name: "Curious Author",
+      name: "Dusty Riddle",
       theme: "library",
       layout: [
-        ".####",
-        ".#.#.",
-        ".#.#.",
+        "###.#",
+        "....#",
+        ".##.#",
         ".....",
-        "##.#."
+        ".####"
       ],
       anchors: {
-        "4,2": "page",
-        "1,4": "every"
+        "3,2": "of"
       },
       swaps: 4,
-      seed: 1453426216,
+      seed: 1210290737,
       draw: 2,
       hints: {
-        "3,0": "pron",
-        "3,2": "det",
-        "3,4": "noun"
+        "3,4": "verb",
+        "0,3": "pron",
+        "3,3": "noun"
       },
       stars: [
-        39,
-        47,
-        55
+        38,
+        46,
+        54
       ],
       objectives: [
         {
-          kind: "swapsLeft",
-          count: 2,
+          kind: "themeWords",
+          count: 6,
           points: 8
         }
       ]
@@ -4232,36 +4242,35 @@ var levels_generated_default = {
     },
     {
       id: "level-62",
-      name: "Fluffy Croissant",
+      name: "Hot Butter",
       theme: "breakfast",
       layout: [
-        "####.",
-        ".....",
-        "#.##.",
-        "#....",
-        "#.###"
+        "....",
+        ".##.",
+        ".##.",
+        "....",
+        "###."
       ],
       anchors: {
-        "1,2": "of",
-        "2,1": "through"
+        "0,2": "of"
       },
       swaps: 4,
-      seed: 487800945,
+      seed: 73746224,
       draw: 2,
       hints: {
-        "3,2": "noun",
-        "3,4": "pron",
-        "3,3": "verb"
+        "3,0": "adv",
+        "2,0": "verb",
+        "0,1": "noun"
       },
       stars: [
-        39,
-        47,
-        55
+        40,
+        48,
+        56
       ],
       objectives: [
         {
-          kind: "greatLines",
-          count: 1,
+          kind: "swapsLeft",
+          count: 2,
           points: 8
         }
       ]
@@ -4430,9 +4439,9 @@ var levels_generated_default = {
         "0,0": "det"
       },
       stars: [
-        40,
-        48,
-        56
+        41,
+        49,
+        57
       ],
       objectives: [
         {
@@ -4444,109 +4453,105 @@ var levels_generated_default = {
     },
     {
       id: "level-68",
-      name: "Sleepy Plate",
+      name: "Creamy Berry",
       theme: "breakfast",
       layout: [
-        "....",
-        ".#.#",
-        "....",
-        ".#.#",
-        ".#.#"
+        ".....",
+        ".###.",
+        ".###.",
+        ".###.",
+        "#...."
       ],
       anchors: {
-        "2,2": "with",
-        "0,1": "of"
+        "2,4": "over"
       },
       swaps: 4,
-      seed: 950880723,
+      seed: 519842982,
       draw: 2,
       hints: {
-        "4,2": "noun",
-        "3,0": "adj",
-        "0,0": "noun"
+        "0,0": "det",
+        "4,3": "det",
+        "0,1": "verb",
+        "0,4": "pron"
       },
       stars: [
-        37,
-        44,
-        51
+        40,
+        48,
+        56
       ],
       objectives: [
         {
-          kind: "greatLines",
-          count: 1,
-          points: 7
+          kind: "themeWords",
+          count: 6,
+          points: 8
         }
       ]
     },
     {
       id: "level-69",
-      name: "The Cereal",
+      name: "Sleepy Morning",
       theme: "breakfast",
       layout: [
-        "#....",
-        ".#.##",
-        ".#.##",
-        "....#",
-        ".####"
+        ".#.#.",
+        ".#.#.",
+        ".....",
+        ".#.#."
       ],
       anchors: {
-        "3,1": "of",
-        "2,2": "near"
+        "1,0": "on"
       },
       swaps: 4,
-      seed: 486150744,
+      seed: 1629245016,
       draw: 2,
       hints: {
-        "3,2": "pron",
-        "1,0": "det",
-        "3,0": "noun"
+        "2,2": "det",
+        "0,4": "det",
+        "3,2": "noun"
       },
       stars: [
-        32,
-        40,
-        48
+        41,
+        49,
+        57
       ],
       objectives: [
         {
-          kind: "themeWords",
-          count: 4,
-          points: 6
+          kind: "rareCrossing",
+          value: 6,
+          points: 8
         }
       ]
     },
     {
       id: "level-70",
-      name: "The Fork",
+      name: "The Juice",
       theme: "breakfast",
       layout: [
-        "#.###",
-        "#.#.#",
-        "....#",
-        "#.#.#",
-        "....."
+        "#.#.",
+        "....",
+        "#.#.",
+        "...."
       ],
       anchors: {
-        "1,3": "this",
-        "2,1": "of"
+        "1,1": "under"
       },
       swaps: 4,
-      seed: 1815229159,
+      seed: 830603742,
       draw: 2,
       hints: {
-        "4,3": "pron",
-        "3,1": "det",
-        "4,4": "verb"
+        "3,1": "noun",
+        "2,3": "pron",
+        "3,3": "adv"
       },
       stars: [
-        45,
-        54,
-        63
+        39,
+        47,
+        55
       ],
       objectives: [
         {
-          kind: "themeWords",
-          count: 5,
-          points: 9
+          kind: "swapsLeft",
+          count: 2,
+          points: 8
         }
       ]
     },
@@ -4643,14 +4648,14 @@ var levels_generated_default = {
         "5,1": "det"
       },
       stars: [
-        43,
-        52,
-        61
+        47,
+        56,
+        65
       ],
       objectives: [
         {
-          kind: "themeWords",
-          count: 5,
+          kind: "swapsLeft",
+          count: 2,
           points: 9
         }
       ]
@@ -4827,7 +4832,7 @@ var levels_generated_default = {
       objectives: [
         {
           kind: "themeWords",
-          count: 9,
+          count: 7,
           points: 11
         }
       ]
@@ -4869,36 +4874,36 @@ var levels_generated_default = {
     },
     {
       id: "level-80",
-      name: "Starry Crater",
+      name: "Cosmic Night",
       theme: "night-sky",
       layout: [
-        "#....",
-        "###.#",
+        "....#",
+        "#.###",
         "#....",
         "#.#.#",
-        "....#",
-        "#.###"
+        "###.#",
+        "....."
       ],
       anchors: {
-        "2,3": "with",
-        "0,1": "a"
+        "5,2": "on",
+        "4,3": "over"
       },
       swaps: 4,
-      seed: 1014174548,
+      seed: 9032787,
       draw: 2,
       hints: {
-        "1,3": "verb",
-        "4,1": "verb"
+        "2,1": "noun",
+        "2,4": "noun"
       },
       stars: [
-        49,
-        59,
-        69
+        50,
+        60,
+        70
       ],
       objectives: [
         {
-          kind: "greatLines",
-          count: 1,
+          kind: "swapsLeft",
+          count: 2,
           points: 10
         }
       ]
@@ -5013,38 +5018,37 @@ var levels_generated_default = {
     },
     {
       id: "level-84",
-      name: "Fence & Soil",
+      name: "Thorny Gate",
       theme: "garden",
       layout: [
-        "....",
-        ".###",
-        "....",
-        ".##.",
-        "###.",
-        "...."
+        "....#",
+        "##.##",
+        "##.#.",
+        ".....",
+        "####.",
+        "....."
       ],
       anchors: {
-        "0,3": "flower",
-        "3,3": "with",
-        "3,0": "soil"
+        "2,4": "every"
       },
       swaps: 4,
-      seed: 465246108,
+      seed: 82643505,
       draw: 2,
       hints: {
-        "5,1": "prep",
-        "2,3": "noun"
+        "0,0": "verb",
+        "0,2": "det",
+        "5,4": "pron"
       },
       stars: [
-        52,
-        62,
-        72
+        55,
+        66,
+        77
       ],
       objectives: [
         {
           kind: "longWord",
           letters: 7,
-          points: 10
+          points: 11
         }
       ]
     },
@@ -5067,9 +5071,9 @@ var levels_generated_default = {
       seed: 1406267831,
       draw: 2,
       hints: {
-        "2,0": "verb",
+        "2,0": "noun",
         "1,4": "adv",
-        "1,0": "noun"
+        "1,0": "adj"
       },
       stars: [
         54,
@@ -5079,43 +5083,42 @@ var levels_generated_default = {
       objectives: [
         {
           kind: "themeWords",
-          count: 7,
+          count: 6,
           points: 11
         }
       ]
     },
     {
       id: "level-86",
-      name: "Colorful Pond",
+      name: "Pond & Butterfly",
       theme: "garden",
       layout: [
-        "###.#",
-        "#....",
-        "#.#.#",
         "....#",
-        "#.###",
-        "#...."
+        ".#.#.",
+        ".#.#.",
+        ".....",
+        "####."
       ],
       anchors: {
-        "5,2": "through",
-        "3,1": "of"
+        "1,0": "with",
+        "0,1": "near"
       },
       swaps: 4,
-      seed: 589626048,
+      seed: 250769436,
       draw: 2,
       hints: {
-        "3,2": "pron",
-        "3,3": "verb"
+        "2,4": "prep",
+        "3,4": "pron"
       },
       stars: [
-        55,
-        66,
-        77
+        56,
+        67,
+        78
       ],
       objectives: [
         {
-          kind: "longWord",
-          letters: 7,
+          kind: "themeWords",
+          count: 6,
           points: 11
         }
       ]
@@ -5157,37 +5160,36 @@ var levels_generated_default = {
     },
     {
       id: "level-88",
-      name: "Leafy Petal",
+      name: "Butterfly & Daisy",
       theme: "garden",
       layout: [
         "....#",
-        "##.##",
-        "....#",
-        ".#.##",
-        ".####",
-        "....."
+        "#.##.",
+        "#....",
+        "#.##.",
+        "####.",
+        "#...."
       ],
       anchors: {
-        "3,0": "under",
-        "5,1": "over"
+        "0,2": "of"
       },
       swaps: 4,
-      seed: 1671615013,
+      seed: 326535857,
       draw: 2,
       hints: {
-        "5,0": "noun",
-        "0,1": "det"
+        "2,1": "det",
+        "2,4": "verb"
       },
       stars: [
-        64,
-        77,
-        90
+        51,
+        61,
+        71
       ],
       objectives: [
         {
-          kind: "greatLines",
-          count: 1,
-          points: 13
+          kind: "themeWords",
+          count: 7,
+          points: 10
         }
       ]
     },
@@ -5214,9 +5216,9 @@ var levels_generated_default = {
         "1,2": "noun"
       },
       stars: [
-        54,
-        65,
-        76
+        55,
+        66,
+        77
       ],
       objectives: [
         {
@@ -5285,15 +5287,15 @@ var levels_generated_default = {
         "3,4": "noun"
       },
       stars: [
-        53,
-        64,
-        75
+        52,
+        62,
+        72
       ],
       objectives: [
         {
           kind: "rareCrossing",
           value: 6,
-          points: 11
+          points: 10
         }
       ]
     },
@@ -5371,36 +5373,36 @@ var levels_generated_default = {
     },
     {
       id: "level-94",
-      name: "Breezy Starfish",
+      name: "The Jellyfish",
       theme: "seaside",
       layout: [
-        ".....",
-        "##.##",
-        "##.#.",
-        "#....",
-        "####.",
-        "#...."
+        "###.#",
+        "....#",
+        "#.#.#",
+        "....#",
+        "#.###",
+        "....."
       ],
       anchors: {
-        "1,2": "of"
+        "1,0": "i"
       },
       swaps: 4,
-      seed: 579106814,
+      seed: 6865466,
       draw: 2,
       hints: {
-        "0,1": "adj",
-        "0,3": "adv"
+        "2,3": "prep",
+        "1,1": "adv"
       },
       stars: [
-        42,
         50,
-        58
+        60,
+        70
       ],
       objectives: [
         {
-          kind: "longWord",
-          letters: 7,
-          points: 8
+          kind: "greatLines",
+          count: 1,
+          points: 10
         }
       ]
     },
@@ -5427,15 +5429,15 @@ var levels_generated_default = {
         "0,0": "noun"
       },
       stars: [
-        48,
         58,
-        68
+        70,
+        82
       ],
       objectives: [
         {
-          kind: "themeWords",
-          count: 6,
-          points: 10
+          kind: "greatLines",
+          count: 1,
+          points: 12
         }
       ]
     },
@@ -5533,15 +5535,15 @@ var levels_generated_default = {
         "2,0": "adj"
       },
       stars: [
-        51,
-        61,
-        71
+        58,
+        70,
+        82
       ],
       objectives: [
         {
           kind: "swapsLeft",
           count: 2,
-          points: 10
+          points: 12
         }
       ]
     },
@@ -5654,41 +5656,37 @@ var levels_generated_default = {
     },
     {
       id: "level-102",
-      name: "Hushed Riddle",
+      name: "Hushed Candle",
       theme: "library",
       layout: [
-        "....#.",
-        "###.#.",
-        "#.....",
-        "#.#.#.",
-        "#.####",
-        "#....#"
+        "....##",
+        ".##.#.",
+        ".#....",
+        ".##.#.",
+        "#####.",
+        "#....."
       ],
       anchors: {
-        "2,1": "our"
+        "5,3": "under",
+        "1,0": "over"
       },
       swaps: 4,
-      seed: 142537104,
+      seed: 1891398653,
       draw: 2,
       hints: {
-        "0,3": "noun",
-        "5,1": "adj"
+        "5,1": "pron",
+        "5,5": "noun"
       },
       stars: [
+        50,
         60,
-        72,
-        84
+        70
       ],
       objectives: [
         {
-          kind: "longWord",
-          letters: 8,
-          points: 12
-        },
-        {
-          kind: "rareCrossing",
-          value: 7,
-          points: 12
+          kind: "greatLines",
+          count: 1,
+          points: 10
         }
       ]
     },
@@ -5786,19 +5784,19 @@ var levels_generated_default = {
       seed: 1857955774,
       draw: 2,
       hints: {
-        "0,3": "adv",
+        "0,3": "det",
         "5,3": "det"
       },
       stars: [
-        57,
-        68,
-        79
+        58,
+        70,
+        82
       ],
       objectives: [
         {
           kind: "themeWords",
           count: 7,
-          points: 11
+          points: 12
         }
       ]
     },
@@ -5845,77 +5843,77 @@ var levels_generated_default = {
     },
     {
       id: "level-107",
-      name: "Dusty Owl",
+      name: "Magical Novel",
       theme: "library",
       layout: [
-        "###.##",
-        "##....",
-        "#.#.#.",
+        ".....#",
+        ".####.",
         "....#.",
-        "#.###.",
-        "#....."
+        ".#.##.",
+        ".#.##.",
+        "##...."
       ],
       anchors: {
-        "4,1": "of",
-        "3,3": "story"
+        "0,2": "with"
       },
       swaps: 4,
-      seed: 286094139,
+      seed: 348049465,
       draw: 2,
       hints: {
-        "2,5": "verb",
-        "0,3": "pron"
+        "5,5": "noun",
+        "5,2": "noun"
       },
       stars: [
-        50,
-        60,
-        70
+        70,
+        84,
+        98
       ],
       objectives: [
         {
-          kind: "swapsLeft",
-          count: 2,
-          points: 10
-        },
-        {
           kind: "greatLines",
           count: 1,
-          points: 10
+          points: 14
         }
       ]
     },
     {
       id: "level-108",
-      name: "Ink & Atlas",
+      name: "Clever Poem",
       theme: "library",
       layout: [
-        "##....",
-        ".##.#.",
-        "....#.",
-        ".##.#.",
-        ".#####",
+        ".....#",
+        "###.#.",
+        "#.....",
+        "#.#.#.",
+        "#.###.",
         "....##"
       ],
       anchors: {
-        "2,1": "of"
+        "2,1": "the",
+        "5,2": "under"
       },
       swaps: 4,
-      seed: 1187126609,
+      seed: 181305154,
       draw: 2,
       hints: {
-        "2,2": "det",
-        "5,1": "verb"
+        "2,3": "verb",
+        "0,4": "noun"
       },
       stars: [
-        58,
-        70,
-        82
+        64,
+        77,
+        90
       ],
       objectives: [
         {
-          kind: "greatLines",
-          count: 1,
-          points: 12
+          kind: "longWord",
+          letters: 8,
+          points: 13
+        },
+        {
+          kind: "themeWords",
+          count: 8,
+          points: 13
         }
       ]
     },
@@ -5973,13 +5971,13 @@ var levels_generated_default = {
       seed: 148941981,
       draw: 2,
       hints: {
-        "0,5": "pron",
-        "3,3": "verb"
+        "0,5": "noun",
+        "3,3": "noun"
       },
       stars: [
-        58,
-        70,
-        82
+        61,
+        73,
+        85
       ],
       objectives: [
         {
@@ -5996,157 +5994,156 @@ var levels_generated_default = {
     },
     {
       id: "level-111",
-      name: "Sticky Waffle",
+      name: "Spoon & Cup",
       theme: "breakfast",
       layout: [
-        "....##",
-        ".#.###",
-        ".....#",
-        ".#.#.#",
-        "####.#",
-        "#....."
+        "##....",
+        "##.##.",
+        "....#.",
+        ".#.##.",
+        ".#####",
+        "....##"
       ],
       anchors: {
-        "2,2": "of"
+        "0,5": "apple"
       },
       swaps: 4,
-      seed: 1529715397,
+      seed: 534133047,
       draw: 2,
       hints: {
-        "0,2": "det",
-        "0,0": "noun"
+        "3,0": "verb",
+        "5,0": "noun"
       },
       stars: [
-        69,
-        83,
-        97
+        64,
+        77,
+        90
       ],
       objectives: [
         {
-          kind: "longWord",
-          letters: 8,
-          points: 14
+          kind: "swapsLeft",
+          count: 2,
+          points: 13
+        },
+        {
+          kind: "rareCrossing",
+          value: 7,
+          points: 13
         }
       ]
     },
     {
       id: "level-112",
-      name: "The Milk",
+      name: "Burnt Napkin",
       theme: "breakfast",
       layout: [
-        "##....",
+        ".....#",
         ".####.",
-        ".##.#.",
-        ".#....",
-        ".##.##",
-        "....##"
+        ".#.##.",
+        "....#.",
+        "##.##.",
+        "#....."
       ],
       anchors: {
-        "5,1": "of",
-        "3,0": "of"
+        "5,1": "every"
       },
       swaps: 4,
-      seed: 1622445516,
+      seed: 139387962,
       draw: 2,
       hints: {
-        "5,2": "pron",
-        "0,5": "pron"
+        "3,0": "noun",
+        "5,2": "noun"
       },
       stars: [
-        63,
-        76,
-        89
+        78,
+        94,
+        110
       ],
       objectives: [
         {
-          kind: "longWord",
-          letters: 8,
-          points: 13
+          kind: "themeWords",
+          count: 11,
+          points: 16
         },
         {
-          kind: "themeWords",
-          count: 8,
-          points: 13
+          kind: "longWord",
+          letters: 8,
+          points: 16
         }
       ]
     },
     {
       id: "level-113",
-      name: "Kettle & Syrup",
+      name: "Toasted Apple",
       theme: "breakfast",
       layout: [
+        "#....#",
+        "##.##.",
         "....#.",
         ".#.##.",
         ".#....",
-        ".#.##.",
-        "#....#"
+        ".####."
       ],
       anchors: {
-        "0,5": "the",
-        "1,2": "over"
+        "2,1": "over"
       },
       swaps: 4,
-      seed: 78777351,
+      seed: 523987514,
       draw: 2,
       hints: {
-        "0,2": "noun",
-        "1,0": "noun"
+        "4,5": "noun",
+        "0,2": "det"
       },
       stars: [
-        69,
-        83,
-        97
+        59,
+        71,
+        83
       ],
       objectives: [
         {
-          kind: "rareCrossing",
-          value: 7,
-          points: 14
-        },
-        {
-          kind: "themeWords",
-          count: 6,
-          points: 14
+          kind: "longWord",
+          letters: 8,
+          points: 12
         }
       ]
     },
     {
       id: "level-114",
-      name: "The Butter",
+      name: "Sleepy Spoon",
       theme: "breakfast",
       layout: [
-        ".....#",
-        "#.###.",
-        "#.#.#.",
-        "....#.",
-        "###.#.",
-        "##...."
+        "##....",
+        "#####.",
+        ".##.#.",
+        ".#....",
+        ".##.#.",
+        "....##"
       ],
       anchors: {
-        "3,0": "a"
+        "2,0": "we"
       },
       swaps: 4,
-      seed: 447899185,
+      seed: 486340813,
       draw: 2,
       hints: {
-        "0,1": "noun",
-        "5,3": "noun"
+        "3,5": "noun",
+        "3,3": "verb"
       },
       stars: [
-        83,
-        100,
-        117
+        73,
+        88,
+        103
       ],
       objectives: [
         {
-          kind: "greatLines",
-          count: 1,
-          points: 17
+          kind: "themeWords",
+          count: 8,
+          points: 15
         },
         {
           kind: "rareCrossing",
           value: 7,
-          points: 17
+          points: 15
         }
       ]
     },
@@ -6192,41 +6189,36 @@ var levels_generated_default = {
     },
     {
       id: "level-116",
-      name: "The Toaster",
+      name: "Sugary Banana",
       theme: "breakfast",
       layout: [
-        "##.###",
-        "##....",
+        "....##",
         ".#.#.#",
-        ".....#",
+        ".#....",
+        ".#.#.#",
         ".###.#",
-        ".#...."
+        "#....."
       ],
       anchors: {
-        "5,4": "butter"
+        "5,3": "of"
       },
       swaps: 4,
-      seed: 97644097,
+      seed: 1285875112,
       draw: 2,
       hints: {
-        "3,4": "verb",
-        "1,2": "noun"
+        "2,4": "det",
+        "4,4": "adj"
       },
       stars: [
-        72,
-        86,
-        100
+        65,
+        78,
+        91
       ],
       objectives: [
         {
-          kind: "longWord",
-          letters: 8,
-          points: 14
-        },
-        {
-          kind: "swapsLeft",
-          count: 2,
-          points: 14
+          kind: "themeWords",
+          count: 10,
+          points: 13
         }
       ]
     },

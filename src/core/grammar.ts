@@ -64,7 +64,9 @@ const VERBS_NEVER_WITH_OBJECT = new Set([
 /** Verbs that can take an object, but whose objects among the game's words almost never make sense ("dance the beach"). Strict mode only. */
 const VERBS_RARELY_WITH_OBJECT = new Set(['dance', 'run', 'walk', 'fly', 'swim', 'sing']);
 /** Verbs that need an object ("some sun will have" is unfinished). Strict mode only. */
-const VERBS_NEED_OBJECT = new Set(['have', 'find', 'make', 'take', 'love', 'borrow']);
+const VERBS_NEED_OBJECT = new Set(['have', 'find', 'make', 'take', 'love', 'borrow', 'do']);
+/** Verbs an "of" can follow straight after ("dream of the sea"); strictly, no other verb takes one ("dances of the library"). */
+const VERBS_WITH_OF = new Set(['dream']);
 /** Words that can join two adjectives: "warm and sweet", "small but brave" (not "fluffy so golden"). */
 const ADJ_JOINERS = new Set(['and', 'or', 'but']);
 
@@ -109,7 +111,8 @@ export interface GrammarOptions {
    * slowly", "book with a secret"), nouns are singular as in the word lists ("the owl
    * sings", not "the owl sing"), no noun describes another (most pairs of
    * game nouns, like "tea butter", are nonsense), verbs like "dance" take
-   * no object and verbs like "have" need one, no word comes twice in a row ("my old old book") and no line
+   * no object and verbs like "have" need one, "of" follows almost no verb
+   * ("dances of the library"), no word comes twice in a row ("my old old book") and no line
    * starts with "of". Off for the judge, which reads lines more generously.
    */
   strict?: boolean;
@@ -126,19 +129,22 @@ class Parser {
     return this.w[i];
   }
 
-  /** An adjective, optionally "very" first: "very warm". */
-  private adj(i: number): Ends {
+  /** An adjective, optionally "very" first: "very warm". Before a noun (`attributive`), strictly not "too": "our too small nest". */
+  private adj(i: number, attributive = false): Ends {
     const word = this.at(i);
-    if (word && DEGREE.has(word)) return this.at(i + 1) && isAdj(this.at(i + 1)!) ? [i + 2] : [];
+    if (word && DEGREE.has(word)) {
+      if (this.strict && attributive && word === 'too') return [];
+      return this.at(i + 1) && isAdj(this.at(i + 1)!) ? [i + 2] : [];
+    }
     return word && isAdj(word) ? [i + 1] : [];
   }
 
   /** One adjective, or two joined by "and"/"or": "warm and sweet". */
-  private adjPhrase(i: number): Ends {
-    const ends = this.adj(i);
+  private adjPhrase(i: number, attributive = false): Ends {
+    const ends = this.adj(i, attributive);
     const more: Ends = [];
     for (const end of ends) {
-      if (this.at(end) && ADJ_JOINERS.has(this.at(end)!)) more.push(...this.adj(end + 1));
+      if (this.at(end) && ADJ_JOINERS.has(this.at(end)!)) more.push(...this.adj(end + 1, attributive));
     }
     return uniq([...ends, ...more]);
   }
@@ -149,7 +155,8 @@ class Parser {
     if (!word || !isAdv(word)) return [];
     if (DEGREE.has(word)) {
       const next = this.at(i + 1);
-      return next && isAdv(next) && !DEGREE.has(next) ? [i + 2] : [];
+      // "very slowly", but not "too never": only manner adverbs take a degree word.
+      return next && isAdv(next) && !DEGREE.has(next) && !BEFORE_ONLY.has(next) ? [i + 2] : [];
     }
     return [i + 1];
   }
@@ -170,7 +177,7 @@ class Parser {
       let positions = [at];
       const before = [at];
       for (let n = 0; n < 2; n++) {
-        positions = uniq(positions.flatMap((p) => this.adjPhrase(p)));
+        positions = uniq(positions.flatMap((p) => this.adjPhrase(p, true)));
         before.push(...positions);
       }
       // A noun can describe the noun after it: "the kitchen table", "a garden gnome".
@@ -212,22 +219,23 @@ class Parser {
   }
 
   /** A noun phrase after a verb or preposition: "the toast", "me", "tea and toast". */
-  private object(i: number, bare = !this.strict): Ends {
+  private object(i: number, bare = !this.strict, pronouns = true): Ends {
     const word = this.at(i);
     const one: Ends = this.nounGroup(i, bare).map((n) => n.end);
-    if (word && (OBJECT_PRONOUNS.has(word) || DEMONSTRATIVES[word])) one.push(i + 1);
+    if (pronouns && word && (OBJECT_PRONOUNS.has(word) || DEMONSTRATIVES[word])) one.push(i + 1);
     const joined: Ends = [];
     for (const end of one) {
       const conj = this.at(end);
-      if (conj === 'and' || conj === 'or') joined.push(...this.object(end + 1, bare));
+      if (conj === 'and' || conj === 'or') joined.push(...this.object(end + 1, bare, pronouns));
     }
     return uniq([...one, ...joined]);
   }
 
-  /** "under the quiet moon", "with me", "of tea" (a bare noun is fine after "of", even when strict). */
+  /** "under the quiet moon", "with me", "of tea" (strictly, a bare noun is fine after "of", but a pronoun isn't: "the sand of them"). */
   private pp(i: number): Ends {
     const word = this.at(i);
-    return word && isPrep(word) ? this.object(i + 1, word === 'of' || !this.strict) : [];
+    if (!word || !isPrep(word)) return [];
+    return this.object(i + 1, word === 'of' || !this.strict, !(this.strict && word === 'of'));
   }
 
   /** What follows "is"/"was"/"be": an adjective, a noun phrase or a place. */
@@ -251,8 +259,11 @@ class Parser {
     let ends: Ends = this.strict && VERBS_NEED_OBJECT.has(base) ? [] : [i];
     if (!VERBS_NEVER_WITH_OBJECT.has(base) && !(this.strict && VERBS_RARELY_WITH_OBJECT.has(base))) ends = uniq([...ends, ...this.object(i)]);
     // Up to two places or adverbs after it.
+    // Strictly, an "of" only follows the few verbs that take one, straight after them.
+    const pp = (e: number) =>
+      this.strict && this.at(e) === 'of' && !(e === i && VERBS_WITH_OF.has(base)) ? [] : this.pp(e);
     for (let n = 0; n < 2; n++) {
-      ends = uniq([...ends, ...ends.flatMap((e) => [...this.pp(e), ...this.advAfter(e)])]);
+      ends = uniq([...ends, ...ends.flatMap((e) => [...pp(e), ...this.advAfter(e)])]);
     }
     // "want to dance", "wait to see the moon"
     const infinitives = uniq([i, ...ends]).flatMap((e) => (this.at(e) === 'to' ? this.baseVerbPhrase(e + 1) : []));

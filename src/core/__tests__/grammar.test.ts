@@ -48,6 +48,7 @@ describe('the strict check the level bot plays by', () => {
       'under the quiet moon', 'a cup of sweet tea', 'this shell or that boat', 'she sings too', 'you and i dance',
       'moon drifts very slowly', 'book with a secret', 'librarian whispers a secret', 'she finds the old map',
       'they want to find the map', 'the tea and the toast', 'a small but brave owl',
+      'the sunset dreams of every tide', 'a cup of sweet tea', 'the tea is too hot', 'she sings too',
     ].forEach(strictOk);
   });
 
@@ -57,6 +58,8 @@ describe('the strict check the level bot plays by', () => {
       'the owl sing softly', 'i dance tea butter', 'the old kitchen table', 'he does dance her beach',
       'cereal for chef flies you', 'everyone loves warm pancake', 'softly moon glows', 'i sing and moon glows',
       'my old old secret', 'of the silver comet', 'some nest and it', 'some sun will have', 'she finds',
+      'everyone dances of the library', 'the shore laughs of the pirate', 'it sparkles of the coral', 'sleep of your sad paper',
+      'my wet sand of them', 'our too small nest', 'its towel can do too', 'the cover eats too never',
     ].forEach((line) => {
       strictBad(line);
     });
