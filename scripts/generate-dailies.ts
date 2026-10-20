@@ -18,10 +18,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 import { DAILY_BAND } from '../src/core/config';
 import { generateLevel } from '../src/core/levelGen';
+import { encodeProof } from '../src/core/proof';
 import type { LevelDef } from '../src/core/types';
 import { addDays, DAILY_ID_PREFIX } from '../src/data/dailies';
 import { LEVELS } from '../src/data/levels';
 import { THEME_ORDER } from '../src/data/themes';
+import { saveProofs } from './proofsFile';
 
 const START = '2026-10-19';
 const DAYS = 366;
@@ -34,6 +36,7 @@ const existing = new Map<string, LevelDef>(
 );
 
 const levels: LevelDef[] = [];
+const proofs: Record<string, string> = {};
 const names = new Set<string>();
 const seeds = new Set(LEVELS.map((l) => l.seed));
 const started = performance.now();
@@ -49,7 +52,7 @@ for (let i = 0; i < DAYS; i++) {
     continue;
   }
   const theme = THEME_ORDER[i % THEME_ORDER.length];
-  const { level } = generateLevel({
+  const { level, proof } = generateLevel({
     number: 1000 + i,
     id: `${DAILY_ID_PREFIX}${day}`,
     theme,
@@ -61,8 +64,10 @@ for (let i = 0; i < DAYS; i++) {
   names.add(level.name);
   seeds.add(level.seed);
   levels.push(level);
+  proofs[level.id] = encodeProof(proof);
   if (i % 30 === 0) console.log(`${day} ${theme.padEnd(9)} stars ${level.stars!.join('/')}  ${level.name}`);
 }
 
 writeFileSync(OUT, JSON.stringify({ generatedBy: 'scripts/generate-dailies.ts', start: START, levels }) + '\n');
+saveProofs(proofs);
 console.log(`\nWrote ${levels.length} daily puzzles from ${START} in ${Math.round((performance.now() - started) / 1000)}s.`);

@@ -3,6 +3,7 @@ import { cellKey, extractEntries, openCells, parseCellKey } from './grid';
 import { playLevel, type BotRun } from './levelBot';
 import { crossingCells, evaluateObjectives } from './objectives';
 import { Rng, templateTags } from './phraseGen';
+import type { RunAction } from './run';
 import { objectiveBonus } from './scoring';
 import type { CellKey, Direction, Entry, LevelDef, Objective, Pos } from './types';
 import { poolWords, wordInfo } from './words';
@@ -283,6 +284,8 @@ export function levelName(rng: Rng, theme: string, taken: ReadonlySet<string>): 
 
 export interface GeneratedLevel {
   level: LevelDef;
+  /** The bot's moves on the level's own deal: shows it can be cleared (see src/core/proof.ts). */
+  proof: RunAction[];
   /** How the bots did, for the generator's report. */
   stats: { attempts: number; carefulSolved: number; careful: number; greedy: number };
 }
@@ -378,6 +381,7 @@ export function generateLevel(options: {
   if (Object.keys(level.hints ?? {}).length === 0) delete level.hints;
   return {
     level,
+    proof: first.moves,
     stats: {
       attempts: attempt,
       carefulSolved: solved.length,

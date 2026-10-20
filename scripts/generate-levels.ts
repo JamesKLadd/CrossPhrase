@@ -19,9 +19,11 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 import { bandFor, generateLevel } from '../src/core/levelGen';
+import { encodeProof } from '../src/core/proof';
 import type { LevelDef } from '../src/core/types';
 import { THEME_ORDER } from '../src/data/themes';
 import { TUTORIAL } from '../src/data/tutorial';
+import { saveProofs } from './proofsFile';
 
 const FIRST = TUTORIAL.length + 1;
 const LAST = 120;
@@ -36,8 +38,11 @@ const levels: LevelDef[] = [];
 const names = new Set(TUTORIAL.map((l) => l.name));
 const seeds = new Set(TUTORIAL.map((l) => l.seed));
 const started = performance.now();
-const save = () =>
+const proofs: Record<string, string> = {};
+const save = () => {
   writeFileSync(OUT, JSON.stringify({ generatedBy: 'scripts/generate-levels.ts', levels }, null, 1) + '\n');
+  saveProofs(proofs);
+};
 
 for (let n = FIRST; n <= LAST; n++) {
   if (n < FROM) {
@@ -49,7 +54,7 @@ for (let n = FIRST; n <= LAST; n++) {
     continue;
   }
   const theme = THEME_ORDER[Math.floor((n - FIRST) / 10) % THEME_ORDER.length];
-  const { level, stats } = generateLevel({
+  const { level, proof, stats } = generateLevel({
     number: n,
     id: `level-${n}`,
     theme,
@@ -60,6 +65,7 @@ for (let n = FIRST; n <= LAST; n++) {
   names.add(level.name);
   seeds.add(level.seed);
   levels.push(level);
+  proofs[level.id] = encodeProof(proof);
 
   const size = `${level.layout[0].length}×${level.layout.length}`;
   const objectives = (level.objectives ?? []).map((o) => o.kind).join(',') || '-';

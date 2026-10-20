@@ -5,6 +5,7 @@
 //
 // Training data, most trusted first:
 //   training/labels.jsonl     your labels: the labelling screen and "Wrong?" taps in play
+//   training/claude-labels.jsonl  labels Claude wrote with the judge's rubric (yours win where you disagree)
 //   training/pc-verdicts.json verdicts from the PC judge (Gemma), which the tiny model learns to copy
 //   a generated starter set   template phrases as "ok", word salad as "invalid"
 // A slice of your labels is held out to measure the model before it's
@@ -21,11 +22,12 @@ import { isWord } from '../src/core/words';
 
 const ROOT = new URL('../', import.meta.url);
 const LABELS = new URL('training/labels.jsonl', ROOT);
+const CLAUDE_LABELS = new URL('training/claude-labels.jsonl', ROOT);
 const PC_VERDICTS = new URL('training/pc-verdicts.json', ROOT);
 const EVAL = new URL('scripts/judge-eval/phrases.json', ROOT);
 const OUT = new URL('src/data/judgeModel.json', ROOT);
 
-const WEIGHT = { human: 1, pc: 0.6, starter: 0.3 };
+const WEIGHT = { human: 1, claude: 0.8, pc: 0.6, starter: 0.3 };
 const STARTER_COUNT = 3000;
 const TIERS: Tier[] = ['invalid', 'ok', 'great', 'poetic'];
 
@@ -41,10 +43,10 @@ const usable = (phrase: string) => {
   return words.length >= 2 && words.every(isWord) ? words : null;
 };
 
-function readLabels(): Map<string, Tier> {
+function readLabels(file: URL): Map<string, Tier> {
   const latest = new Map<string, Tier>();
-  if (!existsSync(LABELS)) return latest;
-  for (const line of readFileSync(LABELS, 'utf8').split('\n')) {
+  if (!existsSync(file)) return latest;
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
     if (!line.trim()) continue;
     try {
       const label = JSON.parse(line) as LabelLine;
@@ -80,11 +82,13 @@ function accuracy(model: TinyModel, items: [string, Tier][]) {
   return { valid: validRight / items.length, tier: tierRight / items.length };
 }
 
-const human = readLabels();
+const human = readLabels(LABELS);
+const claude = readLabels(CLAUDE_LABELS);
+for (const phrase of human.keys()) claude.delete(phrase);
 const pc = readPcVerdicts();
-for (const phrase of human.keys()) pc.delete(phrase);
+for (const phrase of [...human.keys(), ...claude.keys()]) pc.delete(phrase);
 const starter = bootstrapExamples(STARTER_COUNT, 7, WEIGHT.starter).filter(
-  (e) => !human.has(e.words.join(' ')) && !pc.has(e.words.join(' ')),
+  (e) => !human.has(e.words.join(' ')) && !claude.has(e.words.join(' ')) && !pc.has(e.words.join(' ')),
 );
 
 const toExamples = (entries: [string, Tier][], weight: number): Example[] =>
@@ -92,27 +96,39 @@ const toExamples = (entries: [string, Tier][], weight: number): Example[] =>
 const humanAll = [...human];
 const humanTest = humanAll.filter(([p]) => heldOut(p));
 const humanTrain = humanAll.filter(([p]) => !heldOut(p));
+const claudeAll = [...claude];
+const claudeTest = claudeAll.filter(([p]) => heldOut(p));
+const claudeTrain = claudeAll.filter(([p]) => !heldOut(p));
 const pcExamples = toExamples([...pc], WEIGHT.pc);
-const trainedOn = { human: human.size, pc: pc.size, starter: starter.length };
+const trainedOn = { human: human.size, claude: claude.size, pc: pc.size, starter: starter.length };
 
-console.log(`Training data: ${human.size} labels from you, ${pc.size} PC-judge verdicts, ${starter.length} generated.`);
+console.log(
+  `Training data: ${human.size} labels from you, ${claude.size} from Claude, ${pc.size} PC-judge verdicts, ${starter.length} generated.`,
+);
 
 const metrics: Record<string, number> = {};
-if (humanTest.length >= 10) {
-  const trial = trainModel([...toExamples(humanTrain, WEIGHT.human), ...pcExamples, ...starter], trainedOn);
-  const { valid, tier } = accuracy(trial, humanTest);
-  metrics.heldOutValid = Math.round(valid * 1000) / 1000;
-  metrics.heldOutTier = Math.round(tier * 1000) / 1000;
-  metrics.heldOutCount = humanTest.length;
+const trial = trainModel(
+  [...toExamples(humanTrain, WEIGHT.human), ...toExamples(claudeTrain, WEIGHT.claude), ...pcExamples, ...starter],
+  trainedOn,
+);
+const report = (name: string, key: string, items: [string, Tier][]) => {
+  const { valid, tier } = accuracy(trial, items);
+  metrics[`${key}Valid`] = Math.round(valid * 1000) / 1000;
+  metrics[`${key}Tier`] = Math.round(tier * 1000) / 1000;
+  metrics[`${key}Count`] = items.length;
   console.log(
-    `Held-out labels (${humanTest.length}): ${(valid * 100).toFixed(0)}% right on valid/invalid, ` +
+    `Held-out ${name} (${items.length}): ${(valid * 100).toFixed(0)}% right on valid/invalid, ` +
       `${(tier * 100).toFixed(0)}% on the exact tier.`,
   );
-} else {
-  console.log(`Held-out check skipped: it needs at least ~70 labels from you (have ${human.size}).`);
-}
+};
+if (humanTest.length >= 10) report('labels from you', 'heldOut', humanTest);
+else console.log(`Held-out check of your labels skipped: it needs at least ~70 of them (have ${human.size}).`);
+if (claudeTest.length >= 10) report("Claude's labels", 'claudeHeldOut', claudeTest);
 
-const model = trainModel([...toExamples(humanAll, WEIGHT.human), ...pcExamples, ...starter], trainedOn);
+const model = trainModel(
+  [...toExamples(humanAll, WEIGHT.human), ...toExamples(claudeAll, WEIGHT.claude), ...pcExamples, ...starter],
+  trainedOn,
+);
 
 const evalSet = (JSON.parse(readFileSync(EVAL, 'utf8')) as { phrase: string; expect: string }[]).filter(
   (p) => usable(p.phrase),

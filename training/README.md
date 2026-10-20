@@ -7,6 +7,7 @@ Everything here is written by the PC judge while you play, and read by
 |---|---|---|
 | `labels.jsonl` | you tap a tier on the labelling screen, or "Wrong?" on a verdict in a level | the most trusted training data |
 | `pc-verdicts.json` | the PC judge (Gemma) grades a phrase | the PC judge's memory, and examples the built-in judge learns to copy |
+| `claude-labels.jsonl` | Claude labelled 500 phrases with the judge's rubric (`source: "claude"`) | training at 0.8 the weight of yours; where you labelled the same phrase, yours wins |
 
 Each line of `labels.jsonl` is one label:
 
@@ -32,5 +33,5 @@ npm run train:judge
 ```
 
 It takes a few seconds, prints how often the new model agrees with labels it
-didn't train on (once you have about 70 labels), and writes
+didn't train on (yours once you have about 70, and Claude's), and writes
 `src/data/judgeModel.json`. Reload the game to use it.

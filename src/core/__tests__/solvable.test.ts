@@ -1,35 +1,35 @@
-import { entryWords } from '../game';
-import { isGrammatical } from '../grammar';
-import { playLevel } from '../levelBot';
+import { createGame, entryWords, gameReducer } from '../game';
+import { localVerdict } from '../localJudge';
+import { decodeProof, proofProblem } from '../proof';
 import type { LevelDef } from '../types';
 import generatedDailies from '../../data/dailies.generated.json';
 import { LEVELS } from '../../data/levels';
+import generatedProofs from '../../data/proofs.generated.json';
 import { TUTORIAL } from '../../data/tutorial';
 
-// Every generated board has an answer a person would write: the careful bot
-// clears its own deal in plain English with a swap to spare (the generator's
-// check, src/core/levelGen.ts). Fails if the data goes stale against the
-// grammar, the bot or the dealing rules; regenerate with npm run
-// generate:levels, or npm run generate:dailies -- --from <tomorrow>.
+// Every generated board has an answer a person would write: its proof (the
+// bot's moves when it was generated, src/core/proof.ts) clears its own deal
+// in plain English with a swap to spare, and the built-in judge passes every
+// line. Proofs don't depend on the judge's model, so retraining it never
+// breaks this; changing the grammar or the dealing rules can, and then the
+// boards need regenerating (npm run generate:levels, or npm run
+// generate:dailies -- --from <tomorrow>).
 
-function expectSolvable(level: LevelDef) {
-  const run = playLevel(level, 'careful');
-  expect(run.solved).toBe(true);
-  expect(run.swapsUsed).toBeLessThan(level.swaps);
-  for (const entry of run.state.entries) {
-    expect(isGrammatical(entryWords(run.state, entry)!, { strict: true })).toBe(true);
-  }
-}
-
-describe.each(LEVELS.slice(TUTORIAL.length).map((level) => [level.id, level] as const))('%s', (_, level) => {
-  it('can be cleared in plain English with a swap to spare', () => expectSolvable(level));
-});
-
-// Days dealt with balanced hands (the two before were played already and keep
-// their old deal). Every fourth one, to keep the tests quick: a change that
-// breaks boards breaks most of them.
+const proofs = generatedProofs.proofs as Record<string, string>;
+// Days dealt with balanced hands (the two before were played already and keep their old deal).
 const dailies = (generatedDailies.levels as unknown as LevelDef[]).filter((level) => level.draw === 2);
+const boards = [...LEVELS.slice(TUTORIAL.length), ...dailies];
 
-describe.each(dailies.filter((_, i) => i % 4 === 0).map((level) => [level.id, level] as const))('%s', (_, level) => {
-  it('can be cleared in plain English with a swap to spare', () => expectSolvable(level));
+describe.each(boards.map((level) => [level.id, level] as const))('%s', (id, level) => {
+  it('has a proof that clears it in plain English with a swap to spare', () => {
+    expect(proofs[id]).toBeDefined();
+    expect(proofProblem(level, proofs[id])).toBeNull();
+  });
+
+  it("passes the built-in judge on the proof's lines", () => {
+    const state = decodeProof(proofs[id] ?? '').reduce(gameReducer, createGame(level));
+    for (const entry of state.entries) {
+      expect(localVerdict({ id: entry.id, words: entryWords(state, entry) ?? [] }).valid).toBe(true);
+    }
+  });
 });

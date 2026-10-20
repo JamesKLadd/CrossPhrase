@@ -123,6 +123,10 @@ Study App's training kit) on the NVIDIA desktop.
   npm run generate:levels    # about half an hour (the hard bands search longest)
   ```
 
+  Each board's **proof** (the bot's winning moves) goes into
+  `src/data/proofs.generated.json`, which the app never loads; a test replays
+  every proof, so a board with no plain-English answer can't ship, and
+  retraining the judge can't break one.
   Regenerating after changing word lists, the built-in judge or the knobs in
   `src/core/config.ts` (draw weighting, `LEVEL_BANDS`, `STAR_BASELINE`) can
   change every level, so do it on purpose and commit the result.

@@ -70,7 +70,10 @@ Docs: https://docs.expo.dev/eas/index.md
   accepts, so every level has a real-English answer; keep it that way, and
   keep the built-in judge passing every grammatical line. Never change how an
   existing board deals (`drawTile` in `src/core/game.ts`): a new dealing rule
-  gets a new `draw` version, since old runs must replay identically. Changing word lists, the built-in judge model, `LEVEL_BANDS` or other
+  gets a new `draw` version, since old runs must replay identically. Each
+  generated board's proof (the bot's moves, `src/core/proof.ts`) is in
+  `src/data/proofs.generated.json`, written by the generators and replayed
+  by `solvable.test.ts`; never import it into the app or the server bundle. Changing word lists, the built-in judge model, `LEVEL_BANDS` or other
   knobs in `src/core/config.ts` changes what the generator makes, so only
   regenerate deliberately (it reshuffles levels players have already seen).
 - Every game records a run log (`src/core/run.ts`); `replayRun` rebuilds a
